@@ -18,6 +18,8 @@ hermes/kline_cache/
 hermes/crawl_data/
 hermes/downloads/
 downloads/
+hermes/scripts/~/.hermes/
+**/~/.hermes/
 
 # ---- 历史审计 / 优化产物（巨型，非代码）----
 hermes/smc_audit/
@@ -53,7 +55,10 @@ hermes/smc_monitor/*.json
 hermes/smc_monitor/*.bak*
 hermes/smc_monitor/*.txt
 
-# ---- 本机环境 / IDE ----
+# ---- 本机环境 / IDE / 敏感脚本 ----
 .idea/
 .vscode/
 *.log
+hermes/scripts/list_all_secrets.py
+hermes/scripts/~/
+**/list_all_secrets*.py
