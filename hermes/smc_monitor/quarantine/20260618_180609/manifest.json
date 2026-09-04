@@ -1,0 +1,11 @@
+{
+  "created_at": "2026-06-18T18:06:09",
+  "backup_dir": "/root/.hermes/smc_monitor/backups/20260618_180609_pre_quarantine",
+  "reason": "Physical quarantine of historical/diagnostic closed samples so production review metrics only use PRODUCTION_CLEAN rows.",
+  "archived_closed_positions": 0,
+  "archived_reviews": 0,
+  "archived_ledger_rows": 0,
+  "kept_positions": 140,
+  "kept_reviews": 8,
+  "kept_ledger_rows": 146
+}

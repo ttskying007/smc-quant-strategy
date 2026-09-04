@@ -1,0 +1,142 @@
+{
+  "generated_at": "2026-07-06T00:15:24",
+  "active_version": "V185",
+  "engine": "/root/.hermes/scripts/v25/v185_daily_rematerialize.py",
+  "steps": [
+    {
+      "cmd": "python3 smc_daily_ops.py",
+      "returncode": 0,
+      "stdout": "01350\",\n    \"no_write\": true,\n    \"production_write\": false,\n    \"frontend_write\": false,\n    \"watchlist_write\": false,\n    \"dry_source\": \"/root/.hermes/smc_audit/v164_corrected_scanner_dry_run_20260622/v164_dryrun_rows.json\",\n    \"latest_market_date\": \"20260703\",\n    \"dry_recent45_rows\": 1827,\n    \"raw_rule_rows\": 0,\n    \"dedup_rule_rows\": 0,\n    \"duplicate_symbol_entry_keys\": 0,\n    \"expired_rows\": 0,\n    \"overlap_rows\": 0,\n    \"time_order_bad_count\": 0,\n    \"active_outcome_pollution\": 0,\n    \"new_actionable_rows\": 0,\n    \"selector_fields\": [\n      \"market_state\",\n      \"v132_bull_count_3\",\n      \"v132_post_zone_pullback_depth_pct_3\",\n      \"v231_prev_market_date\",\n      \"v231_all_strong1_pct\",\n      \"poi_source\",\n      \"event_type\",\n      \"risk_pct\",\n      \"entry_chase_above_zone_pct\",\n      \"bars_since_entry\"\n    ],\n    \"selector_leak_fields\": [],\n    \"history_key_counts\": {\n      \"v185_trades\": 334,\n      \"v185_active\": 6,\n      \"v231_combined_history\": 541\n    },\n    \"new_actionable_symbols\": [],\n    \"decision\": \"V231_NO_CURRENT_ACTIONABLE_ROWS__KEEP_SHADOW_MONITORING_NO_WRITE\"\n  },\n  \"v236_shadow_summary\": {\n    \"version\": \"V236_DAILY_CURRENT_SHADOW_AUDIT\",\n    \"generated_at\": \"2026-07-06T00:14:08\",\n    \"out_dir\": \"/root/.hermes/smc_audit/v236_daily_current_shadow_audit_no_write_20260706_001408\",\n    \"no_write\": true,\n    \"production_write\": false,\n    \"frontend_write\": false,\n    \"watchlist_write\": false,\n    \"dry_source\": \"/root/.hermes/smc_audit/v164_corrected_scanner_dry_run_20260622/v164_dryrun_rows.json\",\n    \"latest_market_date\": \"20260703\",\n    \"dry_recent45_rows\": 1827,\n    \"raw_rule_rows\": 0,\n    \"dedup_rule_rows\": 0,\n    \"duplicate_symbol_entry_keys\": 0,\n    \"expired_rows\": 0,\n    \"overlap_rows\": 0,\n    \"time_order_bad_count\": 0,\n    \"active_outcome_pollution\": 0,\n    \"new_actionable_rows\": 0,\n    \"selector_fields\": [\n      \"market_state\",\n      \"event_type\",\n      \"poi_source\",\n      \"v132_bull_count_3\",\n      \"v132_post_zone_pullback_depth_pct_3\",\n      \"v236_prev_market_date\",\n      \"v236_all_strong1_pct\",\n      \"v236_breadth_date\",\n      \"v236_br_above_ma20\",\n      \"bars_since_entry\"\n    ],\n    \"selector_leak_fields\": [],\n    \"history_key_counts\": {\n      \"v185_trades\": 334,\n      \"v185_active\": 6,\n      \"v231_combined_history\": 541\n    },\n    \"new_actionable_symbols\": [],\n    \"decision\": \"V236_NO_CURRENT_ACTIONABLE_ROWS__KEEP_SHADOW_MONITORING_NO_WRITE\"\n  },\n  \"v246_shadow_summary\": {\n    \"version\": \"V246_DAILY_CURRENT_SHADOW_AUDIT\",\n    \"generated_at\": \"2026-07-06T00:15:23\",\n    \"out_dir\": \"/root/.hermes/smc_audit/v246_daily_current_shadow_audit_no_write_20260706_001523\",\n    \"no_write\": true,\n    \"production_write\": false,\n    \"frontend_write\": false,\n    \"watchlist_write\": false,\n    \"dry_source\": \"/root/.hermes/smc_audit/v164_corrected_scanner_dry_run_20260622/v164_dryrun_rows.json\",\n    \"latest_market_date\": \"20260703\",\n    \"dry_recent45_rows\": 1827,\n    \"parent_raw_rule_rows\": 0,\n    \"raw_rule_rows\": 0,\n    \"dedup_rule_rows\": 0,\n    \"duplicate_symbol_entry_keys\": 0,\n    \"expired_rows\": 0,\n    \"overlap_rows\": 0,\n    \"time_order_bad_count\": 0,\n    \"active_outcome_pollution\": 0,\n    \"new_actionable_rows\": 0,\n    \"selector_fields\": [\n      \"market_state\",\n      \"event_type\",\n      \"poi_source\",\n      \"v132_bull_count_3\",\n      \"v132_post_zone_pullback_depth_pct_3\",\n      \"entry_chase_above_zone_pct\",\n      \"v246_prev_market_date\",\n      \"v236_all_strong1_pct\",\n      \"v246_breadth_date\",\n      \"v236_br_above_ma20\",\n      \"v244_industry\",\n      \"v244_industry_prev_date\",\n      \"v244_ind_strong1_pct\",\n      \"v244_ind_up1_pct\",\n      \"v244_ind_vs_all_strong1\",\n      \"bars_since_entry\"\n    ],\n    \"selector_leak_fields\": [],\n    \"history_key_counts\": {\n      \"v185_trades\": 334,\n      \"v185_active\": 6,\n      \"v231_history\": 541,\n      \"v236_history\": 558,\n      \"v246_history\": 573\n    },\n    \"new_actionable_symbols\": [],\n    \"decision\": \"V246_NO_CURRENT_ACTIONABLE_ROWS__KEEP_SHADOW_MONITORING_NO_WRITE\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "python3 v185_daily_rematerialize.py",
+      "returncode": 0,
+      "stdout": "{\"ok\": true, \"version\": \"V185\", \"engine\": \"V185_COMBINED_V175_PLUS_TRUE_TAKEOVER_CHILD\", \"generated_at\": \"2026-07-06T00:15:24\", \"trades\": 334, \"active_picks\": 6, \"metrics\": {\"n\": 334, \"wr\": 86.23, \"avg\": 6.5628, \"min_year_n\": 41, \"year_counts\": {\"2026\": 41, \"2025\": 104, \"2024\": 125, \"2023\": 64}, \"year_wr\": {\"2023\": 82.81, \"2024\": 87.2, \"2025\": 86.54, \"2026\": 87.8}, \"all_year_wr_min\": 82.81, \"micro_profit_pct\": 0.9, \"same_day_exit_violations\": 0, \"exit_counts\": {\"TIME\": 66, \"TP\": 160, \"GAP_SL\": 2, \"SL\": 26, \"RUNNER_TIME_CLOSE\": 63, \"BE_SL\": 13, \"GAP_BE_SL\": 4}, \"total_pnl\": 2191.9668, \"cum_pnl\": 2191.9668}, \"active_outcome_pollution\": 0, \"artifacts\": {\"trades\": \"/root/.hermes/smc_opt_v185_combined_production_candidate/v185_trades.json\", \"active\": \"/root/.hermes/smc_opt_v185_combined_production_candidate/v185_active_picks.json\", \"picks\": \"/root/.hermes/smc_opt_v185_combined_production_candidate/v185_picks.json\", \"report\": \"/root/.hermes/smc_opt_v185_combined_production_candidate/v185_report.json\"}}\n",
+      "stderr": ""
+    }
+  ],
+  "report": {
+    "version": "V185",
+    "engine": "V185_COMBINED_V175_PLUS_TRUE_TAKEOVER_CHILD",
+    "decision": "V185_DAILY_REMATERIALIZE_PASS",
+    "generated_at": "2026-06-26T09:58:08",
+    "source_v185_formal": "/root/.hermes/smc_audit/v185_formal_candidate_v175_plus_child_20260626_001218",
+    "source_v204_shadow": "/root/.hermes/smc_audit/v204_v185_shadow_materialization_no_write_20260626_064406",
+    "production_write": true,
+    "frontend_write": true,
+    "watchlist_write": true,
+    "production_stats": {
+      "n": 334,
+      "wr": 86.23,
+      "avg": 6.5628,
+      "min_year_n": 41,
+      "year_counts": {
+        "2026": 41,
+        "2025": 104,
+        "2024": 125,
+        "2023": 64
+      },
+      "year_wr": {
+        "2023": 82.81,
+        "2024": 87.2,
+        "2025": 86.54,
+        "2026": 87.8
+      },
+      "all_year_wr_min": 82.81,
+      "micro_profit_pct": 0.9,
+      "same_day_exit_violations": 0,
+      "exit_counts": {
+        "TIME": 66,
+        "TP": 160,
+        "GAP_SL": 2,
+        "SL": 26,
+        "RUNNER_TIME_CLOSE": 63,
+        "BE_SL": 13,
+        "GAP_BE_SL": 4
+      },
+      "total_pnl": 2191.9668,
+      "cum_pnl": 2191.9668
+    },
+    "metrics": {
+      "n": 334,
+      "wr": 86.23,
+      "avg": 6.5628,
+      "min_year_n": 41,
+      "year_counts": {
+        "2026": 41,
+        "2025": 104,
+        "2024": 125,
+        "2023": 64
+      },
+      "year_wr": {
+        "2023": 82.81,
+        "2024": 87.2,
+        "2025": 86.54,
+        "2026": 87.8
+      },
+      "all_year_wr_min": 82.81,
+      "micro_profit_pct": 0.9,
+      "same_day_exit_violations": 0,
+      "exit_counts": {
+        "TIME": 66,
+        "TP": 160,
+        "GAP_SL": 2,
+        "SL": 26,
+        "RUNNER_TIME_CLOSE": 63,
+        "BE_SL": 13,
+        "GAP_BE_SL": 4
+      },
+      "total_pnl": 2191.9668,
+      "cum_pnl": 2191.9668
+    },
+    "n_trades": 334,
+    "total_trades": 334,
+    "win_rate": 86.23,
+    "avg_pnl": 6.5628,
+    "active_pick_count": 6,
+    "active_by_entry_date": {
+      "20260616": 3,
+      "20260615": 2,
+      "20260610": 1
+    },
+    "active_outcome_pollution": 0,
+    "historical_same_day_exit": 0,
+    "contract": "V175 baseline + non-overlap V185 true-takeover runner child; selector non-leaking; T+1 enforced",
+    "latest_market_date": "20260616",
+    "promotion_gate": {
+      "n>=260": true,
+      "min_year_n>=40": true,
+      "WR>=84": true,
+      "AvgPnL>=6.2": true,
+      "all_year_WR_min>=82": true,
+      "micro_profit_pct<=1": true,
+      "T+1=0": true
+    },
+    "total_pnl": 2191.9668,
+    "last_rematerialized_at": "2026-07-06T00:15:24",
+    "cron_productionized": true,
+    "daily_rematerialize_script": "/root/.hermes/scripts/v25/v185_daily_rematerialize.py"
+  },
+  "release_gate": {},
+  "closed_loop_summary": {},
+  "issue_counts": {},
+  "smoke": {
+    "/api/summary": {
+      "ok": true,
+      "bytes": 1655,
+      "has_traceback": false
+    },
+    "/api/autopsy/closed-loop": {
+      "ok": true,
+      "bytes": 2,
+      "has_traceback": false
+    },
+    "/api/picks": {
+      "ok": true,
+      "bytes": 20846,
+      "has_traceback": false
+    }
+  },
+  "next_action_hint": "If WR falls, analyze losses by family/zone/conf/BQ/trend; if SOLD_EARLY dominates, classify original-runner vs new setup; create next Vxx only after full audit passes."
+}

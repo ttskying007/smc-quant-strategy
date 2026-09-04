@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-07-16T00:04:29",
+  "active_version": "V88",
+  "engine": "/root/.hermes/scripts/v25/v88_apply_production_contract.py",
+  "steps": [
+    {
+      "cmd": "python3 smc_daily_ops.py",
+      "returncode": 0,
+      "stdout": "{\n  \"ok\": true,\n  \"version\": null,\n  \"pipeline_state\": \"EMPTY_BOOK\",\n  \"buy_enabled\": false,\n  \"active_buy_valid_count\": 0,\n  \"data_epoch\": {\n    \"valid\": true,\n    \"epoch_id\": \"20260716T000108_134876\",\n    \"market_date\": \"20260715\",\n    \"status\": \"COMMITTED\"\n  },\n  \"log\": \"/root/.hermes/smc_monitor/ops_logs/20260716.json\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "python3 v88_apply_production_contract.py",
+      "returncode": 0,
+      "stdout": "19.17,\n      \"avg_rr\": 3.827,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 15.38,\n      \"avg_mfe_r\": 6.935,\n      \"avg_mae_r\": -0.8198\n    }\n  },\n  \"by_market_state\": {\n    \"ACCUMULATION\": {\n      \"n\": 21,\n      \"wr\": 76.19,\n      \"avg_pnl\": 2.1021,\n      \"cum\": 44.14,\n      \"avg_rr\": 2.25,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 19.05,\n      \"avg_mfe_r\": 8.4719,\n      \"avg_mae_r\": -0.7984\n    },\n    \"BULL_CONTINUATION\": {\n      \"n\": 166,\n      \"wr\": 85.54,\n      \"avg_pnl\": 3.4105,\n      \"cum\": 566.14,\n      \"avg_rr\": 2.8822,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 13.86,\n      \"avg_mfe_r\": 5.7334,\n      \"avg_mae_r\": -0.2974\n    },\n    \"MIXED\": {\n      \"n\": 265,\n      \"wr\": 81.51,\n      \"avg_pnl\": 2.9039,\n      \"cum\": 769.53,\n      \"avg_rr\": 3.1319,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 14.72,\n      \"avg_mfe_r\": 5.5122,\n      \"avg_mae_r\": -0.5763\n    },\n    \"RECOVERY\": {\n      \"n\": 80,\n      \"wr\": 65.0,\n      \"avg_pnl\": 1.5742,\n      \"cum\": 125.93,\n      \"avg_rr\": 2.8274,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 26.25,\n      \"avg_mfe_r\": 3.7775,\n      \"avg_mae_r\": -1.577\n    }\n  },\n  \"by_path\": {\n    \"CONTINUATION_EXPANDED_HOLD_ABOVE_POI\": {\n      \"n\": 267,\n      \"wr\": 78.65,\n      \"avg_pnl\": 2.7574,\n      \"cum\": 736.22,\n      \"avg_rr\": 2.816,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 17.98,\n      \"avg_mfe_r\": 5.3628,\n      \"avg_mae_r\": -0.7202\n    },\n    \"MIXED_ACCUMULATION_HOLD_ABOVE_POI\": {\n      \"n\": 265,\n      \"wr\": 81.51,\n      \"avg_pnl\": 2.9039,\n      \"cum\": 769.53,\n      \"avg_rr\": 3.1319,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 14.72,\n      \"avg_mfe_r\": 5.5122,\n      \"avg_mae_r\": -0.5763\n    }\n  },\n  \"by_mtf_score\": {\n    \"0\": {\n      \"n\": 1,\n      \"wr\": 0.0,\n      \"avg_pnl\": -1.7604,\n      \"cum\": -1.76,\n      \"avg_rr\": 5.2041,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 100.0,\n      \"avg_mfe_r\": 0.7865,\n      \"avg_mae_r\": -1.2216\n    },\n    \"1\": {\n      \"n\": 63,\n      \"wr\": 76.19,\n      \"avg_pnl\": 2.4005,\n      \"cum\": 151.23,\n      \"avg_rr\": 3.1612,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 20.63,\n      \"avg_mfe_r\": 4.2929,\n      \"avg_mae_r\": -0.8207\n    },\n    \"2\": {\n      \"n\": 247,\n      \"wr\": 78.95,\n      \"avg_pnl\": 2.7405,\n      \"cum\": 676.91,\n      \"avg_rr\": 2.7856,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 17.41,\n      \"avg_mfe_r\": 5.0857,\n      \"avg_mae_r\": -0.7284\n    },\n    \"3\": {\n      \"n\": 221,\n      \"wr\": 82.81,\n      \"avg_pnl\": 3.0741,\n      \"cum\": 679.37,\n      \"avg_rr\": 3.1197,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 13.57,\n      \"avg_mfe_r\": 6.1773,\n      \"avg_mae_r\": -0.5076\n    }\n  },\n  \"by_exit_reason\": {\n    \"RUNNER_TRAIL\": {\n      \"n\": 380,\n      \"wr\": 100.0,\n      \"avg_pnl\": 4.0407,\n      \"cum\": 1535.46,\n      \"avg_rr\": 2.4661,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 0.0,\n      \"avg_mfe_r\": 4.2019,\n      \"avg_mae_r\": -0.1252\n    },\n    \"SL_HIT\": {\n      \"n\": 87,\n      \"wr\": 0.0,\n      \"avg_pnl\": -1.8325,\n      \"cum\": -159.43,\n      \"avg_rr\": 4.6262,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 100.0,\n      \"avg_mfe_r\": 1.3982,\n      \"avg_mae_r\": -1.6079\n    },\n    \"TIME_STOP\": {\n      \"n\": 65,\n      \"wr\": 70.77,\n      \"avg_pnl\": 1.9958,\n      \"cum\": 129.73,\n      \"avg_rr\": 3.7271,\n      \"low_rr_rate\": 0.0,\n      \"sl_rate\": 0.0,\n      \"avg_mfe_r\": 18.0649,\n      \"avg_mae_r\": -2.4237\n    }\n  },\n  \"field_audit\": {\n    \"engine\": 0,\n    \"pick_date\": 0,\n    \"join_date\": 0,\n    \"zone_type\": 0,\n    \"zone_low\": 0,\n    \"zone_high\": 0,\n    \"cost_line\": 0,\n    \"volatility_pct\": 0,\n    \"entry_price\": 0,\n    \"sl\": 0,\n    \"tp1\": 0,\n    \"tp2\": 0,\n    \"tp3\": 0,\n    \"rr\": 0,\n    \"rr_realized\": 0,\n    \"exit_legs\": 0,\n    \"mfe_r\": 0,\n    \"mae_r\": 0,\n    \"weekly_state\": 0,\n    \"daily_state\": 0,\n    \"m60_state\": 0,\n    \"mtf_score\": 0\n  },\n  \"execution_repair_count\": 114,\n  \"t1_violation_count\": 0,\n  \"missing_contract_keys\": [],\n  \"production_gate\": {\n    \"total_ge_500\": true,\n    \"field_missing_zero\": true,\n    \"t1_zero\": true,\n    \"low_rr_zero\": true,\n    \"year_min_ge_50_and_wr_ge_65\": true\n  }\n}\n",
+      "stderr": ""
+    }
+  ],
+  "report": {},
+  "release_gate": {},
+  "closed_loop_summary": {},
+  "issue_counts": {},
+  "smoke": {
+    "/api/summary": {
+      "ok": true,
+      "bytes": 2004,
+      "has_traceback": false
+    },
+    "/api/autopsy/closed-loop": {
+      "ok": true,
+      "bytes": 2,
+      "has_traceback": false
+    },
+    "/api/picks": {
+      "ok": true,
+      "bytes": 2,
+      "has_traceback": false
+    }
+  },
+  "next_action_hint": "If WR falls, analyze losses by family/zone/conf/BQ/trend; if SOLD_EARLY dominates, classify original-runner vs new setup; create next Vxx only after full audit passes."
+}

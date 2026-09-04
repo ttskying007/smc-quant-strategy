@@ -1,0 +1,112 @@
+{
+  "version": "V670_RESUMABLE_SOURCE_BUILD_PROGRESS",
+  "updated_at": "2026-08-03T20:54:31",
+  "database": "/root/.hermes/smc_source/v670_institutional_survey/source.sqlite3",
+  "partitions": {
+    "2023": {
+      "count": 599963,
+      "pages": 12000,
+      "committed_pages": 186,
+      "committed_raw_rows": 9300,
+      "remaining_pages": 11814
+    },
+    "2024": {
+      "count": 393071,
+      "pages": 7862,
+      "committed_pages": 1,
+      "committed_raw_rows": 50,
+      "remaining_pages": 7861
+    },
+    "2025": {
+      "count": 342443,
+      "pages": 6849,
+      "committed_pages": 1,
+      "committed_raw_rows": 50,
+      "remaining_pages": 6848
+    }
+  },
+  "query_failures": [
+    {
+      "year": 2023,
+      "page": 70,
+      "error": "year=2023 page=70: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 72,
+      "error": "year=2023 page=72: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 75,
+      "error": "year=2023 page=75: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 92,
+      "error": "year=2023 page=92: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 93,
+      "error": "year=2023 page=93: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 96,
+      "error": "year=2023 page=96: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 102,
+      "error": "year=2023 page=102: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 119,
+      "error": "year=2023 page=119: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 128,
+      "error": "year=2023 page=128: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 137,
+      "error": "year=2023 page=137: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 138,
+      "error": "year=2023 page=138: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 152,
+      "error": "year=2023 page=152: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 163,
+      "error": "year=2023 page=163: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 172,
+      "error": "year=2023 page=172: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 180,
+      "error": "year=2023 page=180: 服务器繁忙"
+    },
+    {
+      "year": 2023,
+      "page": 183,
+      "error": "year=2023 page=183: 服务器繁忙"
+    }
+  ],
+  "complete": false,
+  "outcome_read": false
+}

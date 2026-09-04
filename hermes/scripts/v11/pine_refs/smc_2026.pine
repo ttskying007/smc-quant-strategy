@@ -1,0 +1,1247 @@
+//@version=6
+indicator("Smart Money Concepts 2026", overlay=true, max_boxes_count=500, max_labels_count=500, max_lines_count=500)
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// INPUT PARAMETERS
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+// UNIVERSAL ZONE HEIGHT SETTINGS
+use_normalized_zones = input.bool(true, "🎯 Normalize All Zone Heights", group="🎯 Universal Zone Settings", tooltip="Make all zones equal height for clean visual")
+zone_height_method = input.string("ATR Based", "Zone Height Method", options=["ATR Based", "Fixed Percentage"], group="🎯 Universal Zone Settings")
+zone_height_atr_mult = input.float(0.75, "Zone Height (ATR Multiplier)", minval=0.1, maxval=3.0, step=0.05, group="🎯 Universal Zone Settings", tooltip="All zones will be this many ATRs tall")
+zone_height_percent = input.float(0.3, "Zone Height (% of Price)", minval=0.05, maxval=2.0, step=0.05, group="🎯 Universal Zone Settings", tooltip="All zones will be this % of current price")
+
+// Market Structure
+swing_length = input.int(5, "Swing Length", minval=3, maxval=50, group="📊 Market Structure")
+show_bos = input.bool(true, "Show BOS", group="📊 Market Structure")
+show_choch = input.bool(true, "Show CHOCH", group="📊 Market Structure")
+show_mss = input.bool(false, "Show MSS (Early Warning)", group="📊 Market Structure")
+
+// Order Blocks
+show_order_blocks = input.bool(true, "Show Order Blocks", group="📦 Order Blocks")
+ob_swing_length = input.int(7, "OB Swing Detection Length", minval=3, maxval=20, group="📦 Order Blocks")
+ob_lookback = input.int(10, "OB Lookback", minval=5, maxval=50, group="📦 Order Blocks")
+ob_displacement_mult = input.float(1.5, "OB Displacement Multiplier", minval=0.5, maxval=5.0, step=0.1, group="📦 Order Blocks")
+max_obs = input.int(10, "Max Order Blocks", minval=1, maxval=10, group="📦 Order Blocks")
+show_ob_info = input.bool(true, "Show OB Info Labels", group="📦 Order Blocks")
+ob_info_size = input.string("Large", "OB Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="📦 Order Blocks")
+
+// Breaker Blocks
+show_breaker_blocks = input.bool(false, "Show Breaker Blocks", group="🔄 Breaker Blocks")
+bb_swing_length = input.int(10, "BB Swing Detection Length", minval=2, maxval=20, group="🔄 Breaker Blocks")
+bb_use_displacement = input.bool(true, "BB Displacement Filter", group="🔄 Breaker Blocks")
+bb_displacement_mult = input.float(2.6, "BB Displacement Multiplier", minval=0.5, maxval=5.0, step=0.1, group="🔄 Breaker Blocks")
+bb_invalidation = input.string("Close", "BB Invalidation Method", options=["Close", "Wick"], group="🔄 Breaker Blocks")
+max_bbs = input.int(5, "Max Breaker Blocks", minval=1, maxval=50, group="🔄 Breaker Blocks")
+show_bb_info = input.bool(true, "Show BB Info Labels", group="🔄 Breaker Blocks")
+
+// Fair Value Gaps
+show_fvg = input.bool(true, "Show Fair Value Gaps", group="⚡ Fair Value Gaps")
+fvg_use_atr = input.bool(true, "FVG ATR Filter", group="⚡ Fair Value Gaps")
+fvg_atr_mult = input.float(0.5, "FVG ATR Multiplier", minval=0.1, maxval=3.0, step=0.1, group="⚡ Fair Value Gaps")
+fvg_mitigation = input.string("50% Fill", "FVG Mitigation Type", options=["Touch", "Full Fill", "50% Fill"], group="⚡ Fair Value Gaps")
+max_fvgs = input.int(5, "Max FVGs", minval=1, maxval=100, group="⚡ Fair Value Gaps")
+show_fvg_info = input.bool(true, "Show FVG Info Labels", group="⚡ Fair Value Gaps")
+fvg_label_size = input.string("Small", "FVG Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="⚡ Fair Value Gaps")
+fvg_info_size = input.string("Large", "FVG Info Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="⚡ Fair Value Gaps")
+
+// Premium & Discount
+show_premium_discount = input.bool(true, "Show Premium/Discount Zones", group="💎 Premium & Discount")
+
+// Liquidity (EQH/EQL - UAlgo Logic)
+show_liquidity = input.bool(true, "Show Equal Highs/Lows", group="💧 Liquidity")
+eqhl_pivot_length = input.int(4, "EQH/EQL Pivot Length", minval=1, maxval=20, group="💧 Liquidity")
+eqhl_atr_length = input.int(200, "EQH/EQL ATR Length", minval=1, group="💧 Liquidity")
+eqhl_threshold = input.float(0.10, "EQH/EQL Threshold", minval=0, maxval=1.0, step=0.01, group="💧 Liquidity")
+eqhl_wait_confirmation = input.bool(true, "Wait For Confirmation", group="💧 Liquidity")
+
+// Strength Rating
+enable_strength_rating = input.bool(true, "Enable Strength Rating", group="⭐ Strength Rating")
+min_strength_filter = input.float(3.0, "Minimum Strength Filter", minval=0.0, maxval=10.0, step=0.5, group="⭐ Strength Rating")
+
+// Visualization
+show_legend = input.bool(true, "Show Legend", group="🎨 Visualization")
+
+// Alerts
+enable_ob_alerts = input.bool(true, "Enable Order Block Alerts", group="🔔 Alerts")
+enable_fvg_alerts = input.bool(true, "Enable FVG Alerts", group="🔔 Alerts")
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// COLOR PALETTE (NORMAL RED/GREEN THEME)
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+// Order Blocks
+bull_ob_color = color.new(#089981, 85)
+bull_ob_border = color.new(#089981, 30)
+bull_ob_text = color.new(#089981, 0)
+
+bear_ob_color = color.new(#f23645, 85)
+bear_ob_border = color.new(#f23645, 30)
+bear_ob_text = color.new(#f23645, 0)
+
+// Breaker Blocks - Lighter
+bull_bb_color = color.new(#089981, 90)
+bull_bb_border = color.new(#089981, 50)
+bull_bb_text = color.new(#089981, 0)
+
+bear_bb_color = color.new(#f23645, 90)
+bear_bb_border = color.new(#f23645, 50)
+bear_bb_text = color.new(#f23645, 0)
+
+// FVG
+bull_fvg_color = color.new(#089981, 85)
+bull_fvg_border = color.new(#089981, 30)
+bull_fvg_text = color.new(#089981, 0)
+
+bear_fvg_color = color.new(#f23645, 85)
+bear_fvg_border = color.new(#f23645, 30)
+bear_fvg_text = color.new(#f23645, 0)
+
+// Premium/Discount
+premium_color = color.new(#f23645, 92)
+equilibrium_color = color.new(#787b86, 95)
+discount_color = color.new(#089981, 92)
+
+// Structure - Clean colors
+bos_bull_color = color.new(color.green, 0)
+bos_bear_color = color.new(color.red, 0)
+choch_bull_color = color.new(color.green, 0)
+choch_bear_color = color.new(color.red, 0)
+mss_color = color.new(color.orange, 0)
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// TYPE DEFINITIONS
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+type OB
+    box b
+    label l
+    label info_label
+    float top
+    float bot
+    int bar_idx
+    bool bullish
+    string session
+    int creation_time
+    float strength
+
+type BreakerBlock
+    int startBar
+    float top
+    float bottom
+    string bbType
+    box boxId
+    label labelId
+    label info_label
+    bool mitigated
+    int mitigatedBar
+    float strength
+
+type FVGData
+    box bx
+    label lbl
+    label info_label
+    float top
+    float bot
+    int bar_idx
+    bool bullish
+    float strength
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// VARIABLES & ARRAYS
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+var array<OB> bull_obs = array.new<OB>()
+var array<OB> bear_obs = array.new<OB>()
+var array<BreakerBlock> g_breakerBlocks = array.new<BreakerBlock>()
+
+var array<box> bullishFVGBoxes = array.new<box>()
+var array<float> bullishFVGTops = array.new<float>()
+var array<float> bullishFVGBottoms = array.new<float>()
+var array<label> bullishFVGLabels = array.new<label>()
+var array<label> bullishFVGInfoLabels = array.new<label>()
+var array<float> bullishFVGStrengths = array.new<float>()
+
+var array<box> bearishFVGBoxes = array.new<box>()
+var array<float> bearishFVGTops = array.new<float>()
+var array<float> bearishFVGBottoms = array.new<float>()
+var array<label> bearishFVGLabels = array.new<label>()
+var array<label> bearishFVGInfoLabels = array.new<label>()
+var array<float> bearishFVGStrengths = array.new<float>()
+
+var float last_swing_high = na
+var float last_swing_low = na
+var int last_swing_high_idx = na
+var int last_swing_low_idx = na
+var int swing_trend = 0
+var int last_bos_bar = -999
+var int last_choch_bar = -999
+var int last_structure_label_bar = -999
+var float last_labeled_high = na
+var float last_labeled_low = na
+
+var box premium_box = na
+var box equilibrium_box = na
+var box discount_box = na
+var label premium_label = na
+var label discount_label = na
+var label equilibrium_label = na
+
+// EQH/EQL Variables (UAlgo Logic)
+var float previousHigh = 0.0
+var int highLocX = 0
+var float previousLow = 0.0
+var int lowLocX = 0
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// UTILITY FUNCTIONS
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+get_session(bar_time) =>
+    hour_utc = hour(bar_time, "GMT")
+    minute_utc = minute(bar_time, "GMT")
+    time_in_minutes = hour_utc * 60 + minute_utc
+    
+    session_name = "Other"
+    
+    if time_in_minutes >= 480 and time_in_minutes < 1020
+        session_name := "London"
+    else if time_in_minutes >= 780 and time_in_minutes < 1320
+        session_name := "NY"
+    else if time_in_minutes >= 0 and time_in_minutes < 540
+        session_name := "Asian"
+    
+    session_name
+
+calc_pips(price_diff) =>
+    pip_value = syminfo.mintick * 10
+    math.round(price_diff / pip_value)
+
+get_text_size(size_str) =>
+    switch size_str
+        "Tiny" => size.tiny
+        "Small" => size.small
+        "Normal" => size.normal
+        "Large" => size.large
+        "Huge" => size.huge
+        => size.normal
+
+// UNIVERSAL ZONE HEIGHT NORMALIZATION
+get_normalized_zone_height(atr_val) =>
+    if use_normalized_zones
+        if zone_height_method == "ATR Based"
+            atr_val * zone_height_atr_mult
+        else
+            close * (zone_height_percent / 100.0)
+    else
+        na
+
+normalize_zone(original_top, original_bottom, is_bullish, atr_val) =>
+    if use_normalized_zones
+        target_height = get_normalized_zone_height(atr_val)
+        original_mid = (original_top + original_bottom) / 2
+        
+        new_top = original_mid + (target_height / 2)
+        new_bottom = original_mid - (target_height / 2)
+        
+        [new_top, new_bottom]
+    else
+        [original_top, original_bottom]
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// STRENGTH RATING FUNCTIONS
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+calculate_ob_strength(displacement, zone_height, session_name, age, atr_val) =>
+    if not enable_strength_rating
+        5.0
+    else
+        disp_score = 0.0
+        if atr_val > 0
+            disp_ratio = displacement / atr_val
+            if disp_ratio >= 3.0
+                disp_score := 3.0
+            else if disp_ratio >= 2.0
+                disp_score := 2.5
+            else if disp_ratio >= 1.5
+                disp_score := 2.0
+            else if disp_ratio >= 1.0
+                disp_score := 1.5
+            else
+                disp_score := 1.0
+        else
+            disp_score := 1.0
+        
+        sess_score = 0.0
+        if session_name == "London" or session_name == "NY"
+            sess_score := 2.0
+        else if session_name == "Asian"
+            sess_score := 1.0
+        else
+            sess_score := 0.5
+        
+        age_score = 0.0
+        if age < 50
+            age_score := 2.0
+        else if age < 100
+            age_score := 1.5
+        else if age < 200
+            age_score := 1.0
+        else
+            age_score := 0.5
+        
+        zone_score = 0.0
+        if atr_val > 0
+            zone_ratio = zone_height / atr_val
+            if zone_ratio >= 0.5 and zone_ratio <= 2.0
+                zone_score := 3.0
+            else if zone_ratio >= 0.3 and zone_ratio <= 3.0
+                zone_score := 2.0
+            else
+                zone_score := 1.0
+        else
+            zone_score := 1.5
+        
+        total = disp_score + sess_score + age_score + zone_score
+        math.min(math.max(total, 0.0), 10.0)
+
+calculate_fvg_strength(gap_size, atr_value) =>
+    if not enable_strength_rating
+        5.0
+    else
+        gap_score = 0.0
+        if atr_value > 0
+            gap_ratio = gap_size / atr_value
+            if gap_ratio >= 1.5
+                gap_score := 8.0
+            else if gap_ratio >= 1.0
+                gap_score := 6.0
+            else if gap_ratio >= 0.75
+                gap_score := 4.5
+            else if gap_ratio >= 0.5
+                gap_score := 3.0
+            else
+                gap_score := 1.5
+        else
+            gap_score := 3.0
+        
+        math.min(math.max(gap_score, 0.0), 10.0)
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// PRECALCULATE FUNCTIONS
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+atr_value = ta.atr(14)
+swing_high_ms = ta.pivothigh(high, swing_length, swing_length)
+swing_low_ms = ta.pivotlow(low, swing_length, swing_length)
+swing_high_ob = ta.pivothigh(high, ob_swing_length, ob_swing_length)
+swing_low_ob = ta.pivotlow(low, ob_swing_length, ob_swing_length)
+pivot_high_bb = ta.pivothigh(high, bb_swing_length, bb_swing_length)
+pivot_low_bb = ta.pivotlow(low, bb_swing_length, bb_swing_length)
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// MARKET STRUCTURE DETECTION (NO DUPLICATES - ONLY 1 LABEL PER BREAK)
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+if barstate.isconfirmed
+    // Update swing highs/lows when new pivots form
+    if not na(swing_high_ms)
+        last_swing_high := swing_high_ms
+        last_swing_high_idx := bar_index - swing_length
+    
+    if not na(swing_low_ms)
+        last_swing_low := swing_low_ms
+        last_swing_low_idx := bar_index - swing_length
+    
+    // ABSOLUTE SINGLE LABEL ENFORCEMENT
+    // Check if we've already labeled this exact swing level
+    bool already_labeled_this_high = not na(last_labeled_high) and not na(last_swing_high) and math.abs(last_swing_high - last_labeled_high) < syminfo.mintick * 5
+    bool already_labeled_this_low = not na(last_labeled_low) and not na(last_swing_low) and math.abs(last_swing_low - last_labeled_low) < syminfo.mintick * 5
+    
+    // Check bullish break (price above last high)
+    if not na(last_swing_high) and close > last_swing_high and bar_index > last_structure_label_bar + 20 and not already_labeled_this_high
+        // Determine label type based on previous trend
+        bool create_label = false
+        string label_text = ""
+        color label_color = color.white
+        
+        if swing_trend == -1 and show_choch
+            // Was bearish, now bullish = CHoCH
+            create_label := true
+            label_text := "CHoCH"
+            label_color := choch_bull_color
+        else if swing_trend == 1 and show_bos
+            // Was bullish, still bullish = BOS
+            create_label := true
+            label_text := "BOS"
+            label_color := bos_bull_color
+        else if swing_trend == 0 and show_bos
+            // Neutral to bullish = BOS
+            create_label := true
+            label_text := "BOS"
+            label_color := bos_bull_color
+        
+        if create_label
+            line.new(last_swing_high_idx, last_swing_high, bar_index, last_swing_high, 
+                 color=label_color, width=2, style=line.style_dashed)
+            label.new(bar_index, last_swing_high, label_text, 
+                 color=color.new(color.black, 100), textcolor=label_color, 
+                 style=label.style_none, size=size.normal)
+            last_structure_label_bar := bar_index
+            last_labeled_high := last_swing_high
+        
+        swing_trend := 1
+    
+    // Check bearish break (price below last low) - ONLY if no bullish break occurred
+    else if not na(last_swing_low) and close < last_swing_low and bar_index > last_structure_label_bar + 20 and not already_labeled_this_low
+        // Determine label type based on previous trend
+        bool create_label = false
+        string label_text = ""
+        color label_color = color.white
+        
+        if swing_trend == 1 and show_choch
+            // Was bullish, now bearish = CHoCH
+            create_label := true
+            label_text := "CHoCH"
+            label_color := choch_bear_color
+        else if swing_trend == -1 and show_bos
+            // Was bearish, still bearish = BOS
+            create_label := true
+            label_text := "BOS"
+            label_color := bos_bear_color
+        else if swing_trend == 0 and show_bos
+            // Neutral to bearish = BOS
+            create_label := true
+            label_text := "BOS"
+            label_color := bos_bear_color
+        
+        if create_label
+            line.new(last_swing_low_idx, last_swing_low, bar_index, last_swing_low, 
+                 color=label_color, width=2, style=line.style_dashed)
+            label.new(bar_index, last_swing_low, label_text, 
+                 color=color.new(color.black, 100), textcolor=label_color, 
+                 style=label.style_none, size=size.normal)
+            last_structure_label_bar := bar_index
+            last_labeled_low := last_swing_low
+        
+        swing_trend := -1
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// ORDER BLOCK DETECTION WITH NORMALIZED ZONES
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+if show_order_blocks and barstate.isconfirmed
+    // Bullish OB
+    if not na(swing_low_ob)
+        bool found = false
+        float ob_top = na
+        float ob_bot = na
+        int ob_bar = na
+        int ob_time_offset = na
+        
+        for i = ob_swing_length + 1 to ob_swing_length + ob_lookback
+            if not found
+                hist_close = close[i]
+                hist_open = open[i]
+                hist_high = high[i]
+                hist_low = low[i]
+                
+                if hist_close < hist_open
+                    disp = swing_low_ob - hist_low
+                    rng = hist_high - hist_low
+                    
+                    if disp > (rng * ob_displacement_mult) and rng > 0
+                        ob_top := hist_high
+                        ob_bot := hist_low
+                        ob_bar := bar_index - i
+                        ob_time_offset := i
+                        found := true
+
+        if found and not na(ob_top)
+            ob_session = get_session(time[ob_time_offset])
+            age = 0
+            displacement = close - ob_bot
+            zone_height = ob_top - ob_bot
+            strength = calculate_ob_strength(displacement, zone_height, ob_session, age, atr_value)
+            
+            if strength >= min_strength_filter
+                [norm_top, norm_bot] = normalize_zone(ob_top, ob_bot, true, atr_value)
+                
+                b = box.new(ob_bar, norm_top, bar_index + 20, norm_bot, 
+                     border_color=bull_ob_border, 
+                     bgcolor=bull_ob_color, 
+                     border_width=2,
+                     extend=extend.right)
+                
+                l = label.new(ob_bar, norm_bot, "Bull OB", 
+                     color=color.new(#089981, 20), 
+                     textcolor=color.white, 
+                     style=label.style_label_up, 
+                     size=size.small)
+                
+                info_l = label(na)
+                if show_ob_info
+                    pips = calc_pips(zone_height)
+                    distance_pips = calc_pips(math.abs(close - ((norm_top + norm_bot) / 2)))
+                    info_text = "Bullish OB ||| Strength: " + str.tostring(math.round(strength * 10) / 10) + "/10 ||| " + ob_session + " ||| Age: 0 bars ||| " + str.tostring(pips) + " pips ||| " + str.tostring(distance_pips) + " pips away"
+                    mid_price = (norm_top + norm_bot) / 2
+                    
+                    // EXACT LOGIC FROM SOURCE: Fully transparent background, solid text color
+                    info_l := label.new(bar_index + 25, mid_price, info_text,
+                         color=color.new(#089981, 100),  // Fully transparent background
+                         textcolor=color.new(#089981, 0),  // Solid green text
+                         style=label.style_label_left,
+                         size=get_text_size(ob_info_size),
+                         textalign=text.align_left)
+                
+                new_ob = OB.new(b, l, info_l, norm_top, norm_bot, ob_bar, true, ob_session, ob_bar, strength)
+                array.push(bull_obs, new_ob)
+
+    // Bearish OB
+    if not na(swing_high_ob)
+        bool found = false
+        float ob_top = na
+        float ob_bot = na
+        int ob_bar = na
+        int ob_time_offset = na
+        
+        for i = ob_swing_length + 1 to ob_swing_length + ob_lookback
+            if not found
+                hist_close = close[i]
+                hist_open = open[i]
+                hist_high = high[i]
+                hist_low = low[i]
+                
+                if hist_close > hist_open
+                    disp = hist_high - swing_high_ob
+                    rng = hist_high - hist_low
+                    
+                    if disp > (rng * ob_displacement_mult) and rng > 0
+                        ob_top := hist_high
+                        ob_bot := hist_low
+                        ob_bar := bar_index - i
+                        ob_time_offset := i
+                        found := true
+
+        if found and not na(ob_top)
+            ob_session = get_session(time[ob_time_offset])
+            age = 0
+            displacement = ob_top - close
+            zone_height = ob_top - ob_bot
+            strength = calculate_ob_strength(displacement, zone_height, ob_session, age, atr_value)
+            
+            if strength >= min_strength_filter
+                [norm_top, norm_bot] = normalize_zone(ob_top, ob_bot, false, atr_value)
+                
+                b = box.new(ob_bar, norm_top, bar_index + 20, norm_bot, 
+                     border_color=bear_ob_border, 
+                     bgcolor=bear_ob_color, 
+                     border_width=2,
+                     extend=extend.right)
+                
+                l = label.new(ob_bar, norm_top, "Bear OB", 
+                     color=color.new(#f23645, 20), 
+                     textcolor=color.white, 
+                     style=label.style_label_down, 
+                     size=size.small)
+                
+                info_l = label(na)
+                if show_ob_info
+                    pips = calc_pips(zone_height)
+                    distance_pips = calc_pips(math.abs(close - ((norm_top + norm_bot) / 2)))
+                    info_text = "Bearish OB ||| Strength: " + str.tostring(math.round(strength * 10) / 10) + "/10 ||| " + ob_session + " ||| Age: 0 bars ||| " + str.tostring(pips) + " pips ||| " + str.tostring(distance_pips) + " pips away"
+                    mid_price = (norm_top + norm_bot) / 2
+                    
+                    // EXACT LOGIC FROM SOURCE: Fully transparent background, solid text color
+                    info_l := label.new(bar_index + 25, mid_price, info_text,
+                         color=color.new(#f23645, 100),  // Fully transparent background
+                         textcolor=color.new(#f23645, 0),  // Solid red text
+                         style=label.style_label_left,
+                         size=get_text_size(ob_info_size),
+                         textalign=text.align_left)
+                
+                new_ob = OB.new(b, l, info_l, norm_top, norm_bot, ob_bar, false, ob_session, ob_bar, strength)
+                array.push(bear_obs, new_ob)
+
+// Clean and limit OBs
+if array.size(bull_obs) > 0
+    for i = array.size(bull_obs) - 1 to 0
+        if i < array.size(bull_obs)
+            ob = array.get(bull_obs, i)
+            if close < ob.bot
+                box.delete(ob.b)
+                if not na(ob.l)
+                    label.delete(ob.l)
+                if not na(ob.info_label)
+                    label.delete(ob.info_label)
+                array.remove(bull_obs, i)
+
+if array.size(bear_obs) > 0
+    for i = array.size(bear_obs) - 1 to 0
+        if i < array.size(bear_obs)
+            ob = array.get(bear_obs, i)
+            if close > ob.top
+                box.delete(ob.b)
+                if not na(ob.l)
+                    label.delete(ob.l)
+                if not na(ob.info_label)
+                    label.delete(ob.info_label)
+                array.remove(bear_obs, i)
+
+while array.size(bull_obs) > max_obs
+    old = array.shift(bull_obs)
+    box.delete(old.b)
+    if not na(old.l)
+        label.delete(old.l)
+    if not na(old.info_label)
+        label.delete(old.info_label)
+
+while array.size(bear_obs) > max_obs
+    old = array.shift(bear_obs)
+    box.delete(old.b)
+    if not na(old.l)
+        label.delete(old.l)
+    if not na(old.info_label)
+        label.delete(old.info_label)
+
+// Update OB boxes and labels - OPTIMIZED
+if show_order_blocks
+    if array.size(bull_obs) > 0
+        for i = 0 to array.size(bull_obs) - 1
+            ob = array.get(bull_obs, i)
+            box.set_right(ob.b, bar_index + 20)
+            
+            if show_ob_info and not na(ob.info_label)
+                age = bar_index - ob.creation_time
+                pips = calc_pips(ob.top - ob.bot)
+                distance_pips = calc_pips(math.abs(close - ((ob.top + ob.bot) / 2)))
+                info_text = "Bullish OB ||| Strength: " + str.tostring(math.round(ob.strength * 10) / 10) + "/10 ||| " + ob.session + " ||| Age: " + str.tostring(age) + " bars ||| " + str.tostring(pips) + " pips ||| " + str.tostring(distance_pips) + " pips away"
+                label.set_text(ob.info_label, info_text)
+                
+                mid_price = (ob.top + ob.bot) / 2
+                label.set_xy(ob.info_label, bar_index + 25, mid_price)
+                label.set_style(ob.info_label, label.style_label_left)
+                label.set_textalign(ob.info_label, text.align_left)
+    
+    if array.size(bear_obs) > 0
+        for i = 0 to array.size(bear_obs) - 1
+            ob = array.get(bear_obs, i)
+            box.set_right(ob.b, bar_index + 20)
+            
+            if show_ob_info and not na(ob.info_label)
+                age = bar_index - ob.creation_time
+                pips = calc_pips(ob.top - ob.bot)
+                distance_pips = calc_pips(math.abs(close - ((ob.top + ob.bot) / 2)))
+                info_text = "Bearish OB ||| Strength: " + str.tostring(math.round(ob.strength * 10) / 10) + "/10 ||| " + ob.session + " ||| Age: " + str.tostring(age) + " bars ||| " + str.tostring(pips) + " pips ||| " + str.tostring(distance_pips) + " pips away"
+                label.set_text(ob.info_label, info_text)
+                
+                mid_price = (ob.top + ob.bot) / 2
+                label.set_xy(ob.info_label, bar_index + 25, mid_price)
+                label.set_style(ob.info_label, label.style_label_left)
+                label.set_textalign(ob.info_label, text.align_left)
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// BREAKER BLOCK DETECTION WITH NORMALIZED ZONES - ANTI-REPAINTING
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+if show_breaker_blocks and barstate.isconfirmed
+    // Bullish BB
+    if not na(pivot_high_bb)
+        int obBar = -1
+        for i = bb_swing_length + 1 to bb_swing_length + 10
+            if close[i] > open[i]
+                obBar := i
+                break
+        
+        if obBar > 0
+            float obTop = high[obBar]
+            float obBottom = low[obBar]
+            bool wasBroken = false
+            int breakBar = -1
+            
+            float atr_14 = ta.atr(14)
+            for i = obBar - 1 to 1
+                bool breakCondition = bb_invalidation == "Close" ? close[i] > obTop : high[i] > obTop
+                if breakCondition
+                    bool passesDisplacement = true
+                    if bb_use_displacement
+                        float atr_val = atr_14[i]
+                        float moveSize = math.abs(close[i] - open[i])
+                        passesDisplacement := moveSize > (atr_val * bb_displacement_mult)
+                    
+                    if passesDisplacement
+                        wasBroken := true
+                        breakBar := i
+                        break
+            
+            if wasBroken
+                strength = calculate_ob_strength(close - obBottom, obTop - obBottom, "London", 0, atr_value)
+                
+                if strength >= min_strength_filter
+                    [norm_top, norm_bot] = normalize_zone(obTop, obBottom, true, atr_value)
+                    
+                    newBox = box.new(bar_index - breakBar, norm_top, bar_index, norm_bot, 
+                         border_color=bear_bb_border, border_width=2, bgcolor=bear_bb_color, extend=extend.right)
+                    
+                    newLabel = label.new(bar_index - breakBar, norm_top, "BB ▼", 
+                         style=label.style_label_down, color=color.new(#f23645, 20), textcolor=color.white, size=size.small)
+                    
+                    info_l = label(na)
+                    if show_bb_info
+                        pips = calc_pips(obTop - obBottom)
+                        info_text = "Bearish Breaker\nStrength: " + str.tostring(math.round(strength, 1)) + "/10"
+                        mid_price = (norm_top + norm_bot) / 2
+                        
+                        info_l := label.new(bar_index + 150, mid_price, info_text,
+                             color=color.new(#f23645, 100),
+                             textcolor=color.new(#f23645, 0),
+                             style=label.style_label_center,
+                             size=size.normal)
+                    
+                    bb = BreakerBlock.new(bar_index - breakBar, norm_top, norm_bot, "bullish_bb", newBox, newLabel, info_l, false, na, strength)
+                    array.push(g_breakerBlocks, bb)
+
+    // Bearish BB
+    if not na(pivot_low_bb)
+        int obBar = -1
+        for i = bb_swing_length + 1 to bb_swing_length + 10
+            if close[i] < open[i]
+                obBar := i
+                break
+        
+        if obBar > 0
+            float obTop = high[obBar]
+            float obBottom = low[obBar]
+            bool wasBroken = false
+            int breakBar = -1
+            
+            float atr_14 = ta.atr(14)
+            for i = obBar - 1 to 1
+                bool breakCondition = bb_invalidation == "Close" ? close[i] < obBottom : low[i] < obBottom
+                if breakCondition
+                    bool passesDisplacement = true
+                    if bb_use_displacement
+                        float atr_val = atr_14[i]
+                        float moveSize = math.abs(close[i] - open[i])
+                        passesDisplacement := moveSize > (atr_val * bb_displacement_mult)
+                    
+                    if passesDisplacement
+                        wasBroken := true
+                        breakBar := i
+                        break
+            
+            if wasBroken
+                strength = calculate_ob_strength(obTop - close, obTop - obBottom, "London", 0, atr_value)
+                
+                if strength >= min_strength_filter
+                    [norm_top, norm_bot] = normalize_zone(obTop, obBottom, false, atr_value)
+                    
+                    newBox = box.new(bar_index - breakBar, norm_top, bar_index, norm_bot, 
+                         border_color=bull_bb_border, border_width=2, bgcolor=bull_bb_color, extend=extend.right)
+                    
+                    newLabel = label.new(bar_index - breakBar, norm_bot, "BB ▲", 
+                         style=label.style_label_up, color=color.new(#089981, 20), textcolor=color.white, size=size.small)
+                    
+                    info_l = label(na)
+                    if show_bb_info
+                        pips = calc_pips(obTop - obBottom)
+                        info_text = "Bullish Breaker\nStrength: " + str.tostring(math.round(strength, 1)) + "/10"
+                        mid_price = (norm_top + norm_bot) / 2
+                        
+                        info_l := label.new(bar_index + 150, mid_price, info_text,
+                             color=color.new(#089981, 100),
+                             textcolor=color.new(#089981, 0),
+                             style=label.style_label_center,
+                             size=size.normal)
+                    
+                    bb = BreakerBlock.new(bar_index - breakBar, norm_top, norm_bot, "bearish_bb", newBox, newLabel, info_l, false, na, strength)
+                    array.push(g_breakerBlocks, bb)
+
+// Manage BB array size
+while array.size(g_breakerBlocks) > max_bbs
+    old_bb = array.shift(g_breakerBlocks)
+    box.delete(old_bb.boxId)
+    if not na(old_bb.labelId)
+        label.delete(old_bb.labelId)
+    if not na(old_bb.info_label)
+        label.delete(old_bb.info_label)
+
+// Update BB boxes - OPTIMIZED
+if show_breaker_blocks and array.size(g_breakerBlocks) > 0
+    for i = 0 to array.size(g_breakerBlocks) - 1
+        bb = array.get(g_breakerBlocks, i)
+        box.set_right(bb.boxId, bar_index)
+        
+        if show_bb_info and not na(bb.info_label)
+            mid_price = (bb.top + bb.bottom) / 2
+            label.set_xy(bb.info_label, bar_index + 25, mid_price)
+            label.set_style(bb.info_label, label.style_label_left)
+            label.set_textalign(bb.info_label, text.align_left)
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// FVG DETECTION WITH NORMALIZED ZONES - ANTI-REPAINTING
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+if show_fvg and barstate.isconfirmed
+    // Bullish FVG
+    bullishFVG = false
+    bullGapTop = 0.0
+    bullGapBottom = 0.0
+    
+    if low > high[2]
+        bullGapBottom := high[2]
+        bullGapTop := low
+        gapSize = bullGapTop - bullGapBottom
+        
+        minGap = fvg_use_atr ? atr_value * fvg_atr_mult : 0.0
+        
+        if gapSize >= minGap
+            bullishFVG := true
+            strength = calculate_fvg_strength(gapSize, atr_value)
+            
+            if strength >= min_strength_filter
+                [norm_top, norm_bot] = normalize_zone(bullGapTop, bullGapBottom, true, atr_value)
+                
+                b = box.new(bar_index - 2, norm_top, bar_index + 20, norm_bot, 
+                     border_color=bull_fvg_border, 
+                     bgcolor=bull_fvg_color, 
+                     border_width=2,
+                     extend=extend.right)
+                
+                array.push(bullishFVGBoxes, b)
+                array.push(bullishFVGTops, norm_top)
+                array.push(bullishFVGBottoms, norm_bot)
+                array.push(bullishFVGStrengths, strength)
+                
+                lbl = label.new(bar_index - 2, norm_bot, "FVG", 
+                     color=bull_fvg_color, 
+                     textcolor=color.white, 
+                     style=label.style_label_up, 
+                     size=get_text_size(fvg_label_size))
+                array.push(bullishFVGLabels, lbl)
+                
+                info_l = label(na)
+                if show_fvg_info
+                    fvg_session = get_session(time)
+                    pips = calc_pips(gapSize)
+                    distance_pips = calc_pips(math.abs(close - ((norm_top + norm_bot) / 2)))
+                    info_text = "Bullish FVG ||| Strength: " + str.tostring(math.round(strength, 1)) + "/10 ||| " + fvg_session + " ||| " + str.tostring(pips) + " pips ||| " + str.tostring(distance_pips) + " pips away"
+                    mid_price = (norm_top + norm_bot) / 2
+                    
+                    info_l := label.new(bar_index + 25, mid_price, info_text,
+                         color=color.new(#089981, 100),
+                         textcolor=color.new(#089981, 0),
+                         style=label.style_label_left,
+                         size=get_text_size(fvg_info_size),
+                         textalign=text.align_left)
+                array.push(bullishFVGInfoLabels, info_l)
+
+    // Bearish FVG
+    bearishFVG = false
+    bearGapTop = 0.0
+    bearGapBottom = 0.0
+    
+    if high < low[2]
+        bearGapTop := low[2]
+        bearGapBottom := high
+        gapSize = bearGapTop - bearGapBottom
+        
+        minGap = fvg_use_atr ? atr_value * fvg_atr_mult : 0.0
+        
+        if gapSize >= minGap
+            bearishFVG := true
+            strength = calculate_fvg_strength(gapSize, atr_value)
+            
+            if strength >= min_strength_filter
+                [norm_top, norm_bot] = normalize_zone(bearGapTop, bearGapBottom, false, atr_value)
+                
+                b = box.new(bar_index - 2, norm_top, bar_index + 20, norm_bot, 
+                     border_color=bear_fvg_border, 
+                     bgcolor=bear_fvg_color, 
+                     border_width=2,
+                     extend=extend.right)
+                
+                array.push(bearishFVGBoxes, b)
+                array.push(bearishFVGTops, norm_top)
+                array.push(bearishFVGBottoms, norm_bot)
+                array.push(bearishFVGStrengths, strength)
+                
+                lbl = label.new(bar_index - 2, norm_top, "FVG", 
+                     color=bear_fvg_color, 
+                     textcolor=color.white, 
+                     style=label.style_label_down, 
+                     size=get_text_size(fvg_label_size))
+                array.push(bearishFVGLabels, lbl)
+                
+                info_l = label(na)
+                if show_fvg_info
+                    fvg_session = get_session(time)
+                    pips = calc_pips(gapSize)
+                    distance_pips = calc_pips(math.abs(close - ((norm_top + norm_bot) / 2)))
+                    info_text = "Bearish FVG ||| Strength: " + str.tostring(math.round(strength, 1)) + "/10 ||| " + fvg_session + " ||| " + str.tostring(pips) + " pips ||| " + str.tostring(distance_pips) + " pips away"
+                    mid_price = (norm_top + norm_bot) / 2
+                    
+                    info_l := label.new(bar_index + 25, mid_price, info_text,
+                         color=color.new(#f23645, 100),
+                         textcolor=color.new(#f23645, 0),
+                         style=label.style_label_left,
+                         size=get_text_size(fvg_info_size),
+                         textalign=text.align_left)
+                array.push(bearishFVGInfoLabels, info_l)
+
+// Check mitigation and remove filled FVGs
+if array.size(bullishFVGBoxes) > 0
+    for i = array.size(bullishFVGBoxes) - 1 to 0
+        top = array.get(bullishFVGTops, i)
+        bottom = array.get(bullishFVGBottoms, i)
+        
+        isMitigated = false
+        
+        if fvg_mitigation == "Touch"
+            isMitigated := low <= top
+        else if fvg_mitigation == "Full Fill"
+            isMitigated := low <= bottom
+        else if fvg_mitigation == "50% Fill"
+            midPoint = (top + bottom) / 2
+            isMitigated := low <= midPoint
+        
+        if isMitigated
+            b = array.get(bullishFVGBoxes, i)
+            lbl = array.get(bullishFVGLabels, i)
+            info_l = array.get(bullishFVGInfoLabels, i)
+            
+            box.delete(b)
+            if not na(lbl)
+                label.delete(lbl)
+            if not na(info_l)
+                label.delete(info_l)
+            array.remove(bullishFVGBoxes, i)
+            array.remove(bullishFVGTops, i)
+            array.remove(bullishFVGBottoms, i)
+            array.remove(bullishFVGLabels, i)
+            array.remove(bullishFVGInfoLabels, i)
+            array.remove(bullishFVGStrengths, i)
+
+if array.size(bearishFVGBoxes) > 0
+    for i = array.size(bearishFVGBoxes) - 1 to 0
+        top = array.get(bearishFVGTops, i)
+        bottom = array.get(bearishFVGBottoms, i)
+        
+        isMitigated = false
+        
+        if fvg_mitigation == "Touch"
+            isMitigated := high >= bottom
+        else if fvg_mitigation == "Full Fill"
+            isMitigated := high >= top
+        else if fvg_mitigation == "50% Fill"
+            midPoint = (top + bottom) / 2
+            isMitigated := high >= midPoint
+        
+        if isMitigated
+            b = array.get(bearishFVGBoxes, i)
+            lbl = array.get(bearishFVGLabels, i)
+            info_l = array.get(bearishFVGInfoLabels, i)
+            
+            box.delete(b)
+            if not na(lbl)
+                label.delete(lbl)
+            if not na(info_l)
+                label.delete(info_l)
+            array.remove(bearishFVGBoxes, i)
+            array.remove(bearishFVGTops, i)
+            array.remove(bearishFVGBottoms, i)
+            array.remove(bearishFVGLabels, i)
+            array.remove(bearishFVGInfoLabels, i)
+            array.remove(bearishFVGStrengths, i)
+
+// Limit array sizes
+while array.size(bullishFVGBoxes) > max_fvgs
+    oldBox = array.shift(bullishFVGBoxes)
+    box.delete(oldBox)
+    oldLabel = array.shift(bullishFVGLabels)
+    if not na(oldLabel)
+        label.delete(oldLabel)
+    oldInfo = array.shift(bullishFVGInfoLabels)
+    if not na(oldInfo)
+        label.delete(oldInfo)
+    array.shift(bullishFVGTops)
+    array.shift(bullishFVGBottoms)
+    array.shift(bullishFVGStrengths)
+
+while array.size(bearishFVGBoxes) > max_fvgs
+    oldBox = array.shift(bearishFVGBoxes)
+    box.delete(oldBox)
+    oldLabel = array.shift(bearishFVGLabels)
+    if not na(oldLabel)
+        label.delete(oldLabel)
+    oldInfo = array.shift(bearishFVGInfoLabels)
+    if not na(oldInfo)
+        label.delete(oldInfo)
+    array.shift(bearishFVGTops)
+    array.shift(bearishFVGBottoms)
+    array.shift(bearishFVGStrengths)
+
+// Update FVG info labels - OPTIMIZED WITH DYNAMIC DISTANCE
+if show_fvg and show_fvg_info
+    if array.size(bullishFVGBoxes) > 0
+        for i = 0 to array.size(bullishFVGBoxes) - 1
+            info_l = array.get(bullishFVGInfoLabels, i)
+            if not na(info_l)
+                top = array.get(bullishFVGTops, i)
+                bottom = array.get(bullishFVGBottoms, i)
+                strength = array.get(bullishFVGStrengths, i)
+                mid_price = (top + bottom) / 2
+                
+                pips = calc_pips(top - bottom)
+                distance_pips = calc_pips(math.abs(close - mid_price))
+                fvg_session = get_session(time)
+                info_text = "Bullish FVG ||| Strength: " + str.tostring(math.round(strength, 1)) + "/10 ||| " + fvg_session + " ||| " + str.tostring(pips) + " pips ||| " + str.tostring(distance_pips) + " pips away"
+                
+                label.set_text(info_l, info_text)
+                label.set_xy(info_l, bar_index + 25, mid_price)
+                label.set_style(info_l, label.style_label_left)
+                label.set_textalign(info_l, text.align_left)
+    
+    if array.size(bearishFVGBoxes) > 0
+        for i = 0 to array.size(bearishFVGBoxes) - 1
+            info_l = array.get(bearishFVGInfoLabels, i)
+            if not na(info_l)
+                top = array.get(bearishFVGTops, i)
+                bottom = array.get(bearishFVGBottoms, i)
+                strength = array.get(bearishFVGStrengths, i)
+                mid_price = (top + bottom) / 2
+                
+                pips = calc_pips(top - bottom)
+                distance_pips = calc_pips(math.abs(close - mid_price))
+                fvg_session = get_session(time)
+                info_text = "Bearish FVG ||| Strength: " + str.tostring(math.round(strength, 1)) + "/10 ||| " + fvg_session + " ||| " + str.tostring(pips) + " pips ||| " + str.tostring(distance_pips) + " pips away"
+                
+                label.set_text(info_l, info_text)
+                label.set_xy(info_l, bar_index + 25, mid_price)
+                label.set_style(info_l, label.style_label_left)
+                label.set_textalign(info_l, text.align_left)
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// PREMIUM & DISCOUNT ZONES
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+if show_premium_discount and not na(last_swing_high) and not na(last_swing_low)
+    swing_high_price = last_swing_high
+    swing_low_price = last_swing_low
+    
+    range_size = swing_high_price - swing_low_price
+    equilibrium_level = swing_low_price + (range_size * 0.5)
+    
+    start_bar = math.min(last_swing_high_idx, last_swing_low_idx)
+    
+    if not na(premium_box)
+        box.delete(premium_box)
+    if not na(equilibrium_box)
+        box.delete(equilibrium_box)
+    if not na(discount_box)
+        box.delete(discount_box)
+    if not na(premium_label)
+        label.delete(premium_label)
+    if not na(discount_label)
+        label.delete(discount_label)
+    if not na(equilibrium_label)
+        label.delete(equilibrium_label)
+    
+    premium_box := box.new(start_bar, swing_high_price, bar_index + 200, equilibrium_level, 
+         border_color=color.new(premium_color, 70), 
+         bgcolor=premium_color, 
+         border_width=1,
+         extend=extend.right)
+    
+    premium_label := label.new(bar_index, swing_high_price, "Premium", 
+         color=color.new(color.black, 100), 
+         textcolor=color.new(#f23645, 0), 
+         style=label.style_none, 
+         size=size.normal)
+    
+    equilibrium_box := box.new(start_bar, equilibrium_level + (range_size * 0.02), bar_index + 200, equilibrium_level - (range_size * 0.02), 
+         border_color=color.new(equilibrium_color, 50), 
+         bgcolor=equilibrium_color, 
+         border_width=1,
+         extend=extend.right)
+    
+    equilibrium_label := label.new(bar_index, equilibrium_level, "Equilibrium", 
+         color=color.new(color.black, 100), 
+         textcolor=color.gray, 
+         style=label.style_none, 
+         size=size.small)
+    
+    discount_box := box.new(start_bar, equilibrium_level, bar_index + 200, swing_low_price, 
+         border_color=color.new(discount_color, 70), 
+         bgcolor=discount_color, 
+         border_width=1,
+         extend=extend.right)
+    
+    discount_label := label.new(bar_index, swing_low_price, "Discount", 
+         color=color.new(color.black, 100), 
+         textcolor=color.new(#089981, 0), 
+         style=label.style_none, 
+         size=size.normal)
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// EQH/EQL DETECTION (UAlgo Logic)
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+if show_liquidity
+    atr_eqhl = ta.atr(eqhl_atr_length)
+    threshold_value = atr_eqhl * eqhl_threshold
+    
+    // Pivot detection
+    ph = eqhl_wait_confirmation ? ta.pivothigh(eqhl_pivot_length, eqhl_pivot_length) : ta.pivothigh(eqhl_pivot_length, 1)
+    pl = eqhl_wait_confirmation ? ta.pivotlow(eqhl_pivot_length, eqhl_pivot_length) : ta.pivotlow(eqhl_pivot_length, 1)
+    
+    // Equal Highs Detection
+    if not na(ph)
+        max_high = math.max(ph, previousHigh)
+        min_high = math.min(ph, previousHigh)
+        
+        if max_high < min_high + threshold_value
+            // Draw line connecting equal highs
+            line.new(highLocX, previousHigh, 
+                 eqhl_wait_confirmation ? bar_index - eqhl_pivot_length : bar_index - 1, ph, 
+                 color=color.new(color.red, 0), width=2, style=line.style_solid)
+            
+            // Draw RED EQH label
+            label.new(int(math.avg(eqhl_wait_confirmation ? bar_index - eqhl_pivot_length : bar_index - 1, highLocX)), ph, 
+                 "EQH", 
+                 color=color.new(color.black, 100), 
+                 textcolor=color.new(color.red, 0), 
+                 style=label.style_none, 
+                 size=size.normal)
+        
+        previousHigh := ph
+        highLocX := eqhl_wait_confirmation ? bar_index - eqhl_pivot_length : bar_index - 1
+    
+    // Equal Lows Detection
+    if not na(pl)
+        max_low = math.max(pl, previousLow)
+        min_low = math.min(pl, previousLow)
+        
+        if min_low > max_low - threshold_value
+            // Draw line connecting equal lows
+            line.new(lowLocX, previousLow, 
+                 eqhl_wait_confirmation ? bar_index - eqhl_pivot_length : bar_index - 1, pl, 
+                 color=color.new(color.green, 0), width=2, style=line.style_solid)
+            
+            // Draw GREEN EQL label
+            label.new(int(math.avg(eqhl_wait_confirmation ? bar_index - eqhl_pivot_length : bar_index - 1, lowLocX)), pl, 
+                 "EQL", 
+                 color=color.new(color.black, 100), 
+                 textcolor=color.new(color.green, 0), 
+                 style=label.style_none, 
+                 size=size.normal)
+        
+        previousLow := pl
+        lowLocX := eqhl_wait_confirmation ? bar_index - eqhl_pivot_length : bar_index - 1
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// LEGEND
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+if show_legend and barstate.islast
+    var table legend_table = table.new(position.top_right, 2, 11, 
+         bgcolor=color.new(#000000, 20), 
+         border_color=#373a46, 
+         border_width=2, 
+         frame_color=#373a46, 
+         frame_width=2)
+    
+    table.cell(legend_table, 0, 0, "🎯 SMC LEGEND", text_color=color.white, text_size=size.normal, bgcolor=color.new(#373a46, 10))
+    table.merge_cells(legend_table, 0, 0, 1, 0)
+    
+    table.cell(legend_table, 0, 1, "▮▮", text_color=#089981, text_size=size.large, bgcolor=color.new(#000000, 20))
+    table.cell(legend_table, 1, 1, "Bull OB", text_color=color.white, text_size=size.small, bgcolor=color.new(#000000, 20))
+    
+    table.cell(legend_table, 0, 2, "▮▮", text_color=#f23645, text_size=size.large, bgcolor=color.new(#000000, 20))
+    table.cell(legend_table, 1, 2, "Bear OB", text_color=color.white, text_size=size.small, bgcolor=color.new(#000000, 20))
+    
+    table.cell(legend_table, 0, 3, "▮▮", text_color=#089981, text_size=size.large, bgcolor=color.new(#000000, 20))
+    table.cell(legend_table, 1, 3, "Bull FVG", text_color=color.white, text_size=size.small, bgcolor=color.new(#000000, 20))
+    
+    table.cell(legend_table, 0, 4, "▮▮", text_color=#f23645, text_size=size.large, bgcolor=color.new(#000000, 20))
+    table.cell(legend_table, 1, 4, "Bear FVG", text_color=color.white, text_size=size.small, bgcolor=color.new(#000000, 20))
+    
+    table.cell(legend_table, 0, 5, "BOS", text_color=#089981, text_size=size.normal, bgcolor=color.new(#000000, 20))
+    table.cell(legend_table, 1, 5, "Bullish BOS", text_color=color.white, text_size=size.small, bgcolor=color.new(#000000, 20))
+    
+    table.cell(legend_table, 0, 6, "BOS", text_color=#f23645, text_size=size.normal, bgcolor=color.new(#000000, 20))
+    table.cell(legend_table, 1, 6, "Bearish BOS", text_color=color.white, text_size=size.small, bgcolor=color.new(#000000, 20))
+    
+    table.cell(legend_table, 0, 7, "CHoCH", text_color=#089981, text_size=size.normal, bgcolor=color.new(#000000, 20))
+    table.cell(legend_table, 1, 7, "Bullish CHoCH", text_color=color.white, text_size=size.small, bgcolor=color.new(#000000, 20))
+    
+    table.cell(legend_table, 0, 8, "CHoCH", text_color=#f23645, text_size=size.normal, bgcolor=color.new(#000000, 20))
+    table.cell(legend_table, 1, 8, "Bearish CHoCH", text_color=color.white, text_size=size.small, bgcolor=color.new(#000000, 20))
+    
+    table.cell(legend_table, 0, 9, "EQL", text_color=#089981, text_size=size.normal, bgcolor=color.new(#000000, 20))
+    table.cell(legend_table, 1, 9, "Equal Lows", text_color=color.white, text_size=size.small, bgcolor=color.new(#000000, 20))
+    
+    table.cell(legend_table, 0, 10, "EQH", text_color=#f23645, text_size=size.normal, bgcolor=color.new(#000000, 20))
+    table.cell(legend_table, 1, 10, "Equal Highs", text_color=color.white, text_size=size.small, bgcolor=color.new(#000000, 20))
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// ALERTS
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+// Order Block Alerts
+var bool bull_ob_detected = false
+var bool bear_ob_detected = false
+
+if show_order_blocks and barstate.isconfirmed
+    // Check if new bullish OB was created this bar
+    if not na(swing_low_ob)
+        bull_ob_detected := true
+    else
+        bull_ob_detected := false
+    
+    // Check if new bearish OB was created this bar
+    if not na(swing_high_ob)
+        bear_ob_detected := true
+    else
+        bear_ob_detected := false
+
+// FVG Alerts
+var bool bull_fvg_detected = false
+var bool bear_fvg_detected = false
+
+if show_fvg and barstate.isconfirmed
+    // Bullish FVG detection
+    if low > high[2]
+        gapSize = low - high[2]
+        minGap = fvg_use_atr ? atr_value * fvg_atr_mult : 0.0
+        if gapSize >= minGap
+            strength = calculate_fvg_strength(gapSize, atr_value)
+            if strength >= min_strength_filter
+                bull_fvg_detected := true
+            else
+                bull_fvg_detected := false
+        else
+            bull_fvg_detected := false
+    else
+        bull_fvg_detected := false
+    
+    // Bearish FVG detection
+    if high < low[2]
+        gapSize = low[2] - high
+        minGap = fvg_use_atr ? atr_value * fvg_atr_mult : 0.0
+        if gapSize >= minGap
+            strength = calculate_fvg_strength(gapSize, atr_value)
+            if strength >= min_strength_filter
+                bear_fvg_detected := true
+            else
+                bear_fvg_detected := false
+        else
+            bear_fvg_detected := false
+    else
+        bear_fvg_detected := false
+
+// Alert conditions
+alertcondition(enable_ob_alerts and bull_ob_detected, title="Bullish Order Block Detected", message="🟢 Bullish Order Block detected on {{ticker}} {{interval}}")
+alertcondition(enable_ob_alerts and bear_ob_detected, title="Bearish Order Block Detected", message="🔴 Bearish Order Block detected on {{ticker}} {{interval}}")
+alertcondition(enable_fvg_alerts and bull_fvg_detected, title="Bullish FVG Detected", message="🟢 Bullish Fair Value Gap detected on {{ticker}} {{interval}}")
+alertcondition(enable_fvg_alerts and bear_fvg_detected, title="Bearish FVG Detected", message="🔴 Bearish Fair Value Gap detected on {{ticker}} {{interval}}")

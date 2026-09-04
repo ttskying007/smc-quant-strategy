@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMC V8.2 监控面板</title>
+<style>
+:root { --bg: #0d1117; --card: #161b22; --accent: #58a6ff; --green: #3fb950; --red: #f85149; --orange: #d29922; --text: #c9d1d9; --dim: #8b949e; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
+h1 { font-size: 1.5rem; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+h1 .badge { font-size: 0.7rem; padding: 3px 10px; border-radius: 12px; }
+h2 { font-size: 1.1rem; margin: 20px 0 10px; color: var(--accent); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.card { background: var(--card); border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+.card h3 { font-size: 0.9rem; color: var(--dim); margin-bottom: 8px; }
+.stat { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #21262d; }
+.stat:last-child { border: 0; }
+.stat .label { color: var(--dim); font-size: 0.9rem; }
+.stat .value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat .value.green { color: var(--green); }
+.stat .value.red { color: var(--red); }
+.stat .value.blue { color: var(--accent); }
+.stat .value.orange { color: var(--orange); }
+.progress-bar { height: 8px; background: #21262d; border-radius: 4px; margin: 10px 0; overflow: hidden; }
+.progress-bar .fill { height: 100%; background: var(--accent); transition: width 0.5s; border-radius: 4px; }
+.status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+.dot-ok { background: var(--green); }
+.dot-err { background: var(--red); }
+.dot-warn { background: var(--orange); }
+.hist-chart { display: flex; align-items: flex-end; gap: 2px; height: 100px; margin: 10px 0; position: relative; overflow-x: auto; }
+.hist-bar { width: 8px; border-radius: 2px 2px 0 0; min-height: 2px; opacity: 0.7; position: relative; flex-shrink: 0; }
+.hist-bar:hover { opacity: 1; }
+.hist-bar .tooltip { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #000; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; z-index: 10; }
+.hist-bar:hover .tooltip { display: block; }
+.params-table { font-size: 0.8rem; width: 100%; }
+.params-table td { padding: 3px 8px; }
+.params-table td:first-child { color: var(--dim); }
+.footer { margin-top: 20px; text-align: center; font-size: 0.8rem; color: var(--dim); }
+.refresh-info { text-align: right; font-size: 0.8rem; color: var(--dim); margin-bottom: 10px; }
+.version-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.version-tab { padding: 6px 14px; border-radius: 6px; cursor: pointer; background: var(--card); border: 1px solid #30363d; font-size: 0.85rem; }
+.version-tab.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+.section-hidden { display: none; }
+@keyframes pulse { 0% { opacity: .7; } 50% { opacity: 1; } 100% { opacity: .7; } }
+.pulsing { animation: pulse 2s ease-in-out infinite; }
+</style>
+</head>
+<body>
+<h1>
+  SMC V8.2 监控面板
+  <span class="badge" id="statusBadge" style="background:var(--green);color:#000;">V8.2</span>
+  <span class="badge" id="engineBadge" style="background:#30363d;color:var(--text);">引擎</span>
+  <span style="font-size:0.7rem;color:var(--dim);font-weight:normal;" id="timeLabel"></span>
+</h1>
+<div class="refresh-info">每2秒自动刷新 · <a href="#" onclick="refresh()">手动刷新</a></div>
+
+<div class="version-tabs">
+  <span class="version-tab active" onclick="switchTab('v82',this)">V8.2 🏆</span>
+  <span class="version-tab" onclick="switchTab('v8',this)">V8</span>
+  <span class="version-tab" onclick="switchTab('proxy',this)">代理</span>
+  <span class="version-tab" onclick="switchTab('params',this)">参数</span>
+</div>
+
+<!-- V8.2 面板 -->
+<div id="panel-v82" class="">
+  <div class="grid">
+    <div class="card">
+      <h3>🏆 V8.2 优化器</h3>
+      <div class="stat"><span class="label">运行状态</span><span class="value" id="v82Running">检测中...</span></div>
+      <div class="stat"><span class="label">当前轮次</span><span class="value blue" id="v82Round">-</span></div>
+      <div class="stat"><span class="label">最佳Score</span><span class="value green" id="v82Score">-</span></div>
+      <div class="stat"><span class="label">最佳WR</span><span class="value green" id="v82Wr">-</span></div>
+      <div class="stat"><span class="label">最佳PF</span><span class="value green" id="v82Pf">-</span></div>
+      <div class="stat"><span class="label">交易数</span><span class="value blue" id="v82N">-</span></div>
+      <div class="stat"><span class="label">盈亏比(RR)</span><span class="value orange" id="v82Rr">-</span></div>
+      <div class="stat"><span class="label">回报率</span><span class="value green" id="v82Ret">-</span></div>
+      <div class="stat"><span class="label">夏普比(SR)</span><span class="value blue" id="v82Sr">-</span></div>
+      <div class="stat"><span class="label">有信号股票</span><span class="value" id="v82SigStocks">-</span></div>
+      <div class="progress-bar"><div class="fill" id="v82Progress" style="width:0%"></div></div>
+    </div>
+    <div class="card">
+      <h3>📊 评分组件 (V8.2)</h3>
+      <div class="stat"><span class="label">RR_mult</span><span class="value orange" id="v82RrMult">-</span></div>
+      <div class="stat"><span class="label">N_mult</span><span class="value blue" id="v82NMult">-</span></div>
+      <div class="stat"><span class="label">WR_mult</span><span class="value green" id="v82WRMult">-</span></div>
+      <div class="stat"><span class="label">Coverage</span><span class="value" id="v82Coverage">-</span></div>
+    </div>
+    <div class="card">
+      <h3>🔗 V8.2 代理状态</h3>
+      <div class="stat"><span class="label">代理运行</span><span class="value" id="v82ProxyRun"><span class="status-dot dot-warn"></span>检测中</span></div>
+      <div class="stat"><span class="label">端口</span><span class="value" id="v82ProxyPort">-</span></div>
+      <div class="stat"><span class="label">外网访问</span><span class="value" id="v82ProxyInternet">-</span></div>
+      <div class="stat"><span class="label">存活节点</span><span class="value" id="v82ProxyNodes">-</span></div>
+      <div class="stat"><span class="label">重启次数</span><span class="value" id="v82ProxyRestarts">-</span></div>
+      <div class="stat"><span class="label">运行时长</span><span class="value" id="v82ProxyUptime">-</span></div>
+    </div>
+  </div>
+
+  <h2>📈 Score历史 (V8.2)</h2>
+  <div class="card">
+    <div class="hist-chart" id="v82HistoryChart"></div>
+  </div>
+</div>
+
+<!-- V8 面板 -->
+<div id="panel-v8" class="section-hidden">
+  <div class="grid">
+    <div class="card">
+      <h3>V8 引擎</h3>
+      <div class="stat"><span class="label">运行状态</span><span class="value" id="v8Running">-</span></div>
+      <div class="stat"><span class="label">当前轮次</span><span class="value blue" id="v8Round">-</span></div>
+      <div class="stat"><span class="label">最佳Score</span><span class="value green" id="v8Score">-</span></div>
+      <div class="stat"><span class="label">最佳WR</span><span class="value green" id="v8Wr">-</span></div>
+      <div class="stat"><span class="label">最佳N</span><span class="value blue" id="v8N">-</span></div>
+    </div>
+    <div class="card">
+      <h3>V7+ 引擎</h3>
+      <div class="stat"><span class="label">演化状态</span><span class="value" id="v7Status">-</span></div>
+      <div class="stat"><span class="label">当前代</span><span class="value blue" id="v7Gen">-</span></div>
+    </div>
+    <div class="card">
+      <h3>V7 (旧版)</h3>
+      <div class="stat"><span class="label">状态</span><span class="value" id="v7OldStatus">-</span></div>
+      <div class="stat"><span class="label">当前代</span><span class="value blue" id="v7OldGen">-</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 代理面板 -->
+<div id="panel-proxy" class="section-hidden">
+  <div class="grid">
+    <div class="card">
+      <h3>🔗 代理综合状态</h3>
+      <div class="stat"><span class="label">代理运行</span><span class="value" id="proxyRunning"><span class="status-dot dot-warn"></span>检测中</span></div>
+      <div class="stat"><span class="label">进程PID</span><span class="value" id="proxyPid">-</span></div>
+      <div class="stat"><span class="label">端口 7890</span><span class="value" id="proxyPort7890">-</span></div>
+      <div class="stat"><span class="label">外网连通</span><span class="value" id="proxyInternet">-</span></div>
+      <div class="stat"><span class="label">存活/总节点</span><span class="value" id="proxyNodes">-</span></div>
+      <div class="stat"><span class="label">总重启次数</span><span class="value" id="proxyRestarts">-</span></div>
+      <div class="stat"><span class="label">运行时长</span><span class="value" id="proxyUptime">-</span></div>
+      <div class="stat"><span class="label">最后检查</span><span class="value" id="proxyLastCheck">-</span></div>
+    </div>
+    <div class="card">
+      <h3>🌐 外网连通性</h3>
+      <div class="stat"><span class="label">Google</span><span class="value" id="proxyGoogle">检测中...</span></div>
+      <div class="stat"><span class="label">GitHub</span><span class="value" id="proxyGithub">检测中...</span></div>
+      <div class="stat"><span class="label">YouTube</span><span class="value" id="proxyYoutube">检测中...</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 参数面板 -->
+<div id="panel-params" class="section-hidden">
+  <div class="grid" style="grid-template-columns:1fr;">
+    <div class="card">
+      <h3>🔧 V8.2 最佳参数 (13维)</h3>
+      <div class="stat"><span class="label">评分引擎</span><span class="value" id="pEngine">V8.2</span></div>
+      <div class="stat"><span class="label">Full_Eval</span><span class="value green" id="pEval">-</span></div>
+      <table class="params-table" id="paramsTable">
+        <tr><td colspan="2" style="color:var(--dim);">加载中...</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<h2>🕐 综合信号 (V8.2引擎)</h2>
+<div class="card">
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;">
+    <div class="card" style="background:transparent;border:0;padding:0;">
+      <div class="stat"><span class="label">FVG信号</span><span class="value blue" id="sigFvg">-</span></div>
+      <div class="stat"><span class="label">Sweep</span><span class="value blue" id="sigSweep">-</span></div>
+    </div>
+    <div class="card" style="background:transparent;border:0;padding:0;">
+      <div class="stat"><span class="label">OB</span><span class="value blue" id="sigOb">-</span></div>
+      <div class="stat"><span class="label">BPR</span><span class="value blue" id="sigBpr">-</span></div>
+    </div>
+    <div class="card" style="background:transparent;border:0;padding:0;">
+      <div class="stat"><span class="label">波动率</span><span class="value" id="sigVol">-</span></div>
+      <div class="stat"><span class="label">趋势</span><span class="value" id="sigMs">-</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  SMC V8.2 监控 · <span id="updateTime">-</span>
+</div>
+
+<script>
+const API = 'http://127.0.0.1:8879';
+let apiHistory = [];
+
+function switchTab(name, el) {
+  document.querySelectorAll('.version-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['v82','v8','proxy','params'].forEach(p => {
+    document.getElementById('panel-' + p).classList.toggle('section-hidden', p !== name);
+  });
+}
+
+async function refresh() {
+  try {
+    const [status, progress, chart] = await Promise.all([
+      fetch(API+'/api/status').then(r=>r.json()),
+      fetch(API+'/api/progress').then(r=>r.json()),
+      fetch(API+'/api/history/chart').then(r=>r.json()),
+    ]);
+    window._status = status;
+
+    // ════════ V8.2 ════════
+    const v82 = status.v82 || {};
+    const v82d = v82.details || {};
+    const v82bd = v82.best_detail || {};
+
+    document.getElementById('v82Running').textContent = v82.running ? '运行中' : (v82.status === 'complete' ? '✅ 已完成' : '已停止');
+    document.getElementById('v82Running').className = 'value ' + (v82.running ? 'green pulsing' : (v82.status === 'complete' ? 'green' : 'red'));
+    document.getElementById('v82Round').textContent = (v82.round||0) + '/' + (v82.total_rounds||0);
+    document.getElementById('v82Score').textContent = (v82.best_score||0).toFixed(1);
+    document.getElementById('v82Wr').textContent = (v82.best_wr||0).toFixed(1) + '%';
+    document.getElementById('v82Wr').className = 'value ' + ((v82.best_wr||0) >= 80 ? 'green' : 'orange');
+    document.getElementById('v82Pf').textContent = v82bd.pf || (v82.best_score || 0).toFixed(2);
+    document.getElementById('v82N').textContent = v82.best_n || v82bd.n || 0;
+    document.getElementById('v82Rr').textContent = v82bd.rr_avg ? v82bd.rr_avg.toFixed(2) : (v82d.rr ? v82d.rr.toFixed(2) : '-');
+    document.getElementById('v82Rr').className = 'value ' + ((v82bd.rr_avg||0) >= 1.0 ? 'green' : (v82bd.rr_avg||0) >= 0.8 ? 'orange' : 'red');
+    document.getElementById('v82Ret').textContent = v82bd.ret ? v82bd.ret.toFixed(2) + '%' : '-';
+    document.getElementById('v82Sr').textContent = v82bd.sr ? v82bd.sr.toFixed(2) : '-';
+    document.getElementById('v82SigStocks').textContent = (v82d.stocks_signal || 0) + '/' + (v82d.coverage || 0);
+
+    // V8.2评分组件
+    document.getElementById('v82RrMult').textContent = v82d._rr_mult || '-';
+    document.getElementById('v82NMult').textContent = v82d._n_mult || '-';
+    document.getElementById('v82WRMult').textContent = v82d._wr_mult || '-';
+    document.getElementById('v82Coverage').textContent = v82d.coverage ? v82d.coverage.toFixed(0) + '%' : '-';
+
+    // V8.2 进度条
+    const pct = v82.total_rounds > 0 ? ((v82.round||0)/v82.total_rounds*100) : 0;
+    const pb = document.getElementById('v82Progress');
+    pb.style.width = Math.min(pct, 100) + '%';
+    pb.style.background = v82.running ? 'var(--accent)' : 'var(--green)';
+
+    // 引擎徽章
+    const badge = document.getElementById('engineBadge');
+    badge.textContent = 'V8.2 RR-guided';
+    badge.style.display = 'inline-block';
+
+    // V8.2 代理
+    const p = status.proxy || {};
+    document.getElementById('v82ProxyRun').innerHTML = '<span class="status-dot '+(p.running?'dot-ok':'dot-err')+'"></span>'+(p.running?'运行中':'已停止');
+    document.getElementById('v82ProxyPort').textContent = p.port_ok ? '✓ 正常' : '✗';
+    document.getElementById('v82ProxyPort').className = 'value ' + (p.port_ok ? 'green' : 'red');
+    document.getElementById('v82ProxyInternet').textContent = p.internet_ok ? '✓ 正常' : '✗ 异常';
+    document.getElementById('v82ProxyInternet').className = 'value ' + (p.internet_ok ? 'green' : 'red');
+    document.getElementById('v82ProxyNodes').textContent = (p.alive_nodes||0) + '/' + (p.total_nodes||0);
+    document.getElementById('v82ProxyRestarts').textContent = p.restarts||0;
+    const up = p.uptime||0;
+    document.getElementById('v82ProxyUptime').textContent = up > 3600 ? (up/3600).toFixed(1)+'h' : up > 60 ? Math.floor(up/60)+'m'+up%60+'s' : up+'s';
+
+    // ════════ V8 ════════
+    const v8 = status.v8 || {};
+    document.getElementById('v8Running').textContent = v8.running ? '运行中' : (v8.status === 'complete' ? '已完成' : '已停止');
+    document.getElementById('v8Running').className = 'value ' + (v8.running ? 'green pulsing' : (v8.status === 'complete' ? 'green' : 'red'));
+    document.getElementById('v8Round').textContent = (v8.round||0) + '/' + (v8.total_rounds||0);
+    document.getElementById('v8Score').textContent = (v8.best_score||0).toFixed(1);
+    document.getElementById('v8Wr').textContent = (v8.best_wr||0).toFixed(1)+'%';
+    document.getElementById('v8N').textContent = v8.best_n||0;
+
+    // ════════ V7 ════════
+    const v7 = status.v7 || {};
+    const v7p = status.v7plus || {};
+    document.getElementById('v7Status').textContent = v7p.status === 'running' ? '运行中' : (v7p.status === 'complete' ? '✅ 完成' : '⏸ 停止');
+    document.getElementById('v7Gen').textContent = v7p.round || 0;
+    document.getElementById('v7OldStatus').textContent = v7.status || 'unknown';
+    document.getElementById('v7OldGen').textContent = v7.round || 0;
+
+    // ════════ 代理面板 ════════
+    document.getElementById('proxyRunning').innerHTML = '<span class="status-dot '+(p.running?'dot-ok':'dot-err')+'"></span>'+(p.running?'运行中':'已停止');
+    document.getElementById('proxyPid').textContent = p.pid || '-';
+    document.getElementById('proxyPort7890').textContent = p.port_ok ? '✓ 正常' : '✗';
+    document.getElementById('proxyPort7890').className = 'value ' + (p.port_ok ? 'green' : 'red');
+    document.getElementById('proxyInternet').textContent = p.internet_ok ? '✓ 正常' : '✗';
+    document.getElementById('proxyInternet').className = 'value ' + (p.internet_ok ? 'green' : 'red');
+    document.getElementById('proxyNodes').textContent = (p.alive_nodes||0) + '/' + (p.total_nodes||0);
+    document.getElementById('proxyRestarts').textContent = p.restarts||0;
+    document.getElementById('proxyUptime').textContent = up > 3600 ? (up/3600).toFixed(1)+'h' : up > 60 ? Math.floor(up/60)+'m'+up%60+'s' : up+'s';
+    document.getElementById('proxyLastCheck').textContent = p.last_check || '-';
+
+    // 外网连通性
+    const conn = p.connectivity || {};
+    Object.entries({'proxyGoogle':'google.com','proxyGithub':'github.com','proxyYoutube':'youtube.com'}).forEach(([id, key]) => {
+      const ok = conn[key];
+      const el = document.getElementById(id);
+      if (ok === true) { el.textContent = '✓ OK'; el.className = 'value green'; }
+      else if (ok === false) { el.textContent = '✗ Fail'; el.className = 'value red'; }
+      else { el.textContent = '-'; el.className = 'value dim'; }
+    });
+
+    // ⓿ 参数面板
+    buildParams(v82bd, v82d);
+
+    // ════════ 信号 ════════
+    const sigs = v82d.total_signals || {};
+    document.getElementById('sigFvg').textContent = sigs.fvg || 0;
+    document.getElementById('sigSweep').textContent = sigs.sweep || 0;
+    document.getElementById('sigOb').textContent = sigs.ob || 0;
+    document.getElementById('sigBpr').textContent = sigs.bpr || 0;
+
+    // ⓿ 历史图表
+    buildChart(chart);
+
+    // ⓿ 状态
+    document.getElementById('timeLabel').textContent = v82.timestamp ? '更新 '+v82.timestamp : '';
+    document.getElementById('updateTime').textContent = new Date().toLocaleString('zh-CN');
+
+    const badgeEl = document.getElementById('statusBadge');
+    if (v82.running) { badgeEl.textContent = '🟢 RUNNING'; badgeEl.style.background = '#3fb950'; }
+    else if (v82.status === 'complete') { badgeEl.textContent = '✅ COMPLETE'; badgeEl.style.background = '#58a6ff'; }
+    else { badgeEl.textContent = '⏸ STOPPED'; badgeEl.style.background = '#30363d'; }
+
+  } catch(e) {
+    console.error('Refresh error:', e);
+    document.querySelectorAll('.stat .value').forEach(el => {
+      if (el.textContent === '-' || el.textContent === '') {
+        el.textContent = '⚠ err';
+        el.style.color = 'var(--orange)';
+      }
+    });
+  }
+}
+
+function buildParams(bd, det) {
+  const tbl = document.getElementById('paramsTable');
+  // show best params from best_detail
+  const params = det.best_params || {};
+  const keys = Object.keys(params);
+  if (keys.length > 0) {
+    // eval line
+    let evalLine = 'WR='+(bd.wr||0)+'%';
+    if (bd.pf) evalLine += ' PF='+bd.pf;
+    if (bd.n) evalLine += ' N='+bd.n;
+    if (bd.rr_avg) evalLine += ' RR='+bd.rr_avg.toFixed(2);
+    if (bd.ret) evalLine += ' Ret='+bd.ret+'%';
+    document.getElementById('pEval').textContent = evalLine;
+    document.getElementById('pEval').className = 'value ' + ((bd.wr||0) >= 80 ? 'green' : 'orange');
+
+    tbl.innerHTML = keys.map(k => {
+      const val = params[k];
+      return '<tr><td>'+k+'</td><td style="text-align:right;font-family:monospace;">'+val+'</td></tr>';
+    }).join('');
+  } else {
+    tbl.innerHTML = '<tr><td style="color:var(--dim);">暂无参数 (优化未完成)</td></tr>';
+  }
+}
+
+function buildChart(chart) {
+  const el = document.getElementById('v82HistoryChart');
+  const scores = chart.scores || [];
+  const wrs = chart.wrs || [];
+  const rrs = chart.rrs || [];
+
+  if (scores.length < 2) {
+    el.innerHTML = '<div style="color:var(--dim);padding:20px;text-align:center;">等待优化数据...</div>';
+    return;
+  }
+
+  apiHistory = scores;
+  const maxScore = Math.max(...scores.filter(s => s > 0), 1);
+
+  el.innerHTML = scores.map((s, i) => {
+    if (i % 2 !== 0 && i < scores.length - 1) return ''; // 隔一个显示保持清晰
+    const pct = Math.max(2, (s / maxScore) * 100);
+    const wr = wrs[i] || 0;
+    const rr = rrs ? (rrs[i] || 0) : 0;
+    let color = s > maxScore * 0.8 ? '#3fb950' : s > maxScore * 0.5 ? '#58a6ff' : '#d29922';
+    if (wr >= 80) color = '#3fb950';
+    else if (wr >= 60) color = '#58a6ff';
+    else color = '#8b949e';
+    const tip = `R${i}: S=${s.toFixed(0)}, WR=${wr.toFixed(0)}%${rr ? ', RR='+rr.toFixed(2) : ''}`;
+    const bar = document.createElement('div');
+    return `<div class="hist-bar" style="height:${pct}%;background:${color};" data-i="${i}"><span class="tooltip">${tip}</span></div>`;
+  }).filter(Boolean).join('');
+
+  // also show RR line if available
+  if (rrs && rrs.length > 5) {
+    const rrMax = Math.max(...rrs, 1);
+    const rrDiv = document.createElement('div');
+    rrDiv.style.cssText = 'margin-top:8px;display:flex;align-items:center;gap:4px;height:20px;';
+    const recentRrs = rrs.slice(-30);
+    const maxRr = Math.max(...recentRrs, 1);
+    recentRrs.forEach((rr, i) => {
+      const dot = document.createElement('span');
+      const h = Math.min(18, Math.max(2, (rr / maxRr) * 18));
+      dot.style.cssText = `display:inline-block;width:6px;height:${h}px;background:${rr>=1?'#3fb950':'#d29922'};border-radius:1px;margin-right:1px;`;
+      dot.title = `RR=${rr}`;
+      rrDiv.appendChild(dot);
+    });
+    el.appendChild(document.createTextNode(''));
+    el.appendChild(rrDiv);
+  }
+}
+
+// 每2秒刷新
+setInterval(refresh, 2000);
+refresh();
+</script>
+</body>
+</html>

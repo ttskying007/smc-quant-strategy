@@ -1,0 +1,5 @@
+事件(v20e): 4407
+v20f CSV(无泄漏): 4481 笔 → E:\test\smc_project\research\combo_v20f_trades.csv
+  2024: n=2869 avg=+11.40% PF=14.13
+  2025: n=652 avg=+3.06% PF=4.97
+  2026: n=618 avg=+7.54% PF=9.68

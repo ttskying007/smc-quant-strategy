@@ -1,0 +1,84 @@
+﻿file,version,engine,date,n,wr,avg_pnl,cum,avg_rr,sl_rate,by_year,decision,error
+E:\test\smc_project\hermes\smc_opt_v100_economic_net_wr_gate\v100_report.json,100.,V100_ECONOMIC_NET_WR_GATE,20260611,113,78.76,2.5638,,,21.24,"2023:n=9,wr=55.6,avg=0.79; 2024:n=5,wr=20.0,avg=0.20; 2025:n=74,wr=86.5,avg=2.96; 2026:n=25,wr=76.0,avg=2.51","REJECT_V100_FOR_PRODUCTION: economic exit removes sub-cost small-win pollution, but A/B net WR is 78.76% (gate >=90%) and ABC net WR is 72.4%; active picks suppressed; keep as economic autopsy artifact, not production. | pass=False",
+E:\test\smc_project\hermes\smc_opt_v100_high_rr_gate\v100_report.json,100.,V100_HIGH_RR_GATE_V98_STRUCTURAL_EXIT,,869,76.06,3.4248,,5.0291,23.94,,,
+E:\test\smc_project\hermes\smc_opt_v100_structural_net_gate\v100_report.json,100.,V100_STRUCTURAL_NET_5R_GATE,20260626,60,91.67,3.4724,208.3431,,8.33,,,
+E:\test\smc_project\hermes\smc_opt_v101_mtf_dna_combo_contract\v101_report.json,101.,V101_MTF_DNA_COMBO_CONTRACT,,60,91.67,3.4724,,,8.33,,,
+E:\test\smc_project\hermes\smc_opt_v102_balanced_volume_gate\v101_report.json,102.,V102_BALANCED_VOLUME_GATE,,195,87.69,3.7219,,,12.31,,,
+E:\test\smc_project\hermes\smc_opt_v102_balanced_volume_gate\v102_report.json,102.,V102_BALANCED_VOLUME_GATE,,195,87.69,3.7219,,,12.31,,,
+E:\test\smc_project\hermes\smc_opt_v103a_risk_gate\v101_report.json,103a.,V103A_RISK_GATE,,172,88.95,3.9271,,,11.05,,,
+E:\test\smc_project\hermes\smc_opt_v103a_risk_gate\v103a_report.json,103a.,V103A_RISK_GATE,,172,88.95,3.9271,,,11.05,,,
+E:\test\smc_project\hermes\smc_opt_v103a_risk_gate\v103a_stability_report.json,103a.,,,,,,,,,,,no metrics block
+E:\test\smc_project\hermes\smc_opt_v103a_risk_gate\v103f_runner30_be20_report.json,103a.,,,,,,,,,,,no metrics block
+E:\test\smc_project\hermes\smc_opt_v104_strict_reclaim\v104_report.json,104.,V104_STRICT_RECLAIM_CONFIRMED,2026-06-19T22:03:16,487,54.62,0.4248,206.8571,,42.92,,RESEARCH_ONLY_NOT_PROMOTED | pass=False,
+E:\test\smc_project\hermes\smc_opt_v105a_structural_tp2_reentry\v105a_report.json,105a.,V105A_STRUCTURAL_TP2_REENTRY,,172,88.95,3.9212,,,11.05,,RESEARCH_CANDIDATE__NEEDS_LATEST_FULL_MARKET_SCANNER_DRY_RUN,
+E:\test\smc_project\hermes\smc_opt_v152_hybrid_lifecycle_gate\v152_report.json,152.,V152_HYBRID_LIFECYCLE_GATE,,127,92.91,2.9407,,,7.09,"2023:n=25,wr=92.0,avg=3.85; 2024:n=49,wr=89.8,avg=2.50; 2025:n=34,wr=100.0,avg=3.22; 2026:n=19,wr=89.5,avg=2.38",pass=True,
+E:\test\smc_project\hermes\smc_opt_v167_exact_scanner_gate\v167_live_guard_report.json,167.,,,,,,,,,,,no metrics block
+E:\test\smc_project\hermes\smc_opt_v167_exact_scanner_gate\v167_report.json,167.,V167_EXACT_SCANNER_GATE,2026-06-23T17:58:27,793,82.09,4.5403,,,,"2023:n=158,wr=80.4,avg=4.16; 2024:n=289,wr=80.6,avg=4.60; 2025:n=266,wr=83.8,avg=4.51; 2026:n=80,wr=85.0,avg=5.18",V169_PROMOTION_ARTIFACTS_PASS,
+E:\test\smc_project\hermes\smc_opt_v172_v167_high_quality_gate\v172_report.json,172.,V172_V167_HIGH_QUALITY_GATE,2026-06-23T18:03:34,247,83.81,6.0493,1494.1707,,8.91,,V172_QUALITY_UPGRADE_PASS__PROMOTION_CANDIDATE,
+E:\test\smc_project\hermes\smc_opt_v175_semantic_split\v175_report.json,175.,V175_DEMAND_OB_TRUE_TAKEOVER_SEMANTIC_SPLIT,2026-07-17T15:04:47,247,83.81,6.0493,,,8.91,,V175_SEMANTIC_SPLIT_PASS__PROMOTION_READY_LABEL_ONLY | Prevents frontend/reports from overclaiming classical SSL_SWEEP_CHOCH correctness while preserving the verified V172 production economics.,
+E:\test\smc_project\hermes\smc_opt_v185_combined_production_candidate\v185_report.json,185.,V185_COMBINED_V175_PLUS_TRUE_TAKEOVER_CHILD,2026-06-26T09:58:08,334,86.23,6.5628,2191.9668,,,,V185_REJECTED_CAUSALITY__RESEARCH_HISTORY_ONLY | REJECT_V185_AS_PRODUCTION_BASELINE__HISTORICAL_ADVANTAGE_NOT_CAUSALLY_PROVEN,
+E:\test\smc_project\hermes\smc_opt_v45_5\v45_5_report.json,45.5,v45_5_restored,2026-06-04T08:33:29,137,90.5,20.649,,,8.8,,DIAGNOSTIC_RESTORED_FOR_FRONTEND_NONEMPTY_CONTRACT,
+E:\test\smc_project\hermes\smc_opt_v45_5\v45_5_validation_summary.json,45.5,v45_5_restored,2026-06-04T08:33:29,137,90.5,20.649,,,8.8,,DIAGNOSTIC_RESTORED_FOR_FRONTEND_NONEMPTY_CONTRACT,
+E:\test\smc_project\hermes\smc_opt_v50_signal\v50_pine_param_matrix.json,50.,,,,,,,,,,,no metrics block
+E:\test\smc_project\hermes\smc_opt_v50_signal\v50_signal_report.json,50.,,,,,,,,,,,no metrics block
+E:\test\smc_project\hermes\smc_opt_v65\v65_report.json,65,V65 loss-review gate on V64,2026-05-28T09:24:03,143,88.81,20.035,2865.0,4.865,,,,
+E:\test\smc_project\hermes\smc_opt_v66\v66_report.json,66,V66 recent REENTRY risk overlay on V65,2026-06-12T15:22:11,137,90.51,20.649,2828.84,5.016,,,,
+E:\test\smc_project\hermes\smc_opt_v67_strict\v67_report.json,67.,V67_STRICT_REGISTRY_CANDIDATE,2026-06-11T13:36:08,90579,41.12,0.713,,1.855,58.73,,,
+E:\test\smc_project\hermes\smc_opt_v68_directional\v68_report.json,68.,V68_DIRECTION_CLASSIFIER_CANDIDATE,2026-06-09T14:40:16,1657,34.94,0.238,,2.018,64.51,,,
+E:\test\smc_project\hermes\smc_opt_v68_strict_ld\v68_report.json,68.,V68_STRICT_LD_FVG_LIMIT_STRUCTURE,2026-06-11T17:57:20,5546,58.17,1.0758,5966.13,1.073,41.65,,,
+E:\test\smc_project\hermes\smc_opt_v69_matrix\v69_matrix_report.json,69.,V69_STRICT_LD_ENTRY_SL_TP_MATRIX,2026-06-11T21:58:52,1693559,62.47,2.217,3754630.46,1.205,37.02,,,
+E:\test\smc_project\hermes\smc_opt_v70_fast_repair\v70_fast_report.json,70.,/base_v68,2026-06-12T10:30:13,5546,58.17,1.0758,5966.13,,41.65,,NO_PROMOTION_BELOW_90WR,
+E:\test\smc_project\hermes\smc_opt_v70_precision\v70_precision_report.json,70.,metrics,2026-06-12T09:31:49,51,92.16,3.9496,201.43,,7.84,"2023:n=3,wr=66.7,avg=0.71; 2024:n=2,wr=50.0,avg=0.15; 2025:n=46,wr=95.7,avg=4.33",NO_PRODUCTION_YET_WR_OK_BUT_N_LT_100_AND_2023_2024_2026_SPARSE | m_b20_50_65 + m_b60_35_70 + stock_r20_pos + stock_r5_pos + risk_3_6 + pierce_ge0_3 + zone_width_lt3,
+E:\test\smc_project\hermes\smc_opt_v70_reaction_confirm\v70_precision_report.json,70.,V70_REACTION_CONFIRM_HIGH_PRECISION,2026-06-12T08:57:16,67,98.51,0.5821,39.0,,1.49,"2023:n=14,wr=100.0,avg=0.66; 2024:n=15,wr=100.0,avg=0.75; 2025:n=26,wr=96.2,avg=0.39; 2026:n=12,wr=100.0,avg=0.71",CANDIDATE_ONLY_NOT_SYNCED,
+E:\test\smc_project\hermes\smc_opt_v70_reaction_confirm\v70_report.json,70.,metrics,2026-06-12T08:56:01,7479,81.6,0.4799,,,18.38,,NO_PRODUCTION_SYNC,
+E:\test\smc_project\hermes\smc_opt_v70_signal_gate\v70_fast_signal_gate_report.json,70.,/base,2026-06-12T09:30:11,5187,58.65,1.1329,,,41.2,,,
+E:\test\smc_project\hermes\smc_opt_v71\v71_report.json,71,v71_metrics,2026-06-09T15:33:52,62,98.39,16.09,,15.215,0.0,,,
+E:\test\smc_project\hermes\smc_opt_v71_context_poi\v71_context_poi_gate_search.json,71.,,,,,,,,,,,no metrics block
+E:\test\smc_project\hermes\smc_opt_v71_smart_money_position\v71_report.json,71.,V71_SMART_MONEY_POSITION,2026-06-12T13:36:49,9931,55.15,0.1437,1427.48,0.871,44.78,,,
+E:\test\smc_project\hermes\smc_opt_v72_layered\v72_report.json,72.,V72_LAYERED_SL_BUFFER,2026-06-09T16:02:23,250,84.4,18.84,,5.715,14.8,,parallel_candidate_only_do_not_replace_v66_production,
+E:\test\smc_project\hermes\smc_opt_v72_sweep_origin_ob\v72_report.json,72.,V72_SWEEP_ORIGIN_OB,2026-06-12T13:59:48,33808,53.01,0.0076,255.53,0.89,46.96,,,
+E:\test\smc_project\hermes\smc_opt_v73_structural_env\v73_gate_report.json,73.,V73_STRUCTURAL_ENV_GATE_SEARCH,2026-07-09T14:27:05,1459,63.4,0.7571,1104.55,0.878,36.6,,,
+E:\test\smc_project\hermes\smc_opt_v74_env_state_machine\v74_report.json,74.,V74_ENV_STATE_MACHINE_GATE_SEARCH,2026-07-09T14:27:07,796,69.47,1.1742,934.69,0.85,30.53,,,
+E:\test\smc_project\hermes\smc_opt_v75_post_entry_invalidation\v75_gate_candidate.json,75.,metrics,,113,82.3,2.2064,249.32,,17.7,"2023:n=9,wr=22.2,avg=-2.34; 2024:n=9,wr=88.9,avg=3.11; 2025:n=74,wr=85.1,avg=2.44; 2026:n=21,wr=95.2,avg=2.94",,
+E:\test\smc_project\hermes\smc_opt_v75_post_entry_invalidation\v75_report.json,75.,V75_POST_ENTRY_INVALIDATION_AUDIT,2026-06-12T15:01:13,850,69.41,1.1645,989.81,0.85,30.59,,,
+E:\test\smc_project\hermes\smc_opt_v76_env_persistence_story_machine\v76_report.json,76.,V76_ENV_PERSISTENCE_STORY_MACHINE_AUDIT,2026-06-12T15:38:52,203,72.91,1.3384,271.7,0.811,27.09,,,
+E:\test\smc_project\hermes\smc_opt_v76_environment_hysteresis\v76_report.json,76.,V76_ENVIRONMENT_HYSTERESIS_AND_ENV_RISK_EXIT,2026-06-12T15:53:04,850,69.41,1.1645,989.81,0.85,30.59,,,
+E:\test\smc_project\hermes\smc_opt_v77_recovery_quality_gate\v77_report.json,77.,V77_RECOVERY_QUALITY_GATE_SEARCH,2026-06-12T15:42:34,850,69.41,1.1645,,,30.59,,requires >=500 trades and all 4 years with >=10 trades and >=65% WR,
+E:\test\smc_project\hermes\smc_opt_v77_recovery_quality_state_machine\v77_report.json,77.,V77_RECOVERY_QUALITY_STATE_MACHINE_AUDIT,2026-06-12T16:19:16,474,71.73,1.2095,573.3,,28.27,,V77 is still an audit layer; it improves 2024 but 2023 remains below 65% and total sample is below production threshold.,
+E:\test\smc_project\hermes\smc_opt_v78_full_lifecycle_audit\v78_full_lifecycle_report.json,78.,V78_FULL_CANDIDATE_LIFECYCLE_AUDIT,2026-06-12T17:35:46,211,78.2,1.7098,360.77,0.835,21.8,,,
+E:\test\smc_project\hermes\smc_opt_v78_hysteresis_recovery_trend_gate\v78_report.json,78.,V78_HYSTERESIS_RECOVERY_TREND_GATE_RC,2026-06-12T16:17:30,850,69.41,1.1645,989.81,,30.59,,"V78 passes V74/V75 candidate-layer yearly stability, but must be re-run inside the full V71/V74 generator before production promotion.",
+E:\test\smc_project\hermes\smc_opt_v79_full_candidate_v78_replay\v79_report.json,79.,V79_FULL_CANDIDATE_LAYER_REPLAY_OF_V78_RULES,2026-06-12T16:38:14,9931,55.15,0.1437,1427.48,,44.78,,,
+E:\test\smc_project\hermes\smc_opt_v79_full_lifecycle_audit\v79_gate_search_results.json,79.,,,,,,,,,,,not dict
+E:\test\smc_project\hermes\smc_opt_v79_full_lifecycle_audit\v79_report.json,79.,V79_FULL_CANDIDATE_LIFECYCLE_AUDIT,2026-06-12T17:54:35,106,78.3,1.6868,178.8,,21.7,,,
+E:\test\smc_project\hermes\smc_opt_v79_lifecycle_gate_full_candidate\v79_report.json,79.,V79_LIFECYCLE_GATE_FULL_CANDIDATE,2026-06-12T17:38:39,59,76.27,1.6882,99.61,0.878,23.73,,Need stable 2023/2024 coverage and full 4905-stock fresh generation before production.,
+E:\test\smc_project\hermes\smc_opt_v80_full_candidate_production_gate\v80_report.json,80.,V80_FULL_CANDIDATE_PRODUCTION_GATE,2026-06-12T17:10:43,9931,55.15,0.1437,1427.48,0.871,44.78,,,
+E:\test\smc_project\hermes\smc_opt_v81_contextual_smc_generator\v81_report.json,81.,V81_CONTEXTUAL_SMC_GENERATOR,,47612,53.27,-0.116,-5524.7,,,"2015:n=1,wr=100.0,avg=3.91; 2016:n=3,wr=0.0,avg=-2.44; 2017:n=2,wr=50.0,avg=0.17; 2023:n=8465,wr=49.4,avg=-0.40; 2024:n=12246,wr=51.0,avg=-0.20; 2025:n=19527,wr=56.0,avg=0.13; 2026:n=7368,wr=54.3,avg=-0.30",,
+E:\test\smc_project\hermes\smc_opt_v81_contextual_smc_generator\v82_gate_search_small.json,81.,,,,,,,,,,,no metrics block
+E:\test\smc_project\hermes\smc_opt_v82_smart_money_quality_gate\v82_report.json,82.,V82_SMART_MONEY_QUALITY_GATE,,47612,53.27,-0.116,-5524.7,,,"2023:n=56,wr=48.2,avg=0.85; 2024:n=41,wr=48.8,avg=1.26; 2025:n=131,wr=64.1,avg=2.09; 2026:n=37,wr=48.6,avg=0.22",,
+E:\test\smc_project\hermes\smc_opt_v83_post_reclaim_takeover\v83_report.json,83.,V83_POST_RECLAIM_TAKEOVER,,265,56.23,1.4379,381.06,,,"2023:n=41,wr=43.9,avg=-0.18; 2024:n=38,wr=60.5,avg=1.27; 2025:n=115,wr=65.2,avg=2.01; 2026:n=30,wr=53.3,avg=-0.09",,
+E:\test\smc_project\hermes\smc_opt_v84_smart_money_path_split\v84_report.json,84.,V84_SMART_MONEY_PATH_SPLIT,,224,58.93,1.2029,269.44,,,"2023:n=1,wr=0.0,avg=-2.72; 2024:n=2,wr=50.0,avg=2.52; 2025:n=39,wr=76.9,avg=2.36; 2026:n=3,wr=33.3,avg=-2.92",,
+E:\test\smc_project\hermes\smc_opt_v85_mixed_accumulation_generator\v85_gate_search.json,85.,,,,,,,,,,,not dict
+E:\test\smc_project\hermes\smc_opt_v85_mixed_accumulation_generator\v85_report.json,85.,V85_MIXED_ACCUMULATION_GENERATOR,,23307,64.47,0.5595,13041.06,,,"2016:n=1,wr=0.0,avg=-3.49; 2017:n=2,wr=100.0,avg=1.51; 2022:n=1,wr=0.0,avg=-1.85; 2023:n=3693,wr=61.4,avg=0.17; 2024:n=4613,wr=64.2,avg=0.79; 2025:n=10578,wr=65.7,avg=0.64; 2026:n=4419,wr=64.2,avg=0.46",,
+E:\test\smc_project\hermes\smc_opt_v85_production_gate\v85_production_report.json,85.,V85_PRODUCTION_GATE,,559,89.09,2.7117,1515.85,,,"2023:n=110,wr=86.4,avg=2.20; 2024:n=132,wr=88.6,avg=2.55; 2025:n=233,wr=90.6,avg=2.95; 2026:n=84,wr=89.3,avg=2.99",,
+E:\test\smc_project\hermes\smc_opt_v86_production_gate\v86_production_report.json,86.,V86_PRODUCTION_GATE,,532,89.85,2.6845,1428.15,,,"2023:n=108,wr=87.0,avg=2.23; 2024:n=123,wr=89.4,avg=2.51; 2025:n=223,wr=91.0,avg=2.89; 2026:n=78,wr=91.0,avg=3.00",,
+E:\test\smc_project\hermes\smc_opt_v87_mtf_entry_rr_matrix\v87_matrix_report.json,87.,V87_MTF_ENTRY_RR_MATRIX,,20908,78.69,1.9326,40407.04,1.8159,,"2023:n=3632,wr=70.8,avg=0.93; 2024:n=4144,wr=84.2,avg=2.18; 2025:n=8396,wr=80.3,avg=2.15; 2026:n=4736,wr=76.9,avg=2.10",,
+E:\test\smc_project\hermes\smc_opt_v88_production_contract\v88_production_report.json,88.,V88_PRODUCTION_CONTRACT,,532,80.08,2.836,1508.76,2.9771,16.35,"2023:n=108,wr=74.1,avg=2.01; 2024:n=123,wr=82.1,avg=3.01; 2025:n=223,wr=82.1,avg=3.13; 2026:n=78,wr=79.5,avg=2.85",,
+E:\test\smc_project\hermes\smc_opt_v89_recovery_known_target\v89_summary_report.json,89.,V89_RECOVERY_KNOWN_TARGET_RESEARCH,,,,,,,,,,no metrics block
+E:\test\smc_project\hermes\smc_opt_v90_daily_full_market_scanner\v90_3y_v86_gate_known_bsl_report.json,90.,V90_3Y_AUDIT_V86_GATE_KNOWN_BSL,,532,83.65,2.8689,1526.26,1.632,0.0,"2023:n=106,wr=86.8,avg=2.19; 2024:n=123,wr=89.4,avg=2.51; 2025:n=223,wr=91.0,avg=2.89; 2026:n=78,wr=91.0,avg=3.00",FOUND_PRODUCTION_CANDIDATE_MEETING_90WR_AND_SAMPLE_GATE,
+E:\test\smc_project\hermes\smc_opt_v90_daily_full_market_scanner\v90_3y_v86_gate_known_bsl_rows.json,90.,,,,,,,,,,,not dict
+E:\test\smc_project\hermes\smc_opt_v90_daily_full_market_scanner\v90_daily_scan_report.json,90.,V90_DAILY_SCANNER_V88_CONTRACT,,,,,,,,,,no metrics block
+E:\test\smc_project\hermes\smc_opt_v91_mtf_entry_position_audit\v91_mtf_entry_position_report.json,91.,V91_MTF_ENTRY_POSITION_AUDIT,,186350,77.07,1.1602,,1.817,20.9,,,
+E:\test\smc_project\hermes\smc_opt_v91_shadow_zone_entry_scanner\v91_shadow_scan_report.json,91.,V91_SHADOW_ZONE_ENTRY_SCANNER,,,,,,,,,,no metrics block
+E:\test\smc_project\hermes\smc_opt_v91_smc_full_flow_solution\v91_full_flow_report.json,91.,V91_SMC_FULL_FLOW_SOLUTION_AUDIT,,523,90.25,2.6923,1408.08,0.0,9.75,"2023:n=103,wr=87.4,avg=2.21; 2024:n=122,wr=89.3,avg=2.49; 2025:n=220,wr=91.8,avg=2.92; 2026:n=78,wr=91.0,avg=3.00",PASS_PRODUCTION_WR90_AVG_R2_AND_PASS_ELITE_MTF_RR,
+E:\test\smc_project\hermes\smc_opt_v92_recovery_time_stop_zone_mid_autopsy\v92_autopsy_report.json,92.,V92_RECOVERY_TIME_STOP_ZONE_MID_AUTOPSY,,532,83.65,2.8689,,,12.97,,,
+E:\test\smc_project\hermes\smc_opt_v93_recovery_time_runner_audit\v93_recovery_time_runner_report.json,93.,V93_RECOVERY_GATE_TIME_STOP_RUNNER_AUDIT,,22037,87.99,1.3536,,,11.92,,,
+E:\test\smc_project\hermes\smc_opt_v94_post_exit_tp_sl_autopsy\v94_post_exit_report.json,94.,V94_POST_EXIT_TP_SL_AUTOPSY,,,,,,,,,,no metrics block
+E:\test\smc_project\hermes\smc_opt_v95_exit_contract_autopsy\v95_exit_contract_report.json,95.,V95_EXIT_CONTRACT_AUTOPSY,,532,86.09,2.9382,1563.1,,12.97,"2023:n=108,wr=83.3,avg=2.45; 2024:n=123,wr=88.6,avg=2.92; 2025:n=223,wr=86.1,avg=3.18; 2026:n=78,wr=85.9,avg=2.96",,
+E:\test\smc_project\hermes\smc_opt_v96_adaptive_entry_exit_search\v96_report.json,96.,V96_ADAPTIVE_ENTRY_EXIT_SEARCH,,516,87.4,4.9332,2545.52,,4.84,,,
+E:\test\smc_project\hermes\smc_opt_v96_runner_sl_split_autopsy\v96_runner_sl_split_report.json,96.,V96_RUNNER_SL_SPLIT_AUTOPSY,,140,100.0,4.4213,618.99,,,,,
+E:\test\smc_project\hermes\smc_opt_v97_structural_rr_contract\v97_report.json,97.,V97_STRUCTURAL_RR_CONTRACT,2026-06-15T17:26:28,10440,58.6,3.1425,32808.178,,41.4,,,
+E:\test\smc_project\hermes\smc_opt_v98_reachable_5r_probability_gate\v98_report.json,98.,V98_REACHABLE_5R_PROBABILITY_GATE,2026-06-26T15:31:10,7828,62.98,3.0765,24083.1024,,37.02,,,
+E:\test\smc_project\hermes\smc_opt_v98_reachable_5r_probability_gate\v98_shadow_fix_matrix.json,98.,/current/overall,,7923,62.97,3.0708,24329.8376,,37.03,,,
+E:\test\smc_project\hermes\smc_opt_v98_reachable_5r_probability_gate\v99_high_wr_gate_search.json,98.,/base,,7923,62.97,3.0708,24329.8376,,37.03,,,
+E:\test\smc_project\hermes\smc_opt_v99_high_wr_gate\v100_search_report.json,99.,,,,,,,,,,,Expecting value: line 1 column 1 (char 0)
+E:\test\smc_project\hermes\smc_opt_v99_high_wr_gate\v99_report.json,99.,V99_PROFIT_PROTECT_HIGH_WR_GATE,20260626,60,100.0,1.9508,117.048,,0.0,,,

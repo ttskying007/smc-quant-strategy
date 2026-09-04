@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMC V11 Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"></script>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;background:#0f1419;color:#e0e0e0;margin:0;padding:20px}
+h1{color:#ff9800;font-size:24px;margin-bottom:10px}
+h2{color:#ffa726;font-size:18px;margin:20px 0 10px}
+.status-bar{display:flex;gap:15px;flex-wrap:wrap;margin-bottom:20px}
+.stat-card{background:#1a2332;border-radius:10px;padding:15px;min-width:120px;flex:1}
+.stat-card .label{font-size:12px;color:#8899aa}
+.stat-card .value{font-size:24px;font-weight:bold;margin-top:5px}
+.stat-card .value.green{color:#4caf50}
+.stat-card .value.red{color:#f44336}
+.stat-card .value.orange{color:#ff9800}
+.chart-box{background:#1a2332;border-radius:10px;padding:15px;margin-bottom:15px}
+.chart{height:400px;width:100%}
+.search-box{background:#1a2332;border-radius:10px;padding:15px;margin-bottom:15px;display:flex;gap:10px}
+.search-box input{flex:1;padding:10px;border:1px solid #334;border-radius:6px;background:#0f1419;color:#e0e0e0;font-size:14px}
+.search-box button{padding:10px 20px;background:#ff9800;border:none;border-radius:6px;color:#000;font-weight:bold;cursor:pointer}
+.search-box button:hover{background:#ffb74d}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #1a2332}
+th{background:#1a2332;color:#8899aa;font-weight:normal}
+tr:hover{background:#1a2332}
+.platinum{color:#e5e4e2}.gold{color:#ffd700}.silver{color:#c0c0c0}.bronze{color:#cd7f32}
+.bull{color:#4caf50}.bear{color:#f44336}
+</style>
+</head>
+<body>
+
+<h1>&#x1F4CA; SMC V11 Dashboard</h1>
+<p style="color:#667;margin-top:-5px">Adaptive Multi-Dimensional Resonance Trading System</p>
+
+<div class="status-bar" id="statusBar">
+  <div class="stat-card"><div class="label">Overall WR</div><div class="value orange" id="ovWR">--</div></div>
+  <div class="stat-card"><div class="label">Avg RR</div><div class="value green" id="ovRR">--</div></div>
+  <div class="stat-card"><div class="label">Profit Factor</div><div class="value green" id="ovPF">--</div></div>
+  <div class="stat-card"><div class="label">Total Trades</div><div class="value" id="ovN">--</div></div>
+  <div class="stat-card"><div class="label">Signals Active</div><div class="value" id="ovSig">--</div></div>
+</div>
+
+<div class="search-box">
+  <input id="symbolInput" placeholder="Enter symbol (e.g., 600519.SH, AAPL, BTC)" value="600519.SH">
+  <button onclick="analyze()">Analyze</button>
+  <button onclick="analyzeAll()" style="background:#334;color:#e0e0e0">Scan Top 10</button>
+</div>
+
+<div class="chart-box">
+  <h2>V11 Resonance Score</h2>
+  <div class="chart" id="resonanceChart"></div>
+</div>
+
+<div class="chart-box">
+  <h2>Signal Timeline</h2>
+  <div class="chart" id="timelineChart" style="height:200px"></div>
+</div>
+
+<div class="chart-box">
+  <h2>Analysis Results</h2>
+  <pre id="analysisResult" style="background:#0f1419;padding:15px;border-radius:6px;overflow:auto;max-height:500px;font-size:12px;line-height:1.5"></pre>
+</div>
+
+<table id="signalTable">
+  <thead><tr>
+    <th>#</th><th>Type</th><th>Direction</th><th>Idx</th><th>Price</th>
+    <th>Strength</th><th>Confidence</th><th>Grade</th><th>Trend</th>
+  </tr></thead>
+  <tbody id="signalBody"></tbody>
+</table>
+
+<script>
+let resChart, tlChart;
+
+function initCharts() {
+  resChart = echarts.init(document.getElementById('resonanceChart'));
+  tlChart = echarts.init(document.getElementById('timelineChart'));
+  
+  // Resonance radar
+  resChart.setOption({
+    radar: {
+      indicator: [
+        { name: 'TF Resonance', max: 1 },
+        { name: 'Indicator', max: 1 },
+        { name: 'Swing', max: 1 },
+        { name: 'Temporal', max: 1 },
+      ],
+      shape: 'circle',
+      axisName: { color: '#8899aa' },
+      splitArea: { areaStyle: { color: ['rgba(255,152,0,0.02)', 'rgba(255,152,0,0.05)'] } },
+    },
+    series: [{
+      type: 'radar',
+      data: [{ value: [0,0,0,0], name: 'V11', areaStyle: { color: 'rgba(255,152,0,0.3)' }, lineStyle: { color: '#ff9800', width: 2 } }],
+      symbol: 'none',
+    }]
+  });
+  
+  // Timeline
+  tlChart.setOption({
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'category', data: [], axisLabel: { color: '#667' } },
+    yAxis: { type: 'value', axisLabel: { color: '#667' } },
+    series: [
+      { type: 'scatter', symbolSize: 12, data: [], itemStyle: { color: '#ff9800' } }
+    ]
+  });
+  
+  window.addEventListener('resize', () => { resChart.resize(); tlChart.resize(); });
+}
+
+function analyze() {
+  const symbol = document.getElementById('symbolInput').value.trim();
+  if (!symbol) return;
+  
+  document.getElementById('analysisResult').textContent = 'Loading...';
+  document.getElementById('signalBody').innerHTML = '';
+  
+  fetch(`/api/analyze?symbol=${symbol}`)
+    .then(r => r.json())
+    .then(d => {
+      // Update result
+      document.getElementById('analysisResult').textContent = JSON.stringify(d, null, 2);
+      
+      // Update resonance radar
+      const rd = d.resonance || {};
+      resChart.setOption({
+        series: [{ data: [{ value: [rd.tf_score||0, rd.indicator_score||0, rd.swing_score||0, rd.temporal_score||0], name: 'V11' }] }]
+      });
+      
+      // Update signal table
+      const ss = d.signal_stats || {};
+      const signals = d.signals || [];
+      const tbody = document.getElementById('signalBody');
+      tbody.innerHTML = signals.map((s, i) => `
+        <tr>
+          <td>${i+1}</td>
+          <td>${s.type||'-'}</td>
+          <td class="${d.decision?.direction === 'bull' ? 'bull' : 'bear'}">${d.decision?.direction||'-'}</td>
+          <td>${s.idx||'-'}</td>
+          <td>${s.price||'-'}</td>
+          <td>${s.strength||'-'}</td>
+          <td>${s.confidence||'-'}</td>
+          <td>${s.grade||'-'}</td>
+          <td>${s.trend_aligned ? '&#x2705;' : '-'}</td>
+        </tr>
+      `).join('');
+      
+      // Update stats
+      document.getElementById('ovWR').textContent = d.decision?.expected_wr ? (d.decision.expected_wr*100).toFixed(0) + '%' : '--';
+      document.getElementById('ovRR').textContent = d.decision?.rr ? d.decision.rr + 'x' : '--';
+      document.getElementById('ovPF').textContent = '--';
+      document.getElementById('ovN').textContent = ss.total || 0;
+      document.getElementById('ovSig').textContent = signals.length;
+    })
+    .catch(e => {
+      document.getElementById('analysisResult').textContent = 'Error: ' + e;
+    });
+}
+
+function analyzeAll() {
+  const symbols = ['600519.SH','000001.SH','399001.SZ','510050.SH','601318.SH','600036.SH','600276.SH','600887.SH','300750.SZ','000858.SZ'];
+  let results = [];
+  
+  function next(i) {
+    if (i >= symbols.length) {
+      document.getElementById('analysisResult').textContent = JSON.stringify(results, null, 2);
+      return;
+    }
+    fetch(`/api/analyze?symbol=${symbols[i]}`)
+      .then(r => r.json())
+      .then(d => {
+        results.push({ symbol: symbols[i], decision: d.decision, resonance: d.resonance, signals: d.signals?.length });
+        next(i+1);
+      })
+      .catch(() => next(i+1));
+  }
+  next(0);
+}
+
+initCharts();
+</script>
+</body>
+</html>

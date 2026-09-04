@@ -1,0 +1,315 @@
+#!/usr/bin/env python3
+"""
+SMC V5.4 WebUI — 统一前端页面
+================================
+提供实时状态仪表盘:
+  - 优化器运行状态
+  - 信号展示
+  - 代理状态
+  - 版本对比
+"""
+
+import json, os, sys, time, http.server, socketserver
+from pathlib import Path
+from urllib.request import Request, urlopen
+
+PORT = 8880
+STATUS_API_PORT = 8879
+WEBUI_DIR = Path.home() / '.hermes' / 'smc-webui-v55'
+WEBUI_DIR.mkdir(parents=True, exist_ok=True)
+
+INDEX_HTML = '''<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMC V5.4 监控面板</title>
+<style>
+:root { --bg: #0d1117; --card: #161b22; --accent: #58a6ff; --green: #3fb950; --red: #f85149; --text: #c9d1d9; --dim: #8b949e; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
+h1 { font-size: 1.5rem; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+h1 .badge { font-size: 0.7rem; padding: 3px 10px; border-radius: 12px; }
+h2 { font-size: 1.1rem; margin: 20px 0 10px; color: var(--accent); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.card { background: var(--card); border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+.card h3 { font-size: 0.9rem; color: var(--dim); margin-bottom: 8px; }
+.stat { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #21262d; }
+.stat:last-child { border: 0; }
+.stat .label { color: var(--dim); }
+.stat .value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat .value.green { color: var(--green); }
+.stat .value.red { color: var(--red); }
+.stat .value.blue { color: var(--accent); }
+.progress-bar { height: 8px; background: #21262d; border-radius: 4px; margin: 10px 0; overflow: hidden; }
+.progress-bar .fill { height: 100%; background: var(--accent); transition: width 0.5s; border-radius: 4px; }
+.signal-list { max-height: 300px; overflow-y: auto; }
+.signal-item { display: flex; justify-content: space-between; padding: 4px 8px; margin: 2px 0; border-radius: 4px; font-size: 0.85rem; }
+.signal-item:nth-child(odd) { background: #1c2128; }
+.signal-item .dir { font-weight: 700; }
+.dir.L { color: var(--green); }
+.dir.S { color: var(--red); }
+.status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+.dot-ok { background: var(--green); }
+.dot-err { background: var(--red); }
+.dot-warn { background: #d29922; }
+.hist-chart { display: flex; align-items: flex-end; gap: 2px; height: 80px; margin: 10px 0; }
+.hist-bar { width: 10px; background: var(--accent); border-radius: 2px 2px 0 0; min-height: 2px; opacity: 0.7; }
+.hist-bar:hover { opacity: 1; }
+.params-table { font-size: 0.8rem; }
+.params-table td { padding: 2px 8px; }
+.params-table td:first-child { color: var(--dim); }
+.footer { margin-top: 20px; text-align: center; font-size: 0.8rem; color: var(--dim); }
+.refresh-info { text-align: right; font-size: 0.8rem; color: var(--dim); margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<h1>
+  SMC V5.4 监控面板
+  <span class="badge" id="statusBadge" style="background:var(--green);color:#000;">LIVE</span>
+  <span style="font-size:0.7rem;color:var(--dim);font-weight:normal;" id="timeLabel"></span>
+</h1>
+<div class="refresh-info">每3秒自动刷新 · <a href="#" onclick="refresh()">手动刷新</a></div>
+
+<div class="grid">
+  <div class="card">
+    <h3>📊 V5.4 优化器状态</h3>
+    <div class="stat"><span class="label">运行状态</span><span class="value" id="v54Running">检测中...</span></div>
+    <div class="stat"><span class="label">当前轮次</span><span class="value blue" id="v54Round">-</span></div>
+    <div class="stat"><span class="label">最佳Score</span><span class="value green" id="v54BestScore">-</span></div>
+    <div class="stat"><span class="label">最佳WR</span><span class="value green" id="v54BestWr">-</span></div>
+    <div class="stat"><span class="label">最佳PF</span><span class="value green" id="v54BestPf">-</span></div>
+    <div class="stat"><span class="label">交易总数</span><span class="value blue" id="v54Trades">-</span></div>
+    <div class="stat"><span class="label">有信号股票</span><span class="value" id="v54SigStocks">-</span></div>
+  </div>
+
+  <div class="card">
+    <h3>🔗 代理状态</h3>
+    <div class="stat"><span class="label">程序运行</span><span class="value" id="proxyRunning"><span class="status-dot dot-warn"></span>检测中</span></div>
+    <div class="stat"><span class="label">端口 7890</span><span class="value" id="proxyPort7890">-</span></div>
+    <div class="stat"><span class="label">端口 9090</span><span class="value" id="proxyPort9090">-</span></div>
+    <div class="stat"><span class="label">24h重启次数</span><span class="value" id="proxyRestarts">-</span></div>
+    <div class="stat"><span class="label">状态</span><span class="value" id="proxyState">-</span></div>
+    <div class="stat"><span class="label">总检查</span><span class="value" id="proxyTotalChecks">-</span></div>
+  </div>
+
+  <div class="card">
+    <h3>🔌 系统</h3>
+    <div class="stat"><span class="label">K线缓存</span><span class="value" id="sysKlineCache">-</span></div>
+    <div class="stat"><span class="label">引擎脚本数</span><span class="value" id="sysEngines">-</span></div>
+    <div class="stat"><span class="label">负载</span><span class="value" id="sysLoad">-</span></div>
+  </div>
+</div>
+
+<h2>📈 Score历史 (最近30轮)</h2>
+<div class="card">
+  <div class="hist-chart" id="historyChart"></div>
+</div>
+
+<h2>🕐 实时信号</h2>
+<div class="card">
+  <div class="stat"><span class="label">扫描股票数</span><span class="value blue" id="scanStocks">-</span></div>
+  <div class="stat"><span class="label">总信号数</span><span class="value green" id="scanTotalSignals">-</span></div>
+  <div class="signal-list" id="signalList">
+    <div style="color:var(--dim);padding:12px;text-align:center;">加载中...</div>
+  </div>
+</div>
+
+<h2>🔧 最佳参数</h2>
+<div class="card">
+  <table class="params-table" id="paramsTable">
+    <tr><td colspan="2" style="color:var(--dim);">加载中...</td></tr>
+  </table>
+</div>
+
+<div class="footer">
+  SMC V5.4 监控 · <span id="updateTime">-</span>
+</div>
+
+<script>
+const API = '/api';
+let apiHistory = [];
+
+async function refresh() {
+  try {
+    const [status, progress, sigs] = await Promise.all([
+      fetch(API+'/status').then(r=>r.json()),
+      fetch(API+'/progress').then(r=>r.json()),
+      fetch(API+'/signals').then(r=>r.json()),
+    ]);
+
+    const v55 = status.v5_5 || {};
+    const proxy = status.proxy || {};
+
+    // 优化器
+    document.getElementById('v54Running').textContent = v55.is_running ? '运行中' : '已停止';
+    document.getElementById('v54Running').className = 'value ' + (v55.is_running ? 'green' : 'red');
+    document.getElementById('v54Round').textContent = (v55.current_round||0) + '/' + (v55.total_rounds||0) || '-';
+    document.getElementById('v54BestScore').textContent = (v55.best_score||0).toFixed(1);
+    document.getElementById('v54BestWr').textContent = (v55.final_wr||0).toFixed(1) + '%';
+    document.getElementById('v54BestPf').textContent = (v55.final_pf||0).toFixed(2);
+    document.getElementById('v54Trades').textContent = v55.final_n || 0;
+    document.getElementById('v54SigStocks').textContent = v55.stocks_sig || v55.stocks_signal || 0;
+
+    // 代理
+    document.getElementById('proxyRunning').innerHTML = '<span class="status-dot '+(proxy.running?'dot-ok':'dot-err')+'"></span>'+(proxy.running?'运行中':'已停止');
+    document.getElementById('proxyPort7890').textContent = proxy.port_7890 ? '✓ 正常' : '✗ 断开';
+    document.getElementById('proxyPort7890').className = 'value ' + (proxy.port_7890 ? 'green' : 'red');
+    document.getElementById('proxyPort9090').textContent = proxy.port_9090 ? '✓ 正常' : '✗ 断开';
+    document.getElementById('proxyPort9090').className = 'value ' + (proxy.port_9090 ? 'green' : 'red');
+    document.getElementById('proxyRestarts').textContent = proxy.restart_count_24h || 0;
+    document.getElementById('proxyState').textContent = proxy.state || 'unknown';
+    document.getElementById('proxyState').className = 'value ' + (proxy.state==='healthy'?'green':'red');
+
+    // 系统
+    const sys = status.system || {};
+    document.getElementById('sysKlineCache').textContent = sys.kline_cache_files || 0;
+    document.getElementById('sysEngines').textContent = sys.engine_scripts || 0;
+    document.getElementById('sysLoad').textContent = (sys.load_avg||[0,0]).map(v=>v.toFixed(2)).join(', ');
+
+    // 历史
+    const hist = v54.history || [];
+    const chartEl = document.getElementById('historyChart');
+    if (hist.length > 0) {
+      apiHistory = hist;
+      const maxScore = Math.max(...hist.map(h=>h.score||0), 1);
+      chartEl.innerHTML = hist.map(h => {
+        const pct = Math.max(1, (h.score||0) / maxScore * 100);
+        const color = h.score > 30 ? '#3fb950' : h.score > 20 ? '#58a6ff' : '#d29922';
+        return '<div class="hist-bar" style="height:'+pct+'%;background:'+color+';" title="R'+(h.r||'')+': Score='+(h.score||0)+', WR='+(h.wr||0)+'%"></div>';
+      }).join('');
+    }
+
+    // 信号
+    const signalData = sigs || {signals:[]};
+    document.getElementById('scanStocks').textContent = signalData.stocks_found || 0;
+    document.getElementById('scanTotalSignals').textContent = signalData.total_signals || 0;
+    const sigList = document.getElementById('signalList');
+    if (signalData.signals && signalData.signals.length > 0) {
+      sigList.innerHTML = signalData.signals.map(s => {
+        const entries = (s.entries||[]).slice(0,3);
+        return '<div class="signal-item"><span>'+s.symbol+' <small style="color:var(--dim)">'+s.vol.vol_level+' ('+s.vol.atr_pct+'%)</small></span><span>'+
+          entries.map(e => '<span class="dir '+e.dir+'">'+e.dir+'</span> @'+e.ep+' (R='+e.rr+')').join(' ')+
+          '</span></div>';
+      }).join('');
+    } else {
+      sigList.innerHTML = '<div style="color:var(--dim);padding:12px;text-align:center;">暂无信号</div>';
+    }
+
+    // 参数
+    const params = v54.best_params || {};
+    const pKeys = Object.keys(params);
+    if (pKeys.length > 0) {
+      document.getElementById('paramsTable').innerHTML = pKeys.map(k =>
+        '<tr><td>'+k+'</td><td style="font-family:monospace">'+params[k]+'</td></tr>'
+      ).join('');
+    }
+
+    // 时间
+    const now = new Date();
+    document.getElementById('updateTime').textContent = now.toLocaleTimeString();
+    document.getElementById('timeLabel').textContent = status.timestamp_str || now.toLocaleString();
+    document.getElementById('statusBadge').style.background = v54.is_running ? '#3fb950' : '#d29922';
+    document.getElementById('statusBadge').textContent = v54.is_running ? 'LIVE' : 'IDLE';
+
+  } catch(e) {
+    document.getElementById('statusBadge').style.background = '#f85149';
+    document.getElementById('statusBadge').textContent = 'ERR';
+    console.error(e);
+  }
+}
+
+// Auto refresh
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>
+'''
+
+class V54WebHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(WEBUI_DIR), **kwargs)
+    
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+    
+    def do_GET(self):
+        # Proxy to Status API
+        if self.path.startswith('/api/'):
+            api_url = f'http://127.0.0.1:{STATUS_API_PORT}{self.path}'
+            try:
+                req = Request(api_url, headers={'User-Agent': 'SMC-WebUI'})
+                resp = urlopen(req, timeout=5)
+                data = resp.read()
+                self.send_response(resp.status)
+                self.send_header('Content-Type', resp.headers.get('Content-Type', 'application/json'))
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Cache-Control', 'no-cache')
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            except Exception as e:
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    'error': str(e), 'degraded': True,
+                    'v5_4': {}, 'proxy': {}, 'system': {},
+                }).encode())
+                return
+        super().do_GET()
+    
+    def end_headers(self):
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Cache-Control', 'no-cache')
+        super().end_headers()
+    
+    def log_message(self, format, *args):
+        if '/api/' in args[0]:
+            return
+        super().log_message(format, *args)
+
+
+def main():
+    # Write index.html if not exists
+    index_path = WEBUI_DIR / 'index.html'
+    index_path.write_text(INDEX_HTML)
+    
+    # Start Status API in background
+    import subprocess
+    api_script = Path(__file__).parent / 'smc_web_status_api_v54.py'
+    if api_script.exists():
+        try:
+            subprocess.Popen(
+                ['python3', str(api_script)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            print(f"Status API started (port {STATUS_API_PORT})")
+        except:
+            print("Warning: Status API not started")
+    else:
+        print(f"Warning: {api_script} not found")
+    
+    # Start WebUI
+    server = socketserver.TCPServer(('0.0.0.0', PORT), V54WebHandler)
+    print(f"SMC V5.4 WebUI: http://0.0.0.0:{PORT}")
+    print(f"  API: http://0.0.0.0:{STATUS_API_PORT}")
+    print(f"  HTML: {index_path}")
+    print(f"  Press Ctrl+C to stop")
+    
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopped")
+        server.server_close()
+
+
+if __name__ == '__main__':
+    main()

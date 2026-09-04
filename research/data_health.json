@@ -1,0 +1,28 @@
+{
+  "ts": "2026-09-04 15:30:14",
+  "sources": {
+    "sina": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "tencent": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "eastmoney": {
+      "ok": false,
+      "detail": "HTTP Error 502: Bad Gateway"
+    },
+    "ths_fuyao": {
+      "ok": false,
+      "detail": "HTTP Error 429: Too Many Requests"
+    },
+    "netease": {
+      "ok": false,
+      "detail": "<urlopen error [SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] ssl/tls "
+    }
+  },
+  "coverage": 97.8,
+  "latest": "20260903",
+  "alerts": []
+}

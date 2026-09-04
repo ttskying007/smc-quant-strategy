@@ -1,0 +1,7 @@
+# V48.2 signal correctness repair lessons
+
+- User corrected FVG definition: require three consecutive same-color candles plus the three-candle gap. Bullish FVG: candles i-2/i-1/i all close > open and low[i] > high[i-2]. Bearish FVG: candles i-2/i-1/i all close < open and high[i] < low[i-2]. Do not count mixed-color gap-only cases as FVG.
+- BOS/CHOCH visible structure must be anchored near wave HH/HL/LH/LL. In `smc_core_luxalgo_v34.display_structure_lux`, reject swing BOS/CHOCH when the Lux currentLevel pivot is not within 3 bars of the corresponding wave reference: bullish breaks need HH/LH/H; bearish breaks need LL/HL/L.
+- MSS should be rarer than CHOCH/BOS: keep it as internal early-warning/confirmation only, require recent same-direction sweep plus stronger displacement/body evidence. Avoid rendering mid-leg MSS that has no visible pivot context.
+- Pinbar is confirmation, not standalone signal. Strict bullish pinbar/rejection requires touch of execution zone, close > open, lower wick rejecting the zone, close in upper candle portion, and not a tiny doji. Two-bar rejection must also require the retest bar to have a real lower rejection wick.
+- After these fixes, full rebuild reduced V46.1 base from 3153 to 187 kept trades; V48.1 production became 132 trades, WR 88.64%, SL 10.61%, FVG 43 / OB 89, active picks 3. This is expected: stricter signal correctness reduces trade count.

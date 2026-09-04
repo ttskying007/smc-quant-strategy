@@ -1,0 +1,11 @@
+  1500 files, rows 1483
+  3000 files, rows 2976
+  4500 files, rows 4519
+延续腿(低波动): 2361
+combo_v20c_trades saved: 7432
+v20c report written
+dashboard v20c saved
+registry v20c recorded
+  2024: n=3764 avg=+9.29% PF=4.78
+  2025: n=1726 avg=+5.07% PF=3.76
+  2026: n=964 avg=+4.08% PF=2.26

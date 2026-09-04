@@ -1,0 +1,17 @@
+[Unit]
+Description=V536 Sina source-isolated partial-range cache completion
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/.hermes/scripts/v25
+ExecStart=/usr/bin/python3 /root/.hermes/scripts/v25/v536_sina_cache_completion_controller.py
+Restart=always
+RestartSec=30
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

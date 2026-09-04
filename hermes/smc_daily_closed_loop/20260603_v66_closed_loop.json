@@ -1,0 +1,199 @@
+{
+  "generated_at": "2026-06-03T00:01:07",
+  "active_version": "V66",
+  "engine": "/root/.hermes/scripts/v25/v66_engine.py",
+  "steps": [
+    {
+      "cmd": "python3 v66_engine.py",
+      "returncode": 0,
+      "stdout": "{\n  \"generated_at\": \"2026-06-03T00:00:25\",\n  \"profile\": \"V66 recent REENTRY risk overlay on V65\",\n  \"source\": \"v65_trades.json\",\n  \"n_source\": 143,\n  \"n_trades\": 137,\n  \"n_rejected\": 6,\n  \"n_picks\": 137,\n  \"metrics\": {\n    \"n_trades\": 137,\n    \"n_wins\": 124,\n    \"n_losses\": 13,\n    \"raw_wr\": 90.51,\n    \"avg_pnl\": 20.649,\n    \"total_pnl\": 2828.84,\n    \"avg_realized_r\": 5.016\n  },\n  \"family_counts\": {\n    \"CONTINUATION_SETUP\": 107,\n    \"REENTRY_SETUP\": 30\n  },\n  \"reject_counts\": {\n    \"REENTRY_EXACT_HIGH_EXTENDED_RANGE\": 4,\n    \"REENTRY_BQ_LT_60\": 2\n  },\n  \"exit_counts\": {\n    \"STRUCT_CONFIRM_BREAK\": 124,\n    \"SL_HIT\": 10,\n    \"GAP_SL_HIT\": 2,\n    \"TIMEOUT_STRUCTURAL\": 1\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "python3 v66_quality_metrics.py",
+      "returncode": 0,
+      "stdout": "{\n  \"n\": 137,\n  \"raw_wr\": 90.51,\n  \"qualified_wr\": 90.51,\n  \"invalid_small_win_count\": 0,\n  \"win_rr_below_2r\": 0,\n  \"small_win_below_2\": 0,\n  \"loss_inside_1pct\": 0,\n  \"hold_over_90\": 0,\n  \"avg_realized_r\": 5.016,\n  \"median_realized_r\": 3.835,\n  \"avg_pnl\": 20.649,\n  \"avg_win\": 23.199,\n  \"avg_loss\": -3.678\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "python3 v66_trade_provenance_audit.py",
+      "returncode": 0,
+      "stdout": "{\n  \"generated_at\": \"2026-06-03T00:00:43\",\n  \"trade_file\": \"/root/.hermes/smc_opt_v66/v66_trades.json\",\n  \"snapshot_file\": \"/root/.hermes/smc_opt_v50_signal/v50_signal_snapshot.json\",\n  \"n_trades\": 137,\n  \"pass_count\": 137,\n  \"fatal_count\": 0,\n  \"issue_counts\": {},\n  \"note\": \"Before V66 engine, V49 trades may lack source_event_idx/zone_idx/conf_index. This audit exposes required fixes.\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "python3 v66_signal_sequence_audit.py",
+      "returncode": 0,
+      "stdout": "{\n  \"generated_at\": \"2026-06-03T00:00:45\",\n  \"trade_file\": \"/root/.hermes/smc_opt_v66/v66_trades.json\",\n  \"n_trades\": 137,\n  \"pass_count\": 137,\n  \"violation_count\": 0,\n  \"issue_counts\": {}\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "python3 v66_sample_bias_audit.py",
+      "returncode": 0,
+      "stdout": "{\n  \"raw_signal_count\": 1703671,\n  \"raw_signal_family_counts\": {\n    \"fvg\": 163331,\n    \"swing\": 871574,\n    \"structure\": 203540,\n    \"lv\": 130218,\n    \"sweep\": 206575,\n    \"ob\": 58829,\n    \"ote\": 42024,\n    \"eql\": 21846,\n    \"bpr\": 5734\n  },\n  \"snapshot_symbol_count\": 4905,\n  \"trade_count\": 137,\n  \"pick_count\": 137,\n  \"pick_scope_counts\": {\n    \"EXPIRED_REVIEW\": 123,\n    \"ACTIVE_ENTRY\": 14\n  },\n  \"funnel\": {\n    \"snapshot_symbols_without_trade\": 4769,\n    \"trade_symbols\": 136,\n    \"active_entry_count\": 14,\n    \"near_zone_watch_count\": 0,\n    \"post_entry_monitor_count\": 0,\n    \"expired_review_count\": 123\n  },\n  \"bias_flags\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "python3 v66_closed_loop_90d_review.py",
+      "returncode": 0,
+      "stdout": "\"follow_end_date\": \"20240620\",\n      \"entry_price\": 4.03,\n      \"exit_price_final\": 3.8,\n      \"pnl_pct\": -4.994,\n      \"risk_pct\": 5.707,\n      \"realized_r\": -0.875,\n      \"hold_bars\": 7,\n      \"exit_reason\": \"SL_HIT\",\n      \"mfe_trade_pct\": 7.444,\n      \"mae_trade_pct\": 17.493,\n      \"mfe90_pct\": 16.625,\n      \"mae90_pct\": 17.493,\n      \"post_exit_mfe90_pct\": 16.625,\n      \"capture90_rate\": -0.3,\n      \"issues\": [\n        \"SOLD_EARLY_NEXT_90D\",\n        \"BAD_EXIT_LOST_BUT_90D_RECOVERED\",\n        \"LOW_90D_MFE_CAPTURE\"\n      ],\n      \"diagnosis\": [\n        \"90日后续高点显著高于实际卖点：runner/trailing过早或未识别趋势延续。\",\n        \"MFE捕获率低：信号方向对，但出场没有吃到主要利润段。\"\n      ],\n      \"monitor_source\": \"BACKTEST_TRADE_AS_PICK\",\n      \"closed_loop_rule\": \"entry后持续复盘90个日线bar；止盈/止损发生后仍继续看未来90日MFE/MAE判断信号和出场质量\"\n    },\n    {\n      \"symbol\": \"600444.SH\",\n      \"zone_type\": \"OB_Bull\",\n      \"entry_mode\": \"CONTINUATION_SETUP\",\n      \"conf_type\": \"BOS_Bull\",\n      \"signal_date\": \"20250828\",\n      \"qualified_win\": false,\n      \"entry_date\": \"20250901\",\n      \"exit_date\": \"20250903\",\n      \"follow_end_date\": \"20260121\",\n      \"entry_price\": 17.79,\n      \"exit_price_final\": 16.98,\n      \"pnl_pct\": -4.553,\n      \"risk_pct\": 4.553,\n      \"realized_r\": -1.0,\n      \"hold_bars\": 2,\n      \"exit_reason\": \"SL_HIT\",\n      \"mfe_trade_pct\": 1.18,\n      \"mae_trade_pct\": 4.279,\n      \"mfe90_pct\": 21.36,\n      \"mae90_pct\": 6.655,\n      \"post_exit_mfe90_pct\": 21.36,\n      \"capture90_rate\": -0.213,\n      \"issues\": [\n        \"SOLD_EARLY_NEXT_90D\",\n        \"BAD_EXIT_LOST_BUT_90D_RECOVERED\",\n        \"LOW_90D_MFE_CAPTURE\"\n      ],\n      \"diagnosis\": [\n        \"90日后续高点显著高于实际卖点：runner/trailing过早或未识别趋势延续。\",\n        \"MFE捕获率低：信号方向对，但出场没有吃到主要利润段。\"\n      ],\n      \"monitor_source\": \"BACKTEST_TRADE_AS_PICK\",\n      \"closed_loop_rule\": \"entry后持续复盘90个日线bar；止盈/止损发生后仍继续看未来90日MFE/MAE判断信号和出场质量\"\n    },\n    {\n      \"symbol\": \"300074.SZ\",\n      \"zone_type\": \"OB_Bull\",\n      \"entry_mode\": \"CONTINUATION_SETUP\",\n      \"conf_type\": \"CHOCH_Bull\",\n      \"signal_date\": \"20240812\",\n      \"qualified_win\": false,\n      \"entry_date\": \"20240814\",\n      \"exit_date\": \"20240827\",\n      \"follow_end_date\": \"20250106\",\n      \"entry_price\": 3.21,\n      \"exit_price_final\": 3.05,\n      \"pnl_pct\": -4.455,\n      \"risk_pct\": 3.738,\n      \"realized_r\": -1.192,\n      \"hold_bars\": 9,\n      \"exit_reason\": \"GAP_SL_HIT\",\n      \"mfe_trade_pct\": 4.361,\n      \"mae_trade_pct\": 12.238,\n      \"mfe90_pct\": 63.863,\n      \"mae90_pct\": 12.238,\n      \"post_exit_mfe90_pct\": 63.863,\n      \"capture90_rate\": -0.07,\n      \"issues\": [\n        \"SOLD_EARLY_NEXT_90D\",\n        \"BAD_EXIT_LOST_BUT_90D_RECOVERED\",\n        \"LOW_90D_MFE_CAPTURE\"\n      ],\n      \"diagnosis\": [\n        \"90日后续高点显著高于实际卖点：runner/trailing过早或未识别趋势延续。\",\n        \"MFE捕获率低：信号方向对，但出场没有吃到主要利润段。\"\n      ],\n      \"monitor_source\": \"BACKTEST_TRADE_AS_PICK\",\n      \"closed_loop_rule\": \"entry后持续复盘90个日线bar；止盈/止损发生后仍继续看未来90日MFE/MAE判断信号和出场质量\"\n    },\n    {\n      \"symbol\": \"688219.SH\",\n      \"zone_type\": \"OB_Bull\",\n      \"entry_mode\": \"CONTINUATION_SETUP\",\n      \"conf_type\": \"CHOCH_Bull\",\n      \"signal_date\": \"20240327\",\n      \"qualified_win\": false,\n      \"entry_date\": \"20240329\",\n      \"exit_date\": \"20240415\",\n      \"follow_end_date\": \"20240816\",\n      \"entry_price\": 8.202,\n      \"exit_price_final\": 7.822,\n      \"pnl_pct\": -3.975,\n      \"risk_pct\": 4.633,\n      \"realized_r\": -0.858,\n      \"hold_bars\": 9,\n      \"exit_reason\": \"SL_HIT\",\n      \"mfe_trade_pct\": 10.851,\n      \"mae_trade_pct\": 13.57,\n      \"mfe90_pct\": 11.826,\n      \"mae90_pct\": 20.053,\n      \"post_exit_mfe90_pct\": 11.826,\n      \"capture90_rate\": -0.336,\n      \"issues\": [\n        \"SOLD_EARLY_NEXT_90D\",\n        \"BAD_EXIT_LOST_BUT_90D_RECOVERED\",\n        \"LOW_90D_MFE_CAPTURE\"\n      ],\n      \"diagnosis\": [\n        \"90日后续高点显著高于实际卖点：runner/trailing过早或未识别趋势延续。\",\n        \"MFE捕获率低：信号方向对，但出场没有吃到主要利润段。\"\n      ],\n      \"monitor_source\": \"BACKTEST_TRADE_AS_PICK\",\n      \"closed_loop_rule\": \"entry后持续复盘90个日线bar；止盈/止损发生后仍继续看未来90日MFE/MAE判断信号和出场质量\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "python3 v66_t1_audit.py",
+      "returncode": 0,
+      "stdout": "{\n  \"trade_file\": \"/root/.hermes/smc_opt_v66/v66_trades.json\",\n  \"n_trades\": 137,\n  \"violation_count\": 0,\n  \"pass\": true,\n  \"violations\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "python3 v66_release_gate.py",
+      "returncode": 0,
+      "stdout": "{\n  \"pass\": true,\n  \"failed_checks\": [],\n  \"checks\": {\n    \"trade_file_exists\": true,\n    \"pick_file_exists\": true,\n    \"signal_snapshot_exists\": true,\n    \"t1_no_same_day_exit\": true,\n    \"provenance_fatal_count_zero\": true,\n    \"sequence_violations_zero\": true,\n    \"hold_over_90_zero\": true,\n    \"small_win_below_2_zero\": true,\n    \"loss_inside_1pct_zero\": true,\n    \"win_rr_below_2r_zero\": true,\n    \"avg_90d_capture_min_024\": true,\n    \"sample_not_too_narrow\": true\n  },\n  \"quality\": {\n    \"n\": 137,\n    \"raw_wr\": 90.51,\n    \"qualified_wr\": 90.51,\n    \"invalid_small_win_count\": 0,\n    \"win_rr_below_2r\": 0,\n    \"small_win_below_2\": 0,\n    \"loss_inside_1pct\": 0,\n    \"hold_over_90\": 0,\n    \"avg_realized_r\": 5.016,\n    \"median_realized_r\": 3.835,\n    \"avg_pnl\": 20.649,\n    \"avg_win\": 23.199,\n    \"avg_loss\": -3.678\n  },\n  \"closed_loop_summary\": {\n    \"generated_at\": \"2026-06-03T00:01:06\",\n    \"workflow\": \"选股/回测入场 -> 实时监控 -> 触发止盈止损 -> 未来90日持续复盘 -> 归因修复\",\n    \"active_picks_file_count\": 137,\n    \"reviewed_trades\": 137,\n    \"wr\": 90.51,\n    \"avg_pnl\": 20.649,\n    \"avg_win\": 23.199,\n    \"avg_loss\": -3.678,\n    \"profit_loss_ratio\": 6.308,\n    \"avg_hold_bars\": 14.248,\n    \"max_hold_bars\": 66,\n    \"hold_over_90_count\": 0,\n    \"small_win_below_2_count\": 0,\n    \"loss_inside_1pct_noise_count\": 0,\n    \"win_rr_below_2r_count\": 0,\n    \"avg_90d_capture\": 0.41\n  },\n  \"bias_flags\": [],\n  \"provenance_summary\": {\n    \"generated_at\": \"2026-06-03T00:00:43\",\n    \"trade_file\": \"/root/.hermes/smc_opt_v66/v66_trades.json\",\n    \"snapshot_file\": \"/root/.hermes/smc_opt_v50_signal/v50_signal_snapshot.json\",\n    \"n_trades\": 137,\n    \"pass_count\": 137,\n    \"fatal_count\": 0,\n    \"issue_counts\": {},\n    \"note\": \"Before V66 engine, V49 trades may lack source_event_idx/zone_idx/conf_index. This audit exposes required fixes.\"\n  },\n  \"sequence_summary\": {\n    \"generated_at\": \"2026-06-03T00:00:45\",\n    \"trade_file\": \"/root/.hermes/smc_opt_v66/v66_trades.json\",\n    \"n_trades\": 137,\n    \"pass_count\": 137,\n    \"violation_count\": 0,\n    \"issue_counts\": {}\n  }\n}\n",
+      "stderr": ""
+    }
+  ],
+  "report": {
+    "generated_at": "2026-06-03T00:00:25",
+    "profile": "V66 recent REENTRY risk overlay on V65",
+    "source": "v65_trades.json",
+    "n_source": 143,
+    "n_trades": 137,
+    "n_rejected": 6,
+    "n_picks": 137,
+    "metrics": {
+      "n_trades": 137,
+      "n_wins": 124,
+      "n_losses": 13,
+      "raw_wr": 90.51,
+      "avg_pnl": 20.649,
+      "total_pnl": 2828.84,
+      "avg_realized_r": 5.016
+    },
+    "family_counts": {
+      "CONTINUATION_SETUP": 107,
+      "REENTRY_SETUP": 30
+    },
+    "reject_counts": {
+      "REENTRY_EXACT_HIGH_EXTENDED_RANGE": 4,
+      "REENTRY_BQ_LT_60": 2
+    },
+    "exit_counts": {
+      "STRUCT_CONFIRM_BREAK": 124,
+      "SL_HIT": 10,
+      "GAP_SL_HIT": 2,
+      "TIMEOUT_STRUCTURAL": 1
+    }
+  },
+  "release_gate": {
+    "pass": true,
+    "failed_checks": [],
+    "checks": {
+      "trade_file_exists": true,
+      "pick_file_exists": true,
+      "signal_snapshot_exists": true,
+      "t1_no_same_day_exit": true,
+      "provenance_fatal_count_zero": true,
+      "sequence_violations_zero": true,
+      "hold_over_90_zero": true,
+      "small_win_below_2_zero": true,
+      "loss_inside_1pct_zero": true,
+      "win_rr_below_2r_zero": true,
+      "avg_90d_capture_min_024": true,
+      "sample_not_too_narrow": true
+    },
+    "quality": {
+      "n": 137,
+      "raw_wr": 90.51,
+      "qualified_wr": 90.51,
+      "invalid_small_win_count": 0,
+      "win_rr_below_2r": 0,
+      "small_win_below_2": 0,
+      "loss_inside_1pct": 0,
+      "hold_over_90": 0,
+      "avg_realized_r": 5.016,
+      "median_realized_r": 3.835,
+      "avg_pnl": 20.649,
+      "avg_win": 23.199,
+      "avg_loss": -3.678
+    },
+    "closed_loop_summary": {
+      "generated_at": "2026-06-03T00:01:06",
+      "workflow": "选股/回测入场 -> 实时监控 -> 触发止盈止损 -> 未来90日持续复盘 -> 归因修复",
+      "active_picks_file_count": 137,
+      "reviewed_trades": 137,
+      "wr": 90.51,
+      "avg_pnl": 20.649,
+      "avg_win": 23.199,
+      "avg_loss": -3.678,
+      "profit_loss_ratio": 6.308,
+      "avg_hold_bars": 14.248,
+      "max_hold_bars": 66,
+      "hold_over_90_count": 0,
+      "small_win_below_2_count": 0,
+      "loss_inside_1pct_noise_count": 0,
+      "win_rr_below_2r_count": 0,
+      "avg_90d_capture": 0.41
+    },
+    "bias_flags": [],
+    "provenance_summary": {
+      "generated_at": "2026-06-03T00:00:43",
+      "trade_file": "/root/.hermes/smc_opt_v66/v66_trades.json",
+      "snapshot_file": "/root/.hermes/smc_opt_v50_signal/v50_signal_snapshot.json",
+      "n_trades": 137,
+      "pass_count": 137,
+      "fatal_count": 0,
+      "issue_counts": {},
+      "note": "Before V66 engine, V49 trades may lack source_event_idx/zone_idx/conf_index. This audit exposes required fixes."
+    },
+    "sequence_summary": {
+      "generated_at": "2026-06-03T00:00:45",
+      "trade_file": "/root/.hermes/smc_opt_v66/v66_trades.json",
+      "n_trades": 137,
+      "pass_count": 137,
+      "violation_count": 0,
+      "issue_counts": {}
+    }
+  },
+  "closed_loop_summary": {
+    "generated_at": "2026-06-03T00:01:06",
+    "workflow": "选股/回测入场 -> 实时监控 -> 触发止盈止损 -> 未来90日持续复盘 -> 归因修复",
+    "active_picks_file_count": 137,
+    "reviewed_trades": 137,
+    "wr": 90.51,
+    "avg_pnl": 20.649,
+    "avg_win": 23.199,
+    "avg_loss": -3.678,
+    "profit_loss_ratio": 6.308,
+    "avg_hold_bars": 14.248,
+    "max_hold_bars": 66,
+    "hold_over_90_count": 0,
+    "small_win_below_2_count": 0,
+    "loss_inside_1pct_noise_count": 0,
+    "win_rr_below_2r_count": 0,
+    "avg_90d_capture": 0.41
+  },
+  "issue_counts": {
+    "SOLD_EARLY_NEXT_90D": 94,
+    "SOLD_EARLY_BY_STRUCTURE_STOP": 84,
+    "BAD_EXIT_LOST_BUT_90D_RECOVERED": 12,
+    "LOW_90D_MFE_CAPTURE": 41
+  },
+  "smoke": {
+    "/api/summary": {
+      "ok": true,
+      "bytes": 730,
+      "has_traceback": false
+    },
+    "/api/autopsy/closed-loop": {
+      "ok": true,
+      "bytes": 175030,
+      "has_traceback": false
+    },
+    "/api/picks": {
+      "ok": true,
+      "bytes": 13307,
+      "has_traceback": false
+    }
+  },
+  "next_action_hint": "If WR falls, analyze losses by family/zone/conf/BQ/trend; if SOLD_EARLY dominates, classify original-runner vs new setup; create next Vxx only after full audit passes."
+}
