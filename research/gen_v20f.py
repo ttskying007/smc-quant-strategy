@@ -238,10 +238,18 @@ print(f"v20f CSV(无泄漏): {len(combo)} 笔 → {out_path}")
 
 # quick stats
 import statistics
+# FIX(2026-09-04, 审计 P2 幸存者偏差): 回测仅覆盖当前缓存中有 K 线的股票（退市/长期停牌股被排除），
+# 存在正向幸存者偏差。此处提供"剔除极端尾部(net<=-50%，疑似退市/暴跌)"对照，量化偏差影响。
 for y in ("2024", "2025", "2026"):
     ys = [t for t in combo if str(t["entry_date"])[:4] == y]
     if ys:
         pnls = [t["net_pnl_pct"] for t in ys]
         wins = [x for x in pnls if x > 0]
         pf = sum(wins) / abs(sum(x for x in pnls if x <= 0)) if any(x <= 0 for x in pnls) else 99
-        print(f"  {y}: n={len(ys)} avg={sum(pnls)/len(pnls):+.2f}% PF={pf:.2f}")
+        # 剔除尾部对照
+        pnls_c = [x for x in pnls if x > -50.0]
+        wins_c = [x for x in pnls_c if x > 0]
+        pf_c = sum(wins_c) / abs(sum(x for x in pnls_c if x <= 0)) if any(x <= 0 for x in pnls_c) else 99
+        n_tail = len(pnls) - len(pnls_c)
+        print(f"  {y}: n={len(ys)} avg={sum(pnls)/len(pnls):+.2f}% PF={pf:.2f} | 剔除尾部后 n={len(pnls_c)} avg={sum(pnls_c)/len(pnls_c):+.2f}% PF={pf_c:.2f} (剔除{n_tail}笔 net<=-50%)")
+print("注: 回测存在正向幸存者偏差（仅覆盖现存股票），剔除尾部对照供参考。")
