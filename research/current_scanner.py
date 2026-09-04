@@ -125,15 +125,15 @@ def scan_one(p, latest):
         _stage, _deep = _ps.stage_and_deep(daily, entry_idx)
         if _stage not in ("UPTREND", "MARKUP"):
             continue
-        has_fvg = any(daily[k]["h"] < daily[k - 2]["l"] for k in range(max(3, entry_idx - 12), entry_idx))
+        has_fvg = any(daily[k]["l"] > daily[k - 2]["h"] for k in range(max(3, entry_idx - 12), entry_idx))
         if not has_fvg:
             continue
-        fvg_cnt = sum(1 for k in range(max(3, entry_idx - 12), entry_idx) if daily[k]["h"] < daily[k - 2]["l"])
+        fvg_cnt = sum(1 for k in range(max(3, entry_idx - 12), entry_idx) if daily[k]["l"] > daily[k - 2]["h"])
         out.append({"symbol": sym, "event_date": sd["event_date"], "entry_date": sd["entry_date"],
                     "zone_low": sd["zone_low"], "zone_high": sd["zone_high"],
                     "entry_price": sd["entry_price"], "target": sd["target"],
                     "w_permission": sd["w_permission"], "r20": r20, "last": last,
-                    "stage": _stage, "bear_fvg": True, "fvg_cnt": fvg_cnt})
+                    "stage": _stage, "bull_fvg": True, "fvg_cnt": fvg_cnt})
     return (out if out else None), last
 
 if __name__ == "__main__":
