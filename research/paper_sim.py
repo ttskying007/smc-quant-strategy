@@ -78,7 +78,7 @@ def save_ledger(led):
 # ---------- realtime price (Sina) ----------
 def realtime_prices(codes):
     """Fetch realtime current prices for codes (up to ~50 per request).
-    FIX(2026-09-04, 审计 P2): 返回 {code: {"px": 当前价, "prev": 昨收}}，
+    FIX(2026-09-04, 审计 P2): 返回 {code: {"px": 当前价, "prev": 昨收, "vol": 成交量(股)}}，
     供涨跌停/停牌判断；旧调用方取 .get(code) 仍得到价格（兼容）。"""
     syms = []
     for c in codes:
@@ -102,14 +102,22 @@ def realtime_prices(codes):
                     try:
                         _px = float(vals[3])
                         _prev = float(vals[2]) if len(vals) > 2 and vals[2] else 0.0
+                        _vol = float(vals[8]) if len(vals) > 8 and vals[8] else 0.0
                         # FIX(2026-08-22): skip 0.00 prices (Sina off-hours / failure) — don't return 0
                         if _px > 0:
-                            out[sym[2:]] = {"px": _px, "prev": _prev}
+                            out[sym[2:]] = {"px": _px, "prev": _prev, "vol": _vol}
                     except Exception:
                         pass
         except Exception:
             pass
     return out
+
+
+def _is_suspended(px_info):
+    """停牌判定：Sina 成交量=0 视为停牌/无成交（跳过撮合）。
+    FIX(2026-09-04, 审计 P2): 停牌无法买卖，不应按停牌价成交。"""
+    vol = (px_info or {}).get("vol")
+    return vol == 0
 
 
 def _is_limit_up(px_info, side="buy"):
@@ -689,6 +697,9 @@ def realtime_monitor():
             if (t.get("filled_price") or t.get("entry_price")) else None,
         })
         if t["status"] == "PENDING_ORDER":
+            # FIX(2026-09-04, 审计 P2): 停牌无法买入（量=0，跳过）
+            if _is_suspended(_info):
+                continue
             # FIX(2026-09-04, 审计 P2): 涨停无法买入（挂单不成交，等待回落）
             if _is_limit_up(_info, side="buy"):
                 continue
@@ -735,6 +746,9 @@ def realtime_monitor():
                     "trigger": t.get("trigger", "T+1开盘/回踩"), "pnl_pct": None,
                 })
         elif t["status"] == "FILLED":
+            # FIX(2026-09-04, 审计 P2): 停牌无法卖出（量=0，跳过平仓判定）
+            if _is_suspended(_info):
+                continue
             # FIX(2026-09-04, 审计 P2): 跌停无法卖出（跳过平仓判定，避免按跌停价错误成交）
             if _is_limit_up(_info, side="sell"):
                 continue
