@@ -1,0 +1,31 @@
+{
+  "version": "V670_RESUMABLE_SOURCE_BUILD_PROGRESS",
+  "updated_at": "2026-08-04T14:13:56",
+  "database": "/root/.hermes/smc_source/v670c_institutional_survey/source.sqlite3",
+  "partitions": {
+    "2023": {
+      "count": 26272,
+      "pages": 526,
+      "committed_pages": 526,
+      "committed_raw_rows": 26272,
+      "remaining_pages": 0
+    },
+    "2024": {
+      "count": 25374,
+      "pages": 508,
+      "committed_pages": 508,
+      "committed_raw_rows": 25374,
+      "remaining_pages": 0
+    },
+    "2025": {
+      "count": 24566,
+      "pages": 492,
+      "committed_pages": 492,
+      "committed_raw_rows": 24566,
+      "remaining_pages": 0
+    }
+  },
+  "query_failures": [],
+  "complete": true,
+  "outcome_read": false
+}

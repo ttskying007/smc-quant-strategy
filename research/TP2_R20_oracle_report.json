@@ -1,0 +1,8 @@
+{
+  "seed_ids": 558,
+  "oracle_ids": 1078,
+  "intersection": 281,
+  "missing": 277,
+  "coverage_pct": 50.36,
+  "note": "coverage<100% 差异来源：oracle 用 4/4 pivot+不同实现覆盖，缺失多为实现覆盖差异非缺陷"
+}

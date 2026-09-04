@@ -1,0 +1,142 @@
+{
+  "generated_at": "2026-07-04T00:32:06",
+  "active_version": "V185",
+  "engine": "/root/.hermes/scripts/v25/v185_daily_rematerialize.py",
+  "steps": [
+    {
+      "cmd": "python3 smc_daily_ops.py",
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/root/.hermes/scripts/v25/smc_daily_ops.py\", line 483, in <module>\n    main()\n    ~~~~^^\n  File \"/root/.hermes/scripts/v25/smc_daily_ops.py\", line 448, in main\n    refresh = run_kline_refresh()\n  File \"/root/.hermes/scripts/v25/smc_daily_ops.py\", line 131, in run_kline_refresh\n    proc = subprocess.run(cmd, cwd=str(SCRIPTS), text=True, capture_output=True, timeout=900)\n  File \"/usr/lib/python3.13/subprocess.py\", line 556, in run\n    stdout, stderr = process.communicate(input, timeout=timeout)\n                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.13/subprocess.py\", line 1222, in communicate\n    stdout, stderr = self._communicate(input, endtime, timeout)\n                     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.13/subprocess.py\", line 2129, in _communicate\n    self._check_timeout(endtime, orig_timeout, stdout, stderr)\n    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.13/subprocess.py\", line 1269, in _check_timeout\n    raise TimeoutExpired(\n    ...<2 lines>...\n            stderr=b''.join(stderr_seq) if stderr_seq else None)\nsubprocess.TimeoutExpired: Command '['/usr/bin/python3', '/root/.hermes/scripts/v25/refresh_daily_750.py', '--workers', '20']' timed out after 900 seconds\n"
+    },
+    {
+      "cmd": "python3 v185_daily_rematerialize.py",
+      "returncode": 0,
+      "stdout": "{\"ok\": true, \"version\": \"V185\", \"engine\": \"V185_COMBINED_V175_PLUS_TRUE_TAKEOVER_CHILD\", \"generated_at\": \"2026-07-04T00:32:06\", \"trades\": 334, \"active_picks\": 6, \"metrics\": {\"n\": 334, \"wr\": 86.23, \"avg\": 6.5628, \"min_year_n\": 41, \"year_counts\": {\"2026\": 41, \"2025\": 104, \"2024\": 125, \"2023\": 64}, \"year_wr\": {\"2023\": 82.81, \"2024\": 87.2, \"2025\": 86.54, \"2026\": 87.8}, \"all_year_wr_min\": 82.81, \"micro_profit_pct\": 0.9, \"same_day_exit_violations\": 0, \"exit_counts\": {\"TIME\": 66, \"TP\": 160, \"GAP_SL\": 2, \"SL\": 26, \"RUNNER_TIME_CLOSE\": 63, \"BE_SL\": 13, \"GAP_BE_SL\": 4}, \"total_pnl\": 2191.9668, \"cum_pnl\": 2191.9668}, \"active_outcome_pollution\": 0, \"artifacts\": {\"trades\": \"/root/.hermes/smc_opt_v185_combined_production_candidate/v185_trades.json\", \"active\": \"/root/.hermes/smc_opt_v185_combined_production_candidate/v185_active_picks.json\", \"picks\": \"/root/.hermes/smc_opt_v185_combined_production_candidate/v185_picks.json\", \"report\": \"/root/.hermes/smc_opt_v185_combined_production_candidate/v185_report.json\"}}\n",
+      "stderr": ""
+    }
+  ],
+  "report": {
+    "version": "V185",
+    "engine": "V185_COMBINED_V175_PLUS_TRUE_TAKEOVER_CHILD",
+    "decision": "V185_DAILY_REMATERIALIZE_PASS",
+    "generated_at": "2026-06-26T09:58:08",
+    "source_v185_formal": "/root/.hermes/smc_audit/v185_formal_candidate_v175_plus_child_20260626_001218",
+    "source_v204_shadow": "/root/.hermes/smc_audit/v204_v185_shadow_materialization_no_write_20260626_064406",
+    "production_write": true,
+    "frontend_write": true,
+    "watchlist_write": true,
+    "production_stats": {
+      "n": 334,
+      "wr": 86.23,
+      "avg": 6.5628,
+      "min_year_n": 41,
+      "year_counts": {
+        "2026": 41,
+        "2025": 104,
+        "2024": 125,
+        "2023": 64
+      },
+      "year_wr": {
+        "2023": 82.81,
+        "2024": 87.2,
+        "2025": 86.54,
+        "2026": 87.8
+      },
+      "all_year_wr_min": 82.81,
+      "micro_profit_pct": 0.9,
+      "same_day_exit_violations": 0,
+      "exit_counts": {
+        "TIME": 66,
+        "TP": 160,
+        "GAP_SL": 2,
+        "SL": 26,
+        "RUNNER_TIME_CLOSE": 63,
+        "BE_SL": 13,
+        "GAP_BE_SL": 4
+      },
+      "total_pnl": 2191.9668,
+      "cum_pnl": 2191.9668
+    },
+    "metrics": {
+      "n": 334,
+      "wr": 86.23,
+      "avg": 6.5628,
+      "min_year_n": 41,
+      "year_counts": {
+        "2026": 41,
+        "2025": 104,
+        "2024": 125,
+        "2023": 64
+      },
+      "year_wr": {
+        "2023": 82.81,
+        "2024": 87.2,
+        "2025": 86.54,
+        "2026": 87.8
+      },
+      "all_year_wr_min": 82.81,
+      "micro_profit_pct": 0.9,
+      "same_day_exit_violations": 0,
+      "exit_counts": {
+        "TIME": 66,
+        "TP": 160,
+        "GAP_SL": 2,
+        "SL": 26,
+        "RUNNER_TIME_CLOSE": 63,
+        "BE_SL": 13,
+        "GAP_BE_SL": 4
+      },
+      "total_pnl": 2191.9668,
+      "cum_pnl": 2191.9668
+    },
+    "n_trades": 334,
+    "total_trades": 334,
+    "win_rate": 86.23,
+    "avg_pnl": 6.5628,
+    "active_pick_count": 6,
+    "active_by_entry_date": {
+      "20260616": 3,
+      "20260615": 2,
+      "20260610": 1
+    },
+    "active_outcome_pollution": 0,
+    "historical_same_day_exit": 0,
+    "contract": "V175 baseline + non-overlap V185 true-takeover runner child; selector non-leaking; T+1 enforced",
+    "latest_market_date": "20260616",
+    "promotion_gate": {
+      "n>=260": true,
+      "min_year_n>=40": true,
+      "WR>=84": true,
+      "AvgPnL>=6.2": true,
+      "all_year_WR_min>=82": true,
+      "micro_profit_pct<=1": true,
+      "T+1=0": true
+    },
+    "total_pnl": 2191.9668,
+    "last_rematerialized_at": "2026-07-04T00:32:06",
+    "cron_productionized": true,
+    "daily_rematerialize_script": "/root/.hermes/scripts/v25/v185_daily_rematerialize.py"
+  },
+  "release_gate": {},
+  "closed_loop_summary": {},
+  "issue_counts": {},
+  "smoke": {
+    "/api/summary": {
+      "ok": true,
+      "bytes": 1655,
+      "has_traceback": false
+    },
+    "/api/autopsy/closed-loop": {
+      "ok": true,
+      "bytes": 2,
+      "has_traceback": false
+    },
+    "/api/picks": {
+      "ok": true,
+      "bytes": 20846,
+      "has_traceback": false
+    }
+  },
+  "next_action_hint": "If WR falls, analyze losses by family/zone/conf/BQ/trend; if SOLD_EARLY dominates, classify original-runner vs new setup; create next Vxx only after full audit passes."
+}

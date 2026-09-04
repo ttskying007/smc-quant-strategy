@@ -1,0 +1,11 @@
+  1500 files, sigs 49
+  3000 files, sigs 84
+  4500 files, sigs 125
+SMC 反转信号: 126
+
+=== SMC 反转 alpha 时间曲线（固定持有视角）===
+  T+5: avg=+3.35% WR=56% n=126
+  T+10: avg=+3.21% WR=56% n=126
+  T+15: avg=+3.64% WR=56% n=126
+  T+20: avg=+5.01% WR=60% n=126
+  T+30: avg=+5.59% WR=60% n=126

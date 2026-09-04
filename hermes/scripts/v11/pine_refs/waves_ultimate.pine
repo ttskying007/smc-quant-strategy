@@ -1,0 +1,251 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  ██╗    ██╗ █████╗ ██╗   ██╗███████╗███████╗    ██╗   ██╗██╗  ████████╗
+//  ██║    ██║██╔══██╗██║   ██║██╔════╝██╔════╝    ██║   ██║██║  ╚══██╔══╝
+//  ██║ █╗ ██║███████║██║   ██║█████╗  ███████╗    ██║   ██║██║     ██║   
+//  ██║███╗██║██╔══██║╚██╗ ██╔╝██╔══╝  ╚════██║    ██║   ██║██║     ██║   
+//  ╚███╔███╔╝██║  ██║ ╚████╔╝ ███████╗███████║    ╚██████╔╝███████╗██║   
+//   ╚══╝╚══╝ ╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚══════╝     ╚═════╝ ╚══════╝╚═╝   
+//
+//  ═══════════════════════════════════════════════════════════════════════════════
+//  TH_MTMGBS WAVES ULTIMATE - Professional Elliott Wave Analysis Suite
+//  ═══════════════════════════════════════════════════════════════════════════════
+//  
+//  VERSION: 3.0 - ABC CORRECTIVE WAVE DETECTION
+//  
+//  CHANGELOG v3.0:
+//  ✦ ADDED: Full ABC corrective wave detection after 5-wave impulse
+//  ✦ ADDED: ABC wave labels (Ⓐ, Ⓑ, Ⓒ)
+//  ✦ ADDED: Wave B and C Fibonacci targets
+//  ✦ ADDED: State machine to track impulse vs correction phases
+//  ✦ ADDED: ABC target zones
+//  ✦ FIXED: Wave sequence continuity after impulse completion
+//  
+//  FEATURES:
+//  ✦ 5-Wave Impulse Detection with Full Rule Validation
+//  ✦ ABC Corrective Pattern Detection (Zigzag, Flat, Triangle)
+//  ✦ Always-Visible Zigzag with Smart Coloring
+//  ✦ Dynamic Wave Labels with Prices
+//  ✦ Fibonacci Retracement & Extension Levels
+//  ✦ Wave Projection Zones
+//  ✦ Quality Scoring System
+//  ✦ Wave Degree Support
+//  ✦ Channel Detection
+//  ✦ Time/Price Ratio Analysis
+//  
+//  ═══════════════════════════════════════════════════════════════════════════════
+
+//@version=5
+indicator("Waves Ultimate + ABC [v3]", shorttitle="WavesABC", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=100)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INPUTS - SWING DETECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+string GRP_SWING = "══════════ ⚙️ SWING DETECTION ══════════"
+i_useHL = input.bool(true, "◈ Use High/Low (vs Close)", group=GRP_SWING)
+i_swingStrength = input.int(5, "◈ Swing Strength (Left Bars)", minval=2, maxval=20, group=GRP_SWING, 
+     tooltip="Number of bars to the LEFT required to confirm a swing. Higher = fewer swings, more reliable.")
+i_rightBars = input.int(2, "◈ Right Confirmation Bars", minval=1, maxval=10, group=GRP_SWING,
+     tooltip="Number of bars to the RIGHT to confirm swing. LOWER = FASTER detection with less lag.")
+i_minWaveATR = input.float(0.5, "◈ Min Wave Size (ATR)", minval=0.1, maxval=3.0, step=0.1, group=GRP_SWING)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INPUTS - REAL-TIME DETECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+string GRP_REALTIME = "══════════ ⚡ REAL-TIME DETECTION ══════════"
+i_showProvisional = input.bool(true, "◈ Show Provisional Swings", group=GRP_REALTIME,
+     tooltip="Shows potential swing points BEFORE they are confirmed.")
+i_extendToPrice = input.bool(true, "◈ Extend Zigzag to Current Price", group=GRP_REALTIME,
+     tooltip="Draws line from last confirmed swing to current high/low.")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INPUTS - FIBONACCI LEVELS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+string GRP_FIB = "══════════ 📐 FIBONACCI LEVELS ══════════"
+i_w2Fib1 = input.float(0.382, "◈ W2 Fib Level 1", group=GRP_FIB)
+i_w2Fib2 = input.float(0.500, "◈ W2 Fib Level 2", group=GRP_FIB)
+i_w2Fib3 = input.float(0.618, "◈ W2 Fib Level 3 (Ideal)", group=GRP_FIB)
+i_w2Fib4 = input.float(0.786, "◈ W2 Fib Level 4 (Max)", group=GRP_FIB)
+
+i_w3Fib1 = input.float(1.618, "◈ W3 Fib Level 1 (Min)", group=GRP_FIB)
+i_w3Fib2 = input.float(2.000, "◈ W3 Fib Level 2", group=GRP_FIB)
+i_w3Fib3 = input.float(2.618, "◈ W3 Fib Level 3 (Ideal)", group=GRP_FIB)
+i_w3Fib4 = input.float(4.236, "◈ W3 Fib Level 4 (Extended)", group=GRP_FIB)
+
+i_w4Fib1 = input.float(0.236, "◈ W4 Fib Level 1", group=GRP_FIB)
+i_w4Fib2 = input.float(0.382, "◈ W4 Fib Level 2 (Ideal)", group=GRP_FIB)
+i_w4Fib3 = input.float(0.500, "◈ W4 Fib Level 3 (Max)", group=GRP_FIB)
+
+i_w5Fib1 = input.float(0.618, "◈ W5 Fib Level 1", group=GRP_FIB)
+i_w5Fib2 = input.float(1.000, "◈ W5 Fib Level 2 (W5=W1)", group=GRP_FIB)
+i_w5Fib3 = input.float(1.618, "◈ W5 Fib Level 3 (Extended)", group=GRP_FIB)
+
+i_wBFib1 = input.float(0.382, "◈ Wave B Fib 1", group=GRP_FIB)
+i_wBFib2 = input.float(0.500, "◈ Wave B Fib 2", group=GRP_FIB)
+i_wBFib3 = input.float(0.618, "◈ Wave B Fib 3 (Ideal)", group=GRP_FIB)
+i_wBFib4 = input.float(0.786, "◈ Wave B Fib 4 (Max)", group=GRP_FIB)
+
+i_wCFib1 = input.float(0.618, "◈ Wave C Fib 1", group=GRP_FIB)
+i_wCFib2 = input.float(1.000, "◈ Wave C Fib 2 (C=A)", group=GRP_FIB)
+i_wCFib3 = input.float(1.618, "◈ Wave C Fib 3", group=GRP_FIB)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INPUTS - VISUAL STYLE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+string GRP_VIS = "══════════ 🎨 VISUAL STYLE ══════════"
+i_showZigzag = input.bool(true, "◈ Show Zigzag Lines", group=GRP_VIS)
+i_showWaveLabels = input.bool(true, "◈ Show Wave Labels", group=GRP_VIS)
+i_showPriceLabels = input.bool(true, "◈ Show Price at Swings", group=GRP_VIS)
+i_showCurrentFibs = input.bool(true, "◈ Show Current Wave Fibs", group=GRP_VIS)
+i_showNextWaveTargets = input.bool(true, "◈ Show Next Wave Targets", group=GRP_VIS)
+i_showTargetZones = input.bool(true, "◈ Show Target Zones", group=GRP_VIS)
+i_showChannel = input.bool(false, "◈ Show Wave Channel", group=GRP_VIS)
+i_showSwingDots = input.bool(true, "◈ Show Swing Markers", group=GRP_VIS)
+i_showInfoPanel = input.bool(true, "◈ Show Info Panel", group=GRP_VIS)
+i_showAdvancementPanel = input.bool(true, "◈ Show Advancement Panel", group=GRP_VIS)
+i_fibExtendBars = input.int(30, "◈ Fib Lines Extend (bars)", minval=10, maxval=100, group=GRP_VIS)
+i_zigzagWidth = input.int(2, "◈ Zigzag Line Width", minval=1, maxval=5, group=GRP_VIS)
+i_labelSize = input.string("Small", "◈ Label Size", options=["Tiny", "Small", "Normal", "Large"], group=GRP_VIS)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INPUTS - TABLE POSITIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+string GRP_TBL = "══════════ 📊 TABLE POSITIONS ══════════"
+i_infoPanelPos = input.string("Top Right", "◈ Info Panel Position", options=["Top Left", "Top Center", "Top Right", "Middle Left", "Middle Center", "Middle Right", "Bottom Left", "Bottom Center", "Bottom Right"], group=GRP_TBL)
+i_advPanelPos = input.string("Middle Right", "◈ Advancement Panel Position", options=["Top Left", "Top Center", "Top Right", "Middle Left", "Middle Center", "Middle Right", "Bottom Left", "Bottom Center", "Bottom Right"], group=GRP_TBL)
+i_nextPanelPos = input.string("Bottom Right", "◈ Next Wave Panel Position", options=["Top Left", "Top Center", "Top Right", "Middle Left", "Middle Center", "Middle Right", "Bottom Left", "Bottom Center", "Bottom Right"], group=GRP_TBL)
+i_tableSize = input.string("Small", "◈ Table Text Size", options=["Tiny", "Small", "Normal", "Large"], group=GRP_TBL)
+
+// Function to convert position string to position constant
+f_getPosition(pos) =>
+    pos == "Top Left" ? position.top_left : pos == "Top Center" ? position.top_center : pos == "Top Right" ? position.top_right : pos == "Middle Left" ? position.middle_left : pos == "Middle Center" ? position.middle_center : pos == "Middle Right" ? position.middle_right : pos == "Bottom Left" ? position.bottom_left : pos == "Bottom Center" ? position.bottom_center : position.bottom_right
+
+// Get table positions
+infoPanelPosition = f_getPosition(i_infoPanelPos)
+advPanelPosition = f_getPosition(i_advPanelPos)
+nextPanelPosition = f_getPosition(i_nextPanelPos)
+
+// Get table text size
+tableTextSize = i_tableSize == "Tiny" ? size.tiny : i_tableSize == "Small" ? size.small : i_tableSize == "Normal" ? size.normal : size.large
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INPUTS - COLOR THEME
+// ═══════════════════════════════════════════════════════════════════════════════
+
+string GRP_COL = "══════════ 🌈 COLOR THEME ══════════"
+i_bullColor = input.color(#00E676, "◈ Bullish / Up", group=GRP_COL)
+i_bearColor = input.color(#FF5252, "◈ Bearish / Down", group=GRP_COL)
+i_wave1Color = input.color(#42A5F5, "◈ Wave 1", group=GRP_COL)
+i_wave2Color = input.color(#FFA726, "◈ Wave 2", group=GRP_COL)
+i_wave3Color = input.color(#26A69A, "◈ Wave 3 (Special)", group=GRP_COL)
+i_wave4Color = input.color(#AB47BC, "◈ Wave 4", group=GRP_COL)
+i_wave5Color = input.color(#EF5350, "◈ Wave 5", group=GRP_COL)
+i_waveAColor = input.color(#FF9800, "◈ Wave A", group=GRP_COL)
+i_waveBColor = input.color(#9C27B0, "◈ Wave B", group=GRP_COL)
+i_waveCColor = input.color(#F44336, "◈ Wave C", group=GRP_COL)
+i_abcColor = input.color(#FFB74D, "◈ Corrective ABC", group=GRP_COL)
+i_fibColor = input.color(#2196F3, "◈ Fibonacci", group=GRP_COL)
+i_channelColor = input.color(#78909C, "◈ Channel", group=GRP_COL)
+i_provisionalColor = input.color(#FFEB3B, "◈ Provisional Swing", group=GRP_COL)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CORE CALCULATIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+atr = ta.atr(14)
+minWaveSize = nz(atr * i_minWaveATR, 0.001)
+highSrc = i_useHL ? high : close
+lowSrc = i_useHL ? low : close
+lblSize = i_labelSize == "Tiny" ? size.tiny : i_labelSize == "Small" ? size.small : i_labelSize == "Normal" ? size.normal : size.large
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ZIGZAG STRUCTURE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var float[] zzPrice = array.new_float(0)
+var int[] zzBar = array.new_int(0)
+var int[] zzType = array.new_int(0)
+
+pivotHigh = ta.pivothigh(highSrc, i_swingStrength, i_rightBars)
+pivotLow = ta.pivotlow(lowSrc, i_swingStrength, i_rightBars)
+pivotBar = bar_index - i_rightBars
+
+lastType = array.size(zzType) > 0 ? array.get(zzType, 0) : 0
+
+if not na(pivotHigh)
+    validSize = array.size(zzPrice) > 0 ? math.abs(pivotHigh - array.get(zzPrice, 0)) >= minWaveSize : true
+    if lastType == 1 and array.size(zzPrice) > 0
+        if pivotHigh > array.get(zzPrice, 0)
+            array.set(zzPrice, 0, pivotHigh)
+            array.set(zzBar, 0, pivotBar)
+    else if lastType != 1 and validSize
+        array.unshift(zzPrice, pivotHigh)
+        array.unshift(zzBar, pivotBar)
+        array.unshift(zzType, 1)
+        if array.size(zzPrice) > 30
+            array.pop(zzPrice)
+            array.pop(zzBar)
+            array.pop(zzType)
+
+if not na(pivotLow)
+    validSize = array.size(zzPrice) > 0 ? math.abs(pivotLow - array.get(zzPrice, 0)) >= minWaveSize : true
+    if lastType == -1 and array.size(zzPrice) > 0
+        if pivotLow < array.get(zzPrice, 0)
+            array.set(zzPrice, 0, pivotLow)
+            array.set(zzBar, 0, pivotBar)
+    else if lastType != -1 and validSize
+        array.unshift(zzPrice, pivotLow)
+        array.unshift(zzBar, pivotBar)
+        array.unshift(zzType, -1)
+        if array.size(zzPrice) > 30
+            array.pop(zzPrice)
+            array.pop(zzBar)
+            array.pop(zzType)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROVISIONAL SWING DETECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var float provisionalPrice = na
+var int provisionalBar = na
+var int provisionalType = 0
+
+var float highestSinceSwing = na
+var int highestBar = na
+var float lowestSinceSwing = na
+var int lowestBar = na
+
+lastConfirmedType = array.size(zzType) > 0 ? array.get(zzType, 0) : 0
+lastConfirmedPrice = array.size(zzPrice) > 0 ? array.get(zzPrice, 0) : na
+lastConfirmedBar = array.size(zzBar) > 0 ? array.get(zzBar, 0) : na
+
+if ta.change(lastConfirmedBar) != 0 or na(highestSinceSwing)
+    highestSinceSwing := highSrc
+    highestBar := bar_index
+    lowestSinceSwing := lowSrc
+    lowestBar := bar_index
+
+if highSrc > highestSinceSwing
+    highestSinceSwing := highSrc
+    highestBar := bar_index
+if lowSrc < lowestSinceSwing
+    lowestSinceSwing := lowSrc
+    lowestBar := bar_index
+
+if lastConfirmedType == 1
+    if not na(lowestSinceSwing) and not na(lastConfirmedPrice)
+        if math.abs(lowestSinceSwing - lastConfirmedPrice) >= minWaveSize
+            provisionalPrice := lowestSinceSwing
+            provisionalBar := lowestBar
+            provisionalType := -1
+else if lastConfirmedType == -1
+    if not na(highestSinceSwing) and not na(lastConfirmedPrice)
+        if math.abs(highestSinceSwing - lastConfirmedPrice) >= minWaveSize
+            provisionalPrice := highestSinceSwing
+            provisionalBar := highestBar
+            provisionalType := 1

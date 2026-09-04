@@ -1,0 +1,7 @@
+=== OLD 参数 (Pivot3 / Sweep0.3% / close-BOS) ===
+OLD: n=90 WR=63.3% avg=+2.63% PF=1.72 | 2024:+3.50% | 2025:+3.79% | 2026:-3.91%
+
+=== NEW 参数 (Pivot5 / Sweep1.5% / strong-BOS) ===
+NEW: n=1 (过小)
+
+完成 (参数已恢复)

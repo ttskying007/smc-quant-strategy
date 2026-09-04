@@ -1,0 +1,17 @@
+  1500 files, cont 1484
+  3000 files, cont 2977
+  4500 files, cont 4521
+combo_v20_trades saved: 9794
+v20 report written
+dashboard v20 saved
+registry v20 recorded
+  2014: n=1 avg=-0.03% PF=0.0
+  2015: n=1 avg=+2.07% PF=0
+  2019: n=29 avg=+2.73% PF=1.86
+  2020: n=35 avg=+7.34% PF=3.04
+  2021: n=50 avg=+8.95% PF=4.77
+  2022: n=16 avg=+1.56% PF=1.23
+  2023: n=988 avg=-0.41% PF=0.89
+  2024: n=4523 avg=+9.03% PF=4.67
+  2025: n=2449 avg=+5.54% PF=3.38
+  2026: n=1702 avg=+4.09% PF=1.92

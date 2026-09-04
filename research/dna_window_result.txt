@@ -1,0 +1,11 @@
+事件: 7593
+
+阶段识别一致性:
+  45/60/75/90 全一致: 46%
+  60 vs 90 一致: 66%
+
+=== 各窗口的 ACCUM/DOWNTREND 事件表现（15日）===
+  win=60 ACCUM: n=833 avg=+10.95% PF=6.3717
+  win=60 DOWNTREND: n=3799 avg=+6.10% PF=3.1546
+  win=90 ACCUM: n=1052 avg=+8.27% PF=3.7527
+  win=90 DOWNTREND: n=3684 avg=+5.78% PF=2.9457

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMC Navigator v4</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh}
+.header{background:#161b22;padding:12px 20px;display:flex;align-items:center;gap:20px;border-bottom:1px solid #30363d}
+.header h1{font-size:18px;color:#58a6ff}
+.header .sub{font-size:12px;color:#8b949e}
+.container{display:flex;gap:0;height:calc(100vh - 50px)}
+.sidebar{width:320px;background:#161b22;border-right:1px solid #30363d;padding:12px;overflow-y:auto;flex-shrink:0}
+.sidebar h3{font-size:12px;color:#8b949e;text-transform:uppercase;margin:10px 0 6px;letter-spacing:1px}
+.search-bar{display:flex;gap:6px;margin-bottom:10px}
+.search-bar input{flex:1;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;border-radius:6px;font-size:13px}
+.search-bar button{background:#238636;border:none;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px}
+.filters{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
+.filters button{background:#21262d;border:1px solid #30363d;color:#c9d1d9;padding:4px 10px;border-radius:12px;cursor:pointer;font-size:11px}
+.filters button.active{background:#1f6feb;border-color:#1f6feb;color:#fff}
+.stock-list{font-size:12px}
+.stock-item{padding:6px 8px;cursor:pointer;border-radius:4px;display:flex;justify-content:space-between;transition:background 0.15s}
+.stock-item:hover{background:#21262d}
+.stock-item.selected{background:#1f6feb33;border-left:2px solid #58a6ff}
+.stock-item .sym{font-weight:500;color:#c9d1d9}
+.stock-item .info{color:#8b949e;font-size:11px}
+.stock-item .badge{display:inline-block;padding:1px 5px;border-radius:8px;font-size:10px}
+.badge-v13{background:#1f6feb33;color:#58a6ff}
+.badge-v14{background:#23863633;color:#3fb950}
+.main{flex:1;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.panel{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px}
+.panel h2{font-size:13px;color:#8b949e;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px}
+.panel-row{display:flex;gap:10px;flex-wrap:wrap}
+.stat{text-align:center;padding:8px 16px;background:#0d1117;border-radius:6px;min-width:80px}
+.stat .val{font-size:18px;font-weight:600;color:#c9d1d9}
+.stat .lbl{font-size:10px;color:#8b949e;text-transform:uppercase}
+.stat.green .val{color:#3fb950}
+.stat.blue .val{color:#58a6ff}
+.stat.orange .val{color:#d29922}
+.stat.red .val{color:#f85149}
+#chart-main{width:100%;height:400px}
+#analysis-panel{font-size:13px;line-height:1.6}
+.analysis-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
+.analysis-item{padding:6px 10px;background:#0d1117;border-radius:4px}
+.analysis-item .label{color:#8b949e;font-size:11px}
+.analysis-item .value{color:#c9d1d9;font-weight:500;font-size:13px}
+.signal-tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;margin:1px}
+.sig-fvg{background:#d2992233;color:#d29922}
+.sig-ob{background:#58a6ff33;color:#58a6ff}
+.sig-sweep{background:#bc8cff33;color:#bc8cff}
+.sig-choch{background:#3fb95033;color:#3fb950}
+</style>
+</head>
+<body>
+
+<div class="header">
+<h1>SMC Navigator v4</h1>
+<span class="sub" id="status-text">加载中...</span>
+</div>
+
+<div class="container">
+  <!-- 左侧栏 -->
+  <div class="sidebar">
+    <h3>市场筛选</h3>
+    <div class="search-bar">
+      <input id="search" placeholder="股票代码..." onkeyup="searchStock(event)">
+      <button onclick="searchStock()">搜索</button>
+    </div>
+    <div class="filters">
+      <button class="active" onclick="setFilter('all')" id="f-all">全部</button>
+      <button onclick="setFilter('v13')" id="f-v13">V13全量</button>
+      <button onclick="setFilter('v14')" id="f-v14">V14优化</button>
+    </div>
+    <h3>股票列表</h3>
+    <div id="stock-count" style="font-size:11px;color:#8b949e;margin-bottom:6px"></div>
+    <div id="stock-list" class="stock-list"></div>
+    <div style="text-align:center;padding:8px">
+      <button onclick="prevPage()" style="background:#21262d;border:1px solid #30363d;color:#c9d1d9;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px">&lt; 上一页</button>
+      <span id="page-info" style="margin:0 8px;font-size:12px">1/1</span>
+      <button onclick="nextPage()" style="background:#21262d;border:1px solid #30363d;color:#c9d1d9;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px">下一页 &gt;</button>
+    </div>
+  </div>
+
+  <!-- 主面板 -->
+  <div class="main">
+    <!-- 概览 -->
+    <div class="panel" id="overview-panel">
+      <h2>市场概览</h2>
+      <div class="panel-row" id="overview-stats"></div>
+    </div>
+
+    <!-- K线+信号图表 -->
+    <div class="panel">
+      <div id="chart-main"></div>
+    </div>
+
+    <!-- 分析面板 -->
+    <div class="panel" id="analysis-panel">
+      <h2>实时分析 <span id="analyze-symbol" style="color:#58a6ff"></span></h2>
+      <div id="analysis-content">选择一个股票查看分析</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let currentSymbol = '000001.SZ';
+let currentPage = 0;
+let currentFilter = 'all';
+let allSymbols = [];
+let chart = null;
+
+// 初始化
+async function init() {
+  // 加载概览
+  const market = await fetch(`${API}/api/market`).then(r=>r.json());
+  renderOverview(market);
+  
+  // 加载版本对比
+  const ver = await fetch(`${API}/api/versions`).then(r=>r.json());
+  
+  // 加载股票列表
+  await loadStocks();
+  
+  // 分析默认股票
+  analyzeStock('000001.SZ');
+  
+  // ECharts
+  chart = echarts.init(document.getElementById('chart-main'));
+}
+
+async function loadStocks() {
+  const filter = currentFilter === 'all' ? '' : `&filter=${currentFilter}`;
+  const res = await fetch(`${API}/api/symbols?page=${currentPage}&per_page=50${filter}`);
+  const data = await res.json();
+  allSymbols = data.symbols;
+  
+  const list = document.getElementById('stock-list');
+  list.innerHTML = allSymbols.map(s => {
+    const badges = [];
+    if (s.has_v13) badges.push('<span class="badge badge-v13">V13</span>');
+    if (s.has_v14) badges.push('<span class="badge badge-v14">V14</span>');
+    const v14 = s.v14_params || {};
+    const info = v14.wr ? `WR=${v14.wr}% RR=${v14.rr}x` : '';
+    return `<div class="stock-item ${s.symbol === currentSymbol ? 'selected' : ''}" 
+                onclick="analyzeStock('${s.symbol}')">
+              <span class="sym">${s.symbol}</span>
+              <span>${badges.join(' ')} <span class="info">${info}</span></span>
+            </div>`;
+  }).join('');
+  
+  document.getElementById('stock-count').textContent = `共${data.total}只`;
+  document.getElementById('page-info').textContent = `${currentPage+1}/${Math.ceil(data.total/50)}`;
+}
+
+function renderOverview(market) {
+  const stats = document.getElementById('overview-stats');
+  const v13 = market.v13 || {};
+  const v14 = market.v14 || {};
+  const v116 = market.v116 || {};
+  
+  stats.innerHTML = `
+    <div class="stat blue"><div class="val">${v14.tradable||0}</div><div class="lbl">V14优化</div></div>
+    <div class="stat green"><div class="val">${v14.avg_rr||0}x</div><div class="lbl">V14 RR</div></div>
+    <div class="stat green"><div class="val">${v116.swing_pct||0}%</div><div class="lbl">摆动SL%</div></div>
+    <div class="stat blue"><div class="val">${v13.tradable||0}</div><div class="lbl">V13全量</div></div>
+    <div class="stat green"><div class="val">${v13.avg_wr||0}%</div><div class="lbl">V13 WR</div></div>
+    <div class="stat orange"><div class="val">${v116.win_rate||0}%</div><div class="lbl">V11.6 WR</div></div>
+    <div class="stat green"><div class="val">${v116.avg_rr||0}x</div><div class="lbl">V11.6 RR</div></div>
+    <div class="stat green"><div class="val">${v13.total_trades||0}</div><div class="lbl">总交易</div></div>
+  `;
+}
+
+async function analyzeStock(symbol) {
+  currentSymbol = symbol;
+  document.getElementById('analyze-symbol').textContent = `- ${symbol}`;
+  document.getElementById('analysis-content').textContent = '分析中...';
+  
+  // 高亮选中
+  document.querySelectorAll('.stock-item').forEach(el => {
+    el.classList.toggle('selected', el.textContent.includes(symbol));
+  });
+  
+  try {
+    const res = await fetch(`${API}/api/analyze?symbol=${symbol}`);
+    const data = await res.json();
+    
+    if (data.error) {
+      document.getElementById('analysis-content').textContent = data.error;
+      return;
+    }
+    
+    renderAnalysis(data);
+    renderChart(data);
+  } catch(e) {
+    document.getElementById('analysis-content').textContent = `错误: ${e.message}`;
+  }
+}
+
+function renderAnalysis(data) {
+  const dec = data.decision || {};
+  const seq = data.sequence || {};
+  const res = data.resonance || {};
+  const v14 = data.v14_params || {};
+  const sigs = data.signals || [];
+  const swing = data.swing_info || {};
+  
+  const actionColors = {enter:'#3fb950', wait:'#d29922', watch:'#58a6ff', skip:'#f85149'};
+  const actionColor = actionColors[dec.action] || '#8b949e';
+  
+  const recentSigs = sigs.slice(-15);
+  
+  document.getElementById('analysis-content').innerHTML = `
+    <div class="analysis-grid">
+      <div class="analysis-item">
+        <div class="label">决策</div>
+        <div class="value" style="color:${actionColor}">${(dec.action||'N/A').toUpperCase()}</div>
+      </div>
+      <div class="analysis-item">
+        <div class="label">方向</div>
+        <div class="value">${data.phase||'?'}</div>
+      </div>
+      <div class="analysis-item">
+        <div class="label">共振总分</div>
+        <div class="value">${(res.total||0).toFixed(2)}</div>
+      </div>
+      <div class="analysis-item">
+        <div class="label">序列</div>
+        <div class="value">${(seq.best_sequence&&seq.best_sequence.name)||'无'}</div>
+      </div>
+      <div class="analysis-item">
+        <div class="label">周线趋势</div>
+        <div class="value">${data.weekly_trend||'?'}</div>
+      </div>
+      ${swing.sl ? `<div class="analysis-item"><div class="label">摆动SL</div><div class="value">${swing.sl} (${swing.sl_pct}%)</div></div>` : ''}
+      ${v14.wr ? `<div class="analysis-item"><div class="label">V14 WR/TP</div><div class="value">WR=${v14.wr}% SL=${v14.sl_pct}%/TP=${v14.tp_pct}%</div></div>` : ''}
+      <div class="analysis-item">
+        <div class="label">信号数</div>
+        <div class="value">${data.n_total_signals||0} (近60K线:${data.n_recent_signals||0})</div>
+      </div>
+      <div class="analysis-item">
+        <div class="label">入场价</div>
+        <div class="value">${dec.entry_price ? dec.entry_price.toFixed(2) : '-'}</div>
+      </div>
+      <div class="analysis-item">
+        <div class="label">SL/TP (决策)</div>
+        <div class="value">${dec.sl ? dec.sl.toFixed(2)+'/'+dec.tp.toFixed(2) : '-'}</div>
+      </div>
+    </div>
+    
+    <div style="margin-top:8px;font-size:11px;color:#8b949e">
+      <span>最近信号: </span>
+      ${recentSigs.map(s => {
+        const cls = s.type.includes('FVG')?'sig-fvg':s.type.includes('OB')?'sig-ob':s.type.includes('Sweep')?'sig-sweep':'sig-choch';
+        return `<span class="signal-tag ${cls}">${s.type}</span>`;
+      }).join('')}
+    </div>
+    
+    <div style="margin-top:8px;font-size:11px;color:#8b949e">
+      <span>入场理由: </span>
+      <span style="color:#c9d1d9">${dec.reason||'无'}</span>
+    </div>
+  `;
+}
+
+function renderChart(data) {
+  if (!chart) return;
+  const ohlcv = data.ohlcv_latest || [];
+  const sigs = data.signals || [];
+  const dec = data.decision || {};
+  
+  if (!ohlcv.length) return;
+  
+  const dates = ohlcv.map(b => b.date || b.t || '');
+  const opens = ohlcv.map(b => b.o);
+  const closes = ohlcv.map(b => b.c);
+  const highs = ohlcv.map(b => b.h);
+  const lows = ohlcv.map(b => b.l);
+  const vols = ohlcv.map(b => b.v || b.vol || 0);
+  
+  const baseIdx = data.n_bars - 30;
+  
+  // 信号标注
+  const sigMarkers = sigs.map(s => {
+    const idx = s.idx - baseIdx;
+    if (idx < 0 || idx >= ohlcv.length) return null;
+    const colors = {FVG:'#d29922', OB:'#58a6ff', Sweep:'#bc8cff', CHOCH:'#3fb950'};
+    const color = Object.entries(colors).find(([k]) => s.type.includes(k))?.[1] || '#8b949e';
+    return {
+      coord: [dates[idx], highs[idx]],
+      symbol: s.type.includes('FVG') ? 'circle' : s.type.includes('OB') ? 'triangle' : 'diamond',
+      symbolSize: 10,
+      itemStyle: {color, borderColor: '#000', borderWidth: 1},
+      label: {show: true, formatter: s.type.replace(/_.*$/,''), color: color, fontSize: 9, position: 'top'}
+    };
+  }).filter(Boolean);
+  
+  // 决策入场点
+  const decisionMarker = dec.action === 'enter' && dec.entry_price ? [{
+    coord: [dates[dates.length-1], dec.entry_price],
+    symbol: 'arrow',
+    symbolSize: [15, 12],
+    itemStyle: {color: '#3fb950'},
+    label: {show: true, formatter: '入场', color: '#3fb950', fontSize: 10, position: 'bottom'}
+  }] : [];
+  
+  const option = {
+    backgroundColor: '#0d1117',
+    grid: [{left: '5%', right: '5%', top: '10%', height: '60%'},
+           {left: '5%', right: '5%', top: '78%', height: '15%'}],
+    xAxis: [{type: 'category', data: dates, axisLabel: {color:'#8b949e', fontSize:10, rotate:45}},
+            {type: 'category', data: dates, gridIndex: 1, axisLabel: {show: false}}],
+    yAxis: [{scale: true, splitLine: {lineStyle: {color:'#21262d'}}, axisLabel: {color:'#8b949e'}},
+            {scale: true, gridIndex: 1, splitLine: {show: false}, axisLabel: {show: false}}],
+    series: [
+      {name: 'K线', type: 'candlestick',
+       data: ohlcv.map(b => [b.o, b.c, b.l, b.h]),
+       itemStyle: {color: '#3fb950', color0: '#f85149', borderColor: '#3fb950', borderColor0: '#f85149'},
+       markPoint: {data: [...sigMarkers, ...decisionMarker]}},
+      {name: '成交量', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, data: vols,
+       itemStyle: {color: (p) => closes[p.dataIndex] >= opens[p.dataIndex] ? '#3fb95044' : '#f8514944'}},
+    ],
+    tooltip: {trigger: 'axis', axisPointer: {type: 'cross'}},
+    dataZoom: [{type: 'inside', xAxisIndex: [0,1]}],
+  };
+  chart.setOption(option, true);
+}
+
+function setFilter(filter) {
+  currentFilter = filter;
+  currentPage = 0;
+  document.querySelectorAll('.filters button').forEach(b => b.classList.remove('active'));
+  document.getElementById(`f-${filter}`).classList.add('active');
+  loadStocks();
+}
+
+function searchStock(e) {
+  if (e && e.key !== 'Enter') return;
+  const search = document.getElementById('search').value;
+  fetch(`${API}/api/symbols?page=0&per_page=50&search=${search}`)
+    .then(r => r.json()).then(data => {
+      allSymbols = data.symbols;
+      const list = document.getElementById('stock-list');
+      list.innerHTML = allSymbols.map(s => {
+        const badges = [];
+        if (s.has_v13) badges.push('<span class="badge badge-v13">V13</span>');
+        if (s.has_v14) badges.push('<span class="badge badge-v14">V14</span>');
+        const v14 = s.v14_params || {};
+        const info = v14.wr ? `WR=${v14.wr}% RR=${v14.rr}x` : '';
+        return `<div class="stock-item ${s.symbol === currentSymbol ? 'selected' : ''}" 
+                    onclick="analyzeStock('${s.symbol}')">
+                  <span class="sym">${s.symbol}</span>
+                  <span>${badges.join(' ')} <span class="info">${info}</span></span>
+                </div>`;
+      }).join('');
+      document.getElementById('stock-count').textContent = `共${data.total}只`;
+    });
+}
+
+function prevPage() {
+  if (currentPage > 0) { currentPage--; loadStocks(); }
+}
+function nextPage() { currentPage++; loadStocks(); }
+
+// 状态更新
+setInterval(async () => {
+  const s = await fetch(`${API}/api/status`).then(r=>r.json());
+  document.getElementById('status-text').textContent = 
+    `V14优化${s.v14_tradable}只 | V13全量${s.v13_tradable}只 | V11.6 WR${s.v13_avg_wr}%`;
+}, 5000);
+
+init();
+</script>
+</body>
+</html>

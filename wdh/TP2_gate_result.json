@@ -1,0 +1,101 @@
+{
+  "overall": {
+    "n": 1258,
+    "symbols": 1040,
+    "wr": 53.2591,
+    "avg": 1.196,
+    "pf": 1.1963,
+    "payoff": 1.0499
+  },
+  "yearly": {
+    "2023": {
+      "n": 0,
+      "wr": 0.0,
+      "avg": 0.0,
+      "pf": 0.0,
+      "payoff": 0.0
+    },
+    "2024": {
+      "n": 299,
+      "symbols": 275,
+      "wr": 59.1973,
+      "avg": 4.1245,
+      "pf": 1.7248,
+      "payoff": 1.1889
+    },
+    "2025": {
+      "n": 573,
+      "symbols": 517,
+      "wr": 59.6859,
+      "avg": 2.2656,
+      "pf": 1.4468,
+      "payoff": 0.9772
+    },
+    "2026": {
+      "n": 386,
+      "symbols": 323,
+      "wr": 39.1192,
+      "avg": -2.6603,
+      "pf": 0.6642,
+      "payoff": 1.0336
+    }
+  },
+  "checks": [
+    {
+      "name": "total_n",
+      "pass": true,
+      "detail": "n=1258 >= 1000"
+    },
+    {
+      "name": "wr",
+      "pass": false,
+      "detail": "WR=53.2591% >= 55.0%"
+    },
+    {
+      "name": "avg_net",
+      "pass": true,
+      "detail": "AvgNet=1.196% >= 0.5%"
+    },
+    {
+      "name": "pf",
+      "pass": true,
+      "detail": "PF=1.1963 >= 1.15"
+    },
+    {
+      "name": "payoff",
+      "pass": true,
+      "detail": "payoff=1.0499 >= 0.7"
+    },
+    {
+      "name": "yearly_n",
+      "pass": false,
+      "detail": {
+        "2023": 0,
+        "2024": 299,
+        "2025": 573,
+        "2026": 386
+      }
+    },
+    {
+      "name": "yearly_avg_positive",
+      "pass": false,
+      "detail": {
+        "2023": 0.0,
+        "2024": 4.1245,
+        "2025": 2.2656,
+        "2026": -2.6603
+      }
+    },
+    {
+      "name": "monthly_sample",
+      "pass": false,
+      "detail": "months with n<5: ['202403', '202404', '202405']"
+    },
+    {
+      "name": "t1_zero",
+      "pass": true,
+      "detail": "T+1 violations=0"
+    }
+  ],
+  "gate_pass": false
+}

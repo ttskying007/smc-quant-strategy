@@ -1,0 +1,28 @@
+{
+  "generated_at": "2026-06-13T18:24:31",
+  "stamp": "20260613_182431",
+  "positions": {
+    "file": "/root/.hermes/smc_monitor/positions.json",
+    "before": 1073,
+    "kept": 138,
+    "quarantined": 935,
+    "backup": "/root/.hermes/smc_monitor/quarantine/20260613_182431/positions.json.bak",
+    "quarantine": "/root/.hermes/smc_monitor/quarantine/20260613_182431/positions.json"
+  },
+  "closed_reviews": {
+    "file": "/root/.hermes/smc_monitor/closed_reviews.json",
+    "before": 57,
+    "kept": 7,
+    "quarantined": 50,
+    "backup": "/root/.hermes/smc_monitor/quarantine/20260613_182431/closed_reviews.json.bak",
+    "quarantine": "/root/.hermes/smc_monitor/quarantine/20260613_182431/closed_reviews.json"
+  },
+  "trade_ledger": {
+    "file": "/root/.hermes/smc_monitor/trade_ledger.json",
+    "before": 296,
+    "kept": 134,
+    "quarantined": 162,
+    "backup": "/root/.hermes/smc_monitor/quarantine/20260613_182431/trade_ledger.json.bak",
+    "quarantine": "/root/.hermes/smc_monitor/quarantine/20260613_182431/trade_ledger.json"
+  }
+}

@@ -1,0 +1,59 @@
+# ===== SMC 策略项目 .gitignore =====
+
+# ---- 缓存 / 临时 ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.tmpdir/
+*.tmpdir/
+node_modules/
+.gitnexus/
+*.bak
+*.bak_*
+
+# ---- 数据源缓存（可再生，体积巨大）----
+hermes/kline_cache_*/
+hermes/kline_cache/
+hermes/crawl_data/
+hermes/downloads/
+downloads/
+
+# ---- 历史审计 / 优化产物（巨型，非代码）----
+hermes/smc_audit/
+hermes/smc_opt_*/
+
+# ---- 大型数据文件 ----
+announce/*.db
+announce/*.db-*
+wdh/*.csv
+wdh/*_trades.csv
+wdh/*_seeds.csv
+research/*_trades.csv
+research/*_seeds.csv
+research/TP2_*.csv
+margin/*.csv
+margin/*.db
+research/mvd_trades/
+research/corrected_detail/
+smc_backtest_report/V88_reverify/
+hermes/smc_source/**/*.sqlite3
+hermes/blocktrade_cache/
+
+# ---- 运行状态 / 生产账本（敏感，不入库）----
+research/paper_ledger.json
+research/selection_result.json
+research/run_status.json
+research/current_scanner_result.json
+research/combo_dashboard.json
+research/realtime_log.json
+research/trade_log.json
+research/monitor.pid
+hermes/smc_monitor/*.json
+hermes/smc_monitor/*.bak*
+hermes/smc_monitor/*.txt
+
+# ---- 本机环境 / IDE ----
+.idea/
+.vscode/
+*.log

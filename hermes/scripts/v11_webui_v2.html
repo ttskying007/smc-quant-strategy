@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMC V11 Chart — K线回测回溯</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0f1419;color:#e0e0e0;margin:0;padding:16px}
+h1{color:#ff9800;font-size:22px;margin:0 0 4px}
+.subtitle{color:#667;font-size:13px;margin:0 0 16px}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.controls select{flex:1;min-width:200px;padding:8px 12px;border:1px solid #334;border-radius:6px;background:#1a2332;color:#e0e0e0;font-size:14px}
+.controls button{padding:8px 18px;border:none;border-radius:6px;font-size:14px;cursor:pointer;font-weight:bold}
+.btn-primary{background:#ff9800;color:#000}
+.btn-primary:hover{background:#ffb74d}
+.btn-secondary{background:#334;color:#e0e0e0}
+.btn-secondary:hover{background:#445}
+.info-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.info-card{background:#1a2332;border-radius:8px;padding:8px 14px;min-width:80px;flex:1}
+.info-card .lbl{font-size:11px;color:#8899aa}
+.info-card .val{font-size:18px;font-weight:bold;margin-top:2px}
+.info-card .val.green{color:#4caf50}
+.info-card .val.red{color:#f44336}
+.info-card .val.orange{color:#ff9800}
+.chart-box{background:#1a2332;border-radius:10px;padding:12px;margin-bottom:12px}
+.chart{height:520px;width:100%}
+.chart-sm{height:280px;width:100%}
+.trade-panel{background:#1a2332;border-radius:10px;padding:14px;margin-bottom:12px}
+.trade-panel h3{font-size:15px;color:#ffa726;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.trade-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.trade-item{padding:10px;border-radius:6px;font-size:12px;cursor:pointer;position:relative}
+.trade-item:hover{opacity:0.85}
+.trade-won{background:rgba(76,175,80,0.12);border-left:3px solid #4caf50}
+.trade-lost{background:rgba(244,67,54,0.12);border-left:3px solid #f44336}
+.trade-item .sym{font-size:11px;color:#8899aa;margin-bottom:2px}
+.trade-item .dir{font-size:13px;font-weight:bold}
+.direction-bull{color:#4caf50}.direction-bear{color:#f44336}
+.trade-item .stats{display:flex;gap:8px;margin-top:3px;font-size:11px;color:#aaa}
+.signal-legend{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0;font-size:12px}
+.legend-item{display:flex;align-items:center;gap:4px}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.loading{text-align:center;padding:40px;color:#667}
+.error{color:#f44336;padding:20px}
+table.trade-detail{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+table.trade-detail th{background:#0f1419;padding:6px 10px;text-align:left;color:#8899aa;font-weight:normal}
+table.trade-detail td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04)}
+</style>
+</head>
+<body>
+
+<h1>K线回测回溯</h1>
+<p class="subtitle">V11.2 — OHLCV + 信号 + 交易记录</p>
+
+<div class="controls">
+  <select id="symbolSelect">
+    <option value="">Loading symbols...</option>
+  </select>
+  <button class="btn-primary" onclick="loadSymbol()">分析</button>
+  <button class="btn-secondary" onclick="loadNext()">下一只</button>
+  <button class="btn-secondary" onclick="loadPrev()">上一只</button>
+  <span id="tradeCount" style="color:#667;font-size:12px"></span>
+</div>
+
+<div class="info-bar" id="infoBar"></div>
+
+<div class="chart-box">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <span style="font-size:14px;color:#ffa726">K线 + 信号 + 交易</span>
+    <span style="font-size:11px;color:#667" id="dateRange"></span>
+  </div>
+  <div class="chart" id="mainChart"></div>
+</div>
+
+<div class="signal-legend" id="legend"></div>
+
+<div class="chart-box">
+  <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+    <span style="font-size:14px;color:#ffa726">成交量</span>
+  </div>
+  <div class="chart-sm" id="volumeChart"></div>
+</div>
+
+<div class="trade-panel" id="tradePanel">
+  <h3>交易记录 (<span id="tradePanelCount">0</span>)</h3>
+  <div class="trade-grid" id="tradeGrid"></div>
+</div>
+
+<script>
+let mainChart, volumeChart;
+let allSymbols = [];
+let currentIdx = 0;
+let allTrades = {};
+let currentSymbol = '';
+let currentTrades = [];
+
+function init() {
+  mainChart = echarts.init(document.getElementById('mainChart'));
+  volumeChart = echarts.init(document.getElementById('volumeChart'));
+  window.addEventListener('resize', () => { mainChart.resize(); volumeChart.resize(); });
+  
+  // Load symbols
+  fetch('/api/status')
+    .then(r => r.json())
+    .then(st => {
+      console.log('Status:', st);
+    });
+
+  // Build symbol list from a pre-computed list
+  loadSymbolList();
+}
+
+function loadSymbolList() {
+  fetch('/api/symbols')
+    .then(r => r.json())
+    .then(d => {
+      allSymbols = (d.symbols || []).filter(s => s.has_backtest).map(s => s.symbol);
+      const sel = document.getElementById('symbolSelect');
+      sel.innerHTML = allSymbols.map((sym, i) => 
+        `<option value="${sym}" ${i===0?'selected':''}>${sym}</option>`
+      ).join('');
+      if (allSymbols.length > 0) loadSymbol();
+    })
+    .catch(e => {
+      // Fallback: hardcoded list
+      allSymbols = ['000001.SZ','000004.SZ','000009.SZ','000016.SZ','000036.SZ','000042.SZ','000338.SZ','000401.SZ','000410.SZ','000422.SZ','000504.SZ','000553.SZ','000565.SZ','000651.SZ'];
+      const sel = document.getElementById('symbolSelect');
+      sel.innerHTML = allSymbols.map(s => `<option value="${s}">${s}</option>`).join('');
+      loadSymbol();
+    });
+}
+
+function loadSymbol() {
+  const sel = document.getElementById('symbolSelect');
+  currentSymbol = sel.value;
+  if (!currentSymbol) return;
+  currentIdx = allSymbols.indexOf(currentSymbol);
+  document.getElementById('dateRange').textContent = 'Loading...';
+  document.getElementById('tradePanelCount').textContent = '0';
+  
+  fetch(`/api/analyze?symbol=${currentSymbol}`)
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) {
+        document.getElementById('dateRange').textContent = d.error;
+        return;
+      }
+      renderChart(d);
+    })
+    .catch(e => {
+      document.getElementById('dateRange').textContent = 'Error: ' + e;
+    });
+}
+
+function loadNext() {
+  if (currentIdx < allSymbols.length - 1) {
+    currentIdx++;
+    document.getElementById('symbolSelect').value = allSymbols[currentIdx];
+    loadSymbol();
+  }
+}
+
+function loadPrev() {
+  if (currentIdx > 0) {
+    currentIdx--;
+    document.getElementById('symbolSelect').value = allSymbols[currentIdx];
+    loadSymbol();
+  }
+}
+
+function renderChart(data) {
+  const ohlcv = data.ohlcv || [];
+  const signals = data.signals || [];
+  const decision = data.decision || {};
+  const signalStats = data.signal_stats || {};
+  const backtest = data.backtest || {};
+  const resonance = data.resonance || {};
+  
+  if (ohlcv.length === 0) {
+    document.getElementById('dateRange').textContent = 'No data';
+    return;
+  }
+
+  // Date labels
+  const dates = ohlcv.map(b => {
+    const d = b.date || b.t || '';
+    return d.length >= 8 ? `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}` : d;
+  });
+  
+  // OHLCV
+  const ohlcData = ohlcv.map(b => [b.o, b.c, b.l, b.h]);
+  const volumeData = ohlcv.map(b => b.v || 0);
+  
+  // Price range for y-axis
+  const allPrices = ohlcv.flatMap(b => [b.h, b.l]);
+  const priceMin = Math.min(...allPrices);
+  const priceMax = Math.max(...allPrices);
+  const priceRange = priceMax - priceMin;
+  const yMin = priceMin - priceRange * 0.05;
+  const yMax = priceMax + priceRange * 0.15; // Extra space for markers
+
+  // Info bar
+  const phase = data.phase || '?';
+  const decisionAction = decision.action || '?';
+  const decisionGrade = decision.grade || '?';
+  const conf = decision.confidence || 0;
+  const wr = decision.expected_wr ? (decision.expected_wr * 100).toFixed(0) : '?';
+  
+  document.getElementById('infoBar').innerHTML = `
+    <div class="info-card"><div class="lbl">Phase</div><div class="val orange">${phase}</div></div>
+    <div class="info-card"><div class="lbl">Decision</div><div class="val ${decisionAction==='enter'?'green':decisionAction==='skip'?'red':'orange'}">${decisionAction.toUpperCase()}</div></div>
+    <div class="info-card"><div class="lbl">Grade</div><div class="val ${decisionGrade==='A'||decisionGrade==='S'?'green':decisionGrade==='B'?'orange':'red'}">${decisionGrade}</div></div>
+    <div class="info-card"><div class="lbl">Confidence</div><div class="val">${(conf*100).toFixed(0)}%</div></div>
+    <div class="info-card"><div class="lbl">Exp WR</div><div class="val orange">${wr}%</div></div>
+    <div class="info-card"><div class="lbl">Total Signals</div><div class="val">${signalStats.total||0}</div></div>
+    <div class="info-card"><div class="lbl">FVG/Sweep/OB/CHOCH</div><div class="val" style="font-size:13px">${signalStats.fvg||0}/${signalStats.sweep||0}/${signalStats.ob||0}/${signalStats.choch||0}</div></div>
+  `;
+
+  document.getElementById('dateRange').textContent = `${dates[0]} ~ ${dates[dates.length-1]}`;
+  document.getElementById('tradeCount').textContent = `N=${(signalStats.total||0)} sigs | ${backtest.n_trades||0} backtest trades`;
+
+  // Build signal markers
+  const bullSignals = [];
+  const bearSignals = [];
+  const fvgSignals = [];
+  const sweepSignals = [];
+  const obSignals = [];
+  const chochSignals = [];
+
+  for (const s of signals) {
+    const idx = s.idx;
+    if (idx === undefined || idx >= ohlcv.length) continue;
+    const price = s.price || ohlcv[idx].c;
+    const type = s.type || '';
+    const dir = s.direction || '';
+    const confVal = s.confidence || 0.5;
+    
+    const marker = {
+      value: [dates[idx], price],
+      symbolSize: 6 + confVal * 8,
+      itemStyle: { opacity: 0.8 },
+      label: { show: true, formatter: type.substring(0, 4), fontSize: 9, position: 'top', color: dir === 'bull' ? '#4caf50' : '#f44336' },
+    };
+    
+    if (dir === 'bull') bullSignals.push(marker);
+    else if (dir === 'bear') bearSignals.push(marker);
+    
+    if (type.includes('FVG')) fvgSignals.push(marker);
+    else if (type.includes('Sweep')) sweepSignals.push(marker);
+    else if (type.includes('OB') || type.includes('Rejection')) obSignals.push(marker);
+    else if (type.includes('CHOCH') || type.includes('MSB') || type.includes('BPR')) chochSignals.push(marker);
+    else { dir === 'bull' ? bullSignals.push(marker) : bearSignals.push(marker); }
+  }
+
+  // Build trade marks (from backtest)
+  const tradeEntries = [];
+  const tradeExits = [];
+  const tradeLines = [];
+  
+  // Try to load trades from data
+  // We'll use per-symbol trades from the mapping
+  const symbol = data.symbol;
+  
+  // Fetch trade mapping on demand
+  fetch(`/api/trades?symbol=${symbol}`)
+    .then(r => r.json())
+    .then(td => {
+      currentTrades = td.trades || [];
+      renderTrades(currentTrades, dates, ohlcv);
+      updateTradePanel(currentTrades, dates, ohlcv);
+    })
+    .catch(() => {
+      // No trade data available
+      currentTrades = [];
+      document.getElementById('tradeGrid').innerHTML = '<div style="color:#667;padding:10px;font-size:13px">No backtest trades for this symbol</div>';
+    });
+
+  // Legend
+  const legendTypes = [
+    {name:'FVG', color:'#ff9800'}, {name:'Sweep', color:'#9c27b0'},
+    {name:'OB', color:'#2196f3'}, {name:'CHOCH/BPR', color:'#00bcd4'},
+    {name:'Entry', color:'#4caf50'}, {name:'Exit', color:'#f44336'},
+    {name:'SL', color:'#ff5722'}, {name:'TP', color:'#8bc34a'},
+  ];
+  document.getElementById('legend').innerHTML = legendTypes.map(l =>
+    `<span class="legend-item"><span class="legend-dot" style="background:${l.color}"></span>${l.name}</span>`
+  ).join('');
+
+  // Scatter series for signals
+  const signalSeries = [];
+  
+  if (fvgSignals.length > 0) {
+    signalSeries.push({
+      name: 'FVG', type: 'scatter', data: fvgSignals, 
+      symbol: 'circle', symbolSize: 10,
+      itemStyle: { color: '#ff9800', opacity: 0.8 },
+      label: { show: true, formatter: (p) => 'FVG', fontSize: 9, color: '#ff9800', position: 'top', distance: 2 },
+      z: 5,
+    });
+  }
+  
+  if (sweepSignals.length > 0) {
+    signalSeries.push({
+      name: 'Sweep', type: 'scatter', data: sweepSignals,
+      symbol: 'diamond', symbolSize: 10,
+      itemStyle: { color: '#9c27b0', opacity: 0.8 },
+      label: { show: true, formatter: (p) => 'Sweep', fontSize: 9, color: '#9c27b0', position: 'top' },
+      z: 5,
+    });
+  }
+  
+  if (obSignals.length > 0) {
+    signalSeries.push({
+      name: 'OB', type: 'scatter', data: obSignals,
+      symbol: 'triangle', symbolSize: 10,
+      itemStyle: { color: '#2196f3', opacity: 0.8 },
+      label: { show: true, formatter: (p) => 'OB', fontSize: 9, color: '#2196f3', position: 'top' },
+      z: 5,
+    });
+  }
+  
+  if (chochSignals.length > 0) {
+    signalSeries.push({
+      name: 'CHOCH', type: 'scatter', data: chochSignals,
+      symbol: 'rect', symbolSize: 10,
+      itemStyle: { color: '#00bcd4', opacity: 0.8 },
+      label: { show: true, formatter: (p) => 'CH', fontSize: 9, color: '#00bcd4', position: 'top' },
+      z: 5,
+    });
+  }
+
+  // K-line with trade marks (will update when trades load)
+  const klineOption = {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' },
+      formatter: function(params) {
+        const idx = params[0]?.dataIndex ?? 0;
+        const bar = ohlcv[idx];
+        if (!bar) return '';
+        const d = dates[idx] || '';
+        return `<b>${d}</b><br/>O: ${bar.o.toFixed(2)} H: ${bar.h.toFixed(2)} L: ${bar.l.toFixed(2)} C: ${bar.c.toFixed(2)}<br/>V: ${(bar.v||0).toLocaleString()}`;
+      }
+    },
+    grid: { left: '3%', right: '5%', bottom: '10%', top: '8%' },
+    xAxis: { type: 'category', data: dates, axisLabel: { color: '#667', fontSize: 10, rotate: 45 }, axisLine: { lineStyle: { color: '#334' } } },
+    yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }, axisLabel: { color: '#8899aa', fontSize: 10 } },
+    dataZoom: [{ type: 'inside', start: 0, end: 100 }, { type: 'slider', start: 0, end: 100, height: 20, bottom: 0, borderColor: '#334', backgroundColor: '#1a2332', fillerColor: 'rgba(255,152,0,0.1)', handleStyle: { color: '#ff9800' }, textStyle: { color: '#8899aa' } }],
+    series: [
+      {
+        name: 'K线', type: 'candlestick', data: ohlcData,
+        itemStyle: { color: '#4caf50', color0: '#f44336', borderColor: '#4caf50', borderColor0: '#f44336' },
+        markPoint: {
+          data: [
+            { type: 'max', name: '最高', symbolSize: 30, label: { color: '#ff9800', fontSize: 10, formatter: (p) => `¥${p.value}` } },
+            { type: 'min', name: '最低', symbolSize: 30, label: { color: '#8899aa', fontSize: 10, formatter: (p) => `¥${p.value}` } },
+          ],
+          symbol: 'pin',
+          symbolSize: 35,
+          itemStyle: { color: '#ffa726' },
+        },
+        z: 1,
+      },
+      ...signalSeries,
+    ],
+  };
+  
+  mainChart.setOption(klineOption, true);
+  
+  // Volume chart
+  const volColors = ohlcv.map(b => b.c >= b.o ? '#4caf50' : '#f44336');
+  volumeChart.setOption({
+    tooltip: { trigger: 'axis', formatter: (params) => {
+      const idx = params[0]?.dataIndex ?? 0;
+      return `${dates[idx]}<br/>Vol: ${(volumeData[idx]||0).toLocaleString()}`;
+    }},
+    grid: { left: '3%', right: '5%', bottom: '3%', top: '3%' },
+    xAxis: { type: 'category', data: dates, axisLabel: { show: false }, axisLine: { show: false } },
+    yAxis: { type: 'value', splitLine: { show: false }, axisLabel: { color: '#667', fontSize: 9 } },
+    series: [{ type: 'bar', data: volumeData, itemStyle: { color: (p) => volColors[p.dataIndex] }, barWidth: '60%', z: 1 }],
+    dataZoom: [{ type: 'inside', start: 0, end: 100 }],
+  }, true);
+}
+
+function renderTrades(trades, dates, ohlcv) {
+  if (!trades || trades.length === 0) return;
+  
+  // Entry markers
+  const entryPoints = [];
+  const exitPoints = [];
+  const slLines = [];
+  const tpLines = [];
+  
+  for (const t of trades) {
+    const ei = t.entry_idx;
+    const xi = t.exit_idx;
+    if (ei === undefined || ei >= ohlcv.length) continue;
+    if (xi === undefined || xi >= ohlcv.length) continue;
+    
+    const date_e = dates[ei];
+    const date_x = dates[xi];
+    const dir = t.direction || 'bull';
+    const price_e = t.entry_price;
+    const price_x = t.exit_price;
+    const sl = t.sl;
+    const tp = t.tp;
+    const won = t.won;
+    const pnl = t.pnl_pct;
+    
+    entryPoints.push({
+      name: t.seq_name || 'entry',
+      coord: [date_e, price_e],
+      value: `${dir==='bull'?'LONG':'SHORT'} ${pnl >= 0 ? '+' : ''}${pnl?.toFixed(1)}%`,
+      symbol: dir === 'bull' ? 'arrowUp' : 'arrowDown',
+      symbolSize: 25,
+      itemStyle: { color: won ? '#4caf50' : '#f44336' },
+      label: { 
+        show: true, formatter: (p) => `${dir==='bull'?'L':'S'}`, 
+        fontSize: 10, fontWeight: 'bold', color: '#fff',
+        position: 'inside',
+      },
+      z: 10,
+    });
+    
+    exitPoints.push({
+      name: 'exit',
+      coord: [date_x, price_x],
+      value: `${pnl?.toFixed(1)}%`,
+      symbol: 'circle',
+      symbolSize: 12,
+      itemStyle: { color: won ? '#4caf50' : '#f44336', borderColor: '#fff', borderWidth: 1.5 },
+      label: { show: false },
+      z: 9,
+    });
+    
+    // SL line
+    if (sl) {
+      slLines.push({
+        xAxis: date_e, yAxis: sl,
+        symbol: 'none',
+        lineStyle: { color: '#ff5722', width: 1.5, type: 'dashed' },
+        label: { show: true, formatter: `SL ${sl.toFixed(2)}`, fontSize: 9, color: '#ff5722', position: 'start' },
+      });
+    }
+    
+    // TP line
+    if (tp) {
+      tpLines.push({
+        xAxis: date_e, yAxis: tp,
+        symbol: 'none',
+        lineStyle: { color: '#8bc34a', width: 1.5, type: 'dashed' },
+        label: { show: true, formatter: `TP ${tp.toFixed(2)}`, fontSize: 9, color: '#8bc34a', position: 'start' },
+      });
+    }
+  }
+  
+  // Add as markPoint/markLine
+  mainChart.setOption({
+    series: [
+      {}, // K-line
+    ].concat(
+      // Add markPoint & markLine to the K-line series
+    ),
+  });
+  
+  // Alternative: add custom series for entries/exits
+  // Actually, we can use markPoint on the candlestick series
+  mainChart.setOption({
+    series: [
+      {
+        type: 'candlestick',
+        markPoint: {
+          data: entryPoints,
+          symbol: 'pin',
+          symbolSize: 30,
+          label: { show: true, formatter: (p) => p.name?.substring(0,2) || '', color: '#fff', fontSize: 10 },
+        },
+        markLine: {
+          silent: true,
+          data: [
+            ...slLines.slice(0, 20),
+            ...tpLines.slice(0, 20),
+          ],
+        },
+      },
+    ],
+  }, true);
+  
+  // Also add exit markers as a separate scatter
+  if (exitPoints.length > 0) {
+    mainChart.appendData({
+      seriesIndex: mainChart.getOption().series ? mainChart.getOption().series.length : 2,
+      data: [],
+    });
+    mainChart.setOption({
+      series: [null, null, { // third series for exits
+        type: 'scatter',
+        data: exitPoints,
+        symbol: 'circle',
+        symbolSize: 10,
+        itemStyle: { color: '#ff9800', opacity: 0.6 },
+        z: 8,
+        label: { show: false },
+      }]
+    });
+  }
+}
+
+function updateTradePanel(trades, dates, ohlcv) {
+  const grid = document.getElementById('tradeGrid');
+  const count = document.getElementById('tradePanelCount');
+  count.textContent = trades.length;
+  
+  if (trades.length === 0) {
+    grid.innerHTML = '<div style="color:#667;padding:10px;font-size:13px">This stock has no backtest trades</div>';
+    return;
+  }
+  
+  grid.innerHTML = trades.map((t, i) => {
+    const dir = t.direction || 'bull';
+    const won = t.won;
+    const pnl = t.pnl_pct || 0;
+    const rr = t.rr || 0;
+    const seq = t.seq_name || '?';
+    const grade = t.resonance_grade || '?';
+    const ei = t.entry_idx;
+    const xi = t.exit_idx;
+    const entryDate = (ei !== undefined && dates[ei]) || '?';
+    const exitDate = (xi !== undefined && dates[xi]) || '?';
+    const hb = t.hold_bars || 0;
+    
+    return `<div class="trade-item ${won ? 'trade-won' : 'trade-lost'}" onclick="scrollToTrade(${ei})">
+      <div class="sym">#${i+1} ${dir.toUpperCase()} ${won ? 'WIN' : 'LOSS'}</div>
+      <div class="dir direction-${dir}">${seq}</div>
+      <div class="stats">
+        <span>${pnl>=0?'+':''}${pnl.toFixed(2)}%</span>
+        <span>RR ${rr.toFixed(2)}x</span>
+        <span>${grade}</span>
+        <span>${hb} bars</span>
+      </div>
+      <div class="stats">
+        <span>${entryDate}</span>
+        <span>→</span>
+        <span>${exitDate}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function scrollToTrade(entryIdx) {
+  // Zoom chart to around the trade
+  mainChart.dispatchAction({
+    type: 'dataZoom',
+    startValue: Math.max(0, entryIdx - 10),
+    endValue: entryIdx + 15,
+  });
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+{
+  "checked_at": "2026-07-16 08:40:40 CST",
+  "production_state": "EMPTY_BOOK",
+  "buy_enabled": false,
+  "active_buy_valid_count": 0,
+  "forbidden_fallback": true,
+  "api_picks_count": 0,
+  "live_prices_error": "无实时监控持仓",
+  "data_status": {
+    "valid": true,
+    "epoch_id": "20260716T083603_711104",
+    "market_date": "20260715",
+    "status": "COMMITTED"
+  },
+  "ops_generated_at": "2026-07-16T08:39:36",
+  "ops_pipeline_state": "EMPTY_BOOK",
+  "ops_data_date": "20260715",
+  "kline_refresh": {
+    "generated_at": "2026-07-16T08:39:35",
+    "requested": 4905,
+    "ok": 4903,
+    "failed": 2,
+    "elapsed_sec": 212.1,
+    "coverage_pct": 99.96,
+    "gate_pass": true,
+    "gate_failures": [],
+    "observed_latest_date": "20260715",
+    "latest_age_days": 1,
+    "current_date_count": 4888,
+    "current_date_coverage_pct": 99.65,
+    "epoch_id": "20260716T083603_711104",
+    "epoch_status": "COMMITTED",
+    "current_manifest": {
+      "epoch_id": "20260716T083603_711104",
+      "status": "COMMITTED",
+      "committed_at": "2026-07-16T08:39:35",
+      "market_date": "20260715",
+      "file_count": 4903,
+      "gate": {
+        "gate_pass": true,
+        "gate_failures": [],
+        "observed_latest_date": "20260715",
+        "latest_age_days": 1,
+        "request_coverage_pct": 99.96,
+        "current_date_count": 4888,
+        "current_date_coverage_pct": 99.65
+      }
+    },
+    "recovered_epochs": [],
+    "before_latest_counts": {
+      "20260715": 4888,
+      "20260713": 2,
+      "20260413": 1,
+      "20210528": 1,
+      "20260709": 2,
+      "20260708": 1,
+      "20260707": 1,
+      "20260629": 3,
+      "20260622": 2,
+      "20250812": 1,
+      "20260608": 1
+    },
+    "latest_counts": {
+      "20260715": 4888,
+      "20260713": 2,
+      "20260413": 1,
+      "20210528": 1,
+      "20260709": 2,
+      "20260708": 1,
+      "20260707": 1,
+      "20260629": 3,
+      "20260622": 2,
+      "20250812": 1,
+      "20260608": 1
+    },
+    "source_counts": {
+      "tencent": 4655,
+      "sina_fallback": 248
+    },
+    "error_samples": [
+      {
+        "ok": false,
+        "code": "301666",
+        "market": "sz",
+        "error": "rows=58"
+      },
+      {
+        "ok": false,
+        "code": "688820",
+        "market": "sh",
+        "error": "rows=58"
+      }
+    ],
+    "top_errors": {
+      "rows=58": 2
+    }
+  },
+  "v516_decision": "CURRENT_LOCAL_OHLCV_PURE_STRUCTURE_RESEARCH_COMPLETE__ZERO_ALL_YEAR_PROMOTION_PASS__STOP_STRATEGY_ITERATION",
+  "v516_audit_pass": true,
+  "v323_shadow_rows": 70,
+  "v323_open_shadow_rows": 10,
+  "v323_open_symbols": [
+    "002966.SZ",
+    "600919.SH",
+    "601328.SH",
+    "601665.SH",
+    "600803.SH",
+    "600529.SH",
+    "603391.SH",
+    "002907.SZ",
+    "301087.SZ",
+    "301585.SZ"
+  ],
+  "production_write_flags": {
+    "v516": [
+      false,
+      false,
+      false
+    ],
+    "v323": [
+      false,
+      false,
+      false
+    ]
+  }
+}

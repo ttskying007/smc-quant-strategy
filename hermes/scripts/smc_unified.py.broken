@@ -1,0 +1,501 @@
+     1|#!/usr/bin/env python3
+     2|"""
+     3|SMC Unified WebUI — V1+V2+V3+V4+V5+V6 in one server
+     4|====================================================
+     5|Port 8890. Navigation bar to switch between views.
+     6|- V1: K线+出入点 (原始) — V28数据
+     7|- V2: 13 SMC信号 K线查看器 — V28数据 + V11信号检测
+     8|- V3: 统计仪表板 — V38.4数据
+     9|- V4: 高级分析仪表板 — V38.4数据
+    10|- V5: V45 Dashboard
+    11|- V6: V465/V466/V467 统一分析
+    12|"""
+    13|import json, sys, traceback
+    14|from pathlib import Path
+    15|from http.server import HTTPServer, BaseHTTPRequestHandler
+    16|from urllib.parse import urlparse, parse_qs
+    17|from collections import Counter, defaultdict
+    18|
+    19|sys.path.insert(0, '/root/.hermes/scripts')
+    20|from v11.signals_v11 import detect_all_signals_v11
+    21|from v11.signals_v14 import detect_all_signals_v14
+    22|from v11.klines_60min import get_60min_kline
+    23|
+    24|PORT = 8890
+    25|CACHE = Path('/root/.hermes/kline_cache')
+    26|CACHE_60M = Path('/root/.hermes/kline_cache_60min')
+    27|ECHARTS = '/tmp/echarts.min.js'
+    28|V28_JSON = '/root/.hermes/smc_opt_v28/v28_full_merged.json'
+    29|V38_JSON = '/root/.hermes/smc_opt_v38/backtest_v384_full.json'
+    30|
+    31|# ── Load V28 data (for V1/V2) ──
+    32|V28 = json.load(open(V28_JSON))
+    33|V28_STOCKS = V28['stocks']
+    34|V28_TRADES = V28['all_trades']
+    35|offset = 0
+    36|V28_MAP = {}
+    37|for s in V28_STOCKS:
+    38|    n = s['n_trades']
+    39|    V28_MAP[s['symbol']] = {'data': s, 'trades': V28_TRADES[offset:offset+n]}
+    40|    offset += n
+    41|
+    42|# ── Load V38.4 data (for V3/V4) ──
+    43|V38 = json.loads(Path(V38_JSON).read_bytes())
+    44|V38_SUM = V38['summary']
+    45|V38_STOCKS = V38['stock_results']
+    46|
+    47|# ── Load V42 data (for V4 comparison) ──
+    48|V42_JSON = '/root/.hermes/smc_opt_v38/v42_full.json'
+    49|V42 = json.loads(Path(V42_JSON).read_bytes()) if Path(V42_JSON).exists() else None
+    50|V42_SUM = V42['summary'] if V42 else None
+    51|
+    52|# ── Load V43 data (for V4 comparison) ──
+    53|V43_JSON = '/root/.hermes/smc_opt_v38/v43_full.json'
+    54|V43 = json.loads(Path(V43_JSON).read_bytes()) if Path(V43_JSON).exists() else None
+    55|V43_SUM = V43['summary'] if V43 else None
+    56|
+    57|# ── Signal style config (V2) ──
+    58|SIG_STYLE = {
+    59|    'FVG_Bull':  {'fill': 'rgba(156,39,176,0.2)','stroke': 'rgba(156,39,176,0.6)','label': 'FVG','z': 2},
+    60|    'FVG_Bear':  {'fill': 'rgba(233,30,99,0.2)','stroke': 'rgba(233,30,99,0.6)','label': 'FVG','z': 2},
+    61|    'IFVG_Bull': {'fill': 'rgba(138,43,226,0.2)','stroke': 'rgba(138,43,226,0.6)','label': 'IFVG','z': 2},
+    62|    'IFVG_Bear': {'fill': 'rgba(138,43,226,0.2)','stroke': 'rgba(138,43,226,0.6)','label': 'IFVG','z': 2},
+    63|    'OB_Bull':   {'fill': 'rgba(33,150,243,0.15)','stroke': 'rgba(33,150,243,0.5)','label': 'OB','z': 3},
+    64|    'OB_Bear':   {'fill': 'rgba(244,67,54,0.15)','stroke': 'rgba(244,67,54,0.5)','label': 'OB','z': 3},
+    65|    'BPR_Bull':  {'fill': 'rgba(0,150,136,0.15)','stroke': 'rgba(0,150,136,0.5)','label': 'BPR','z': 3},
+    66|    'BPR_Bear':  {'fill': 'rgba(0,150,136,0.15)','stroke': 'rgba(0,150,136,0.5)','label': 'BPR','z': 3},
+    67|    'SweepDown': {'stroke': '#FFEB3B','type':'dashed','width':2,'label':'Sweep','z':4},
+    68|    'SweepUp':   {'stroke': '#FF9800','type':'dashed','width':2,'label':'Sweep','z':4},
+    69|    'CHOCH_Bull':{'stroke': '#00BCD4','type':'solid','width':2,'label':'CHOCH','z':5},
+    70|    'CHOCH_Bear':{'stroke': '#E91E63','type':'solid','width':2,'label':'CHOCH','z':5},
+    71|    'MSS_Bull':  {'stroke': '#4FC3F7','type':'dashed','width':2,'label':'MSS','z':5},
+    72|    'MSS_Bear':  {'stroke': '#4FC3F7','type':'dashed','width':2,'label':'MSS','z':5},
+    73|    'OTE_Bull':  {'fill': 'rgba(76,175,80,0.15)','stroke':'rgba(76,175,80,0.5)','label':'OTE','z':1},
+    74|    'OTE_Bear':  {'fill': 'rgba(76,175,80,0.15)','stroke':'rgba(76,175,80,0.5)','label':'OTE','z':1},
+    75|    'EQL_High':  {'stroke': '#B0BEC5','type':'solid','width':1,'label':'EQL','z':3},
+    76|    'EQL_Low':   {'stroke': '#B0BEC5','type':'solid','width':1,'label':'EQL','z':3},
+    77|    'PO3_Acc':   {'fill': 'rgba(33,150,243,0.12)','stroke':'rgba(33,150,243,0.4)','label':'PO3-A','z':3},
+    78|    'PO3_Man':   {'fill': 'rgba(244,67,54,0.12)','stroke':'rgba(244,67,54,0.4)','label':'PO3-M','z':3},
+    79|    'PO3_DIS':   {'fill': 'rgba(76,175,80,0.12)','stroke':'rgba(76,175,80,0.4)','label':'PO3-D','z':3},
+    80|    'LiquidityVoid': {'stroke':'#9E9E9E','type':'dashed','width':1,'label':'LV','z':2},
+    81|    'Rejection_Resistance': {'fill':'rgba(255,152,0,0.12)','stroke':'rgba(255,152,0,0.4)','label':'RB','z':3},
+    82|    'Rejection_Support': {'fill':'rgba(76,175,80,0.12)','stroke':'rgba(76,175,80,0.4)','label':'RB','z':3},
+    83|    'BreakerBlock_Bull': {'fill':'rgba(156,39,176,0.12)','stroke':'rgba(156,39,176,0.4)','label':'BRK','z':3},
+    84|    'BreakerBlock_Bear': {'fill':'rgba(156,39,176,0.12)','stroke':'rgba(156,39,176,0.4)','label':'BRK','z':3},
+    85|}
+    86|SIG_FAMILY = {
+    87|    'FVG_Bull':'fvg','FVG_Bear':'fvg','IFVG_Bull':'ifvg','IFVG_Bear':'ifvg',
+    88|    'OB_Bull':'ob','OB_Bear':'ob','BPR_Bull':'bpr','BPR_Bear':'bpr',
+    89|    'SweepDown':'sweep','SweepUp':'sweep',
+    90|    'CHOCH_Bull':'choch','CHOCH_Bear':'choch',
+    91|    'MSS_Bull':'mss','MSS_Bear':'mss',
+    92|    'OTE_Bull':'ote','OTE_Bear':'ote',
+    93|    'EQL_High':'eql','EQL_Low':'eql',
+    94|    'PO3_Acc':'po3','PO3_Man':'po3','PO3_DIS':'po3',
+    95|    'LiquidityVoid':'lv','Rejection_Resistance':'rb','Rejection_Support':'rb',
+    96|    'BreakerBlock_Bull':'brk','BreakerBlock_Bear':'brk',
+    97|}
+    98|
+    99|# ── V6 module: V465/V466/V467 analytics ──
+   100|from v6_module import build_v6, build_v6_stock, _fmt as fmt_v6
+   101|from v7_module import build_v7
+   102|
+   103|# ── Helpers ──
+   104|def fmt_date(d):
+   105|    s = str(d).strip()
+   106|    if len(s) >= 10 and s[4]=='-' and s[7]=='-': return s[:10]
+   107|    if len(s)==8 and s.isdigit(): return f'{s[:4]}-{s[4:6]}-{s[6:8]}'
+   108|    if len(s)>=12 and s.isdigit(): return f'{s[:4]}-{s[4:6]}-{s[6:8]}'
+   109|    return s
+   110|
+   111|def load_ohlcv(symbol):
+   112|    fname = f"{symbol.replace('.','_')}_daily_300.json"
+   113|    fp = CACHE / fname
+   114|    if not fp.exists(): return None
+   115|    data = json.loads(fp.read_text())
+   116|    for b in data:
+   117|        if 'date' not in b and 't' in b: b['date'] = str(b['t'])
+   118|        b['_date'] = fmt_date(b.get('date',b.get('t','')))[:10]
+   119|    return data
+   120|
+   121|def load_60m(symbol):
+   122|    fname = f"{symbol.replace('.','_')}_60min_200.json"
+   123|    fp = CACHE_60M / fname
+   124|    if not fp.exists(): return None
+   125|    data = json.loads(fp.read_text())
+   126|    for b in data:
+   127|        if 'date' not in b and 't' in b: b['date'] = str(b['t'])
+   128|        b['_date'] = fmt_date(b.get('date',b.get('t','')))[:10]
+   129|    return data
+   130|
+   131|def short_label(t):
+   132|    return SIG_STYLE.get(t,{}).get('label',t[:4])
+   133|
+   134|def compute_sl_tp(signals, entry_idx, entry_price, direction):
+   135|    sl, tp = None, None
+   136|    for sig in signals:
+   137|        if sig['idx'] >= entry_idx or sig['idx'] < entry_idx - 20: continue
+   138|        if direction == 'bull':
+   139|            if sig['type'] in ('SweepDown',) and sig.get('lower',0):
+   140|                c = sig.get('lower',sig.get('price',0))
+   141|                if sl is None or c < sl: sl = c
+   142|            if sig['type'] in ('EQL_Low',) and sig.get('lower',0):
+   143|                c = sig.get('lower',sig.get('price',0))
+   144|                if sl is None or c < sl: sl = c
+   145|            if sig['type'] in ('FVG_Bull','IFVG_Bull','OB_Bull') and sig.get('upper',0) > entry_price:
+   146|                c = sig['upper']
+   147|                if tp is None or c > tp: tp = c
+   148|        else:
+   149|            if sig['type'] in ('SweepUp',) and sig.get('upper',0):
+   150|                c = sig.get('upper',sig.get('price',0))
+   151|                if sl is None or c > sl: sl = c
+   152|            if sig['type'] in ('EQL_High',) and sig.get('upper',0):
+   153|                c = sig.get('upper',sig.get('price',0))
+   154|                if sl is None or c > sl: sl = c
+   155|            if sig['type'] in ('FVG_Bear','IFVG_Bear','OB_Bear') and sig.get('lower',0) < entry_price:
+   156|                c = sig['lower']
+   157|                if tp is None or c < tp: tp = c
+   158|    if sl is None: sl = entry_price * (0.98 if direction=='bull' else 1.02)
+   159|    if tp is None: tp = entry_price * (1.05 if direction=='bull' else 0.95)
+   160|    return sl, tp
+   161|
+   162|# ═══════════════════════════════════════════════════
+   163|# NAV BAR (shared)
+   164|# ═══════════════════════════════════════════════════
+   165|NAV = """<div style="background:#161b22;border-bottom:2px solid #30363d;display:flex;align-items:center;gap:0;padding:0;">
+   166|  <a href="/" style="display:inline-block;padding:12px 20px;color:#f0f6fc;font-weight:bold;text-decoration:none;font-size:15px;background:#1f6feb44;">SMC</a>
+   167|  <a href="/v1" style="display:inline-block;padding:12px 20px;color:#8b949e;text-decoration:none;font-size:13px;border-right:1px solid #30363d;">V1 K线</a>
+   168|  <a href="/v2" style="display:inline-block;padding:12px 20px;color:#8b949e;text-decoration:none;font-size:13px;border-right:1px solid #30363d;">V2 信号</a>
+   169|  <a href="/v14" style="display:inline-block;padding:12px 20px;color:#58a6ff;text-decoration:none;font-size:13px;border-right:1px solid #30363d;font-weight:bold;">V14 🔧</a>
+   170|  <a href="/v15" style="display:inline-block;padding:12px 20px;color:#FFD700;text-decoration:none;font-size:13px;font-weight:bold;background:#FFD70022;border-right:1px solid #30363d;">V15 🏆</a>
+   171|  <a href="/v16" style="display:inline-block;padding:12px 20px;color:#00ff88;text-decoration:none;font-size:13px;font-weight:bold;background:#00ff8822;border-right:1px solid #30363d;">V16 💎</a>
+   172|  <a href="/v17" style="display:inline-block;padding:12px 20px;color:#ff8800;text-decoration:none;font-size:13px;font-weight:bold;background:#ff880022;border-right:1px solid #30363d;">V17 👑 Pine-Exact</a>
+   173|  <a href="/v18" style="display:inline-block;padding:12px 20px;color:#00ff88;text-decoration:none;font-size:13px;font-weight:bold;background:#00ff8833;border-right:1px solid #30363d;">V18 🚀 Zone-Entry</a>
+   174|  <a href="/v19" style="display:inline-block;padding:12px 20px;color:#ff6bcb;text-decoration:none;font-size:13px;font-weight:bold;background:#ff6bcb22;border-right:1px solid #30363d;">V19 📊 Enhanced</a>
+   175|  <a href="/v3" style="display:inline-block;padding:12px 20px;color:#8b949e;text-decoration:none;font-size:13px;border-right:1px solid #30363d;">V3 统计</a>
+   176|  <a href="/v4" style="display:inline-block;padding:12px 20px;color:#8b949e;text-decoration:none;font-size:13px;border-right:1px solid #30363d;">V4 分析</a>
+   177|  <a href="/v5" style="display:inline-block;padding:12px 20px;color:#58a6ff;text-decoration:none;font-size:13px;border-right:1px solid #30363d;">V5 🏆</a>
+   178|  <a href="/v6" style="display:inline-block;padding:12px 20px;color:#f0883e;text-decoration:none;font-size:13px;font-weight:bold;">V6 🔬</a>
+   179|  <a href="/v7" style="display:inline-block;padding:12px 20px;color:#ff6b6b;text-decoration:none;font-size:13px;font-weight:bold;background:#ff6b6b22;">V7 👑</a>
+   180|  <a href="/v8" style="display:inline-block;padding:12px 20px;color:#00d4aa;text-decoration:none;font-size:13px;font-weight:bold;background:#00d4aa22;">V8 🔥</a>
+   181|  <a href="/v9" style="display:inline-block;padding:12px 20px;color:#FFD700;text-decoration:none;font-size:13px;font-weight:bold;background:#FFD70022;">V9 ⭐</a>
+   182|  <a href="/v10" style="display:inline-block;padding:12px 20px;color:#00e5ff;text-decoration:none;font-size:13px;font-weight:bold;background:#00e5ff22;">V10 🎯</a>
+   183|  <a href="/v13" style="display:inline-block;padding:12px 20px;color:#7c3aed;text-decoration:none;font-size:13px;font-weight:bold;background:#7c3aed22;">V13 🧬</a>
+   184|  <span style="flex:1;"></span>
+   185|  <span style="padding:12px 20px;color:#8b949e;font-size:11px;">V473 | 60min | 8890</span>
+   186|</div>"""
+   187|
+   188|# ═══════════════════════════════════════════════════
+   189|# V1 — K线+出入点 (原始)
+   190|# ═══════════════════════════════════════════════════
+   191|def build_v1(symbol):
+   192|    ohlcv = load_ohlcv(symbol)
+   193|    if not ohlcv: return NAV+'<p style="padding:20px;color:#8b949e;">No data for '+symbol+'</p>'
+   194|    info = V28_MAP.get(symbol)
+   195|    trades = info['trades'] if info else []
+   196|    stock = info['data'] if info else {}
+   197|
+   198|    dates = [str(b.get('date',b.get('t',''))) for b in ohlcv]
+   199|    ohlcv_data = [[b['o'],b['c'],b['l'],b['h']] for b in ohlcv]
+   200|    entry_pts, exit_pts = [], []
+   201|    for t in trades:
+   202|        entry_pts.append({'coord':[dates[t['entry_idx']],t['entry_price']],'won':t['won'],'rr':t.get('rr',0),'pnl':t.get('pnl_pct',0),'num':trades.index(t)+1})
+   203|        exit_pts.append({'coord':[dates[t['exit_idx']],t['exit_price']],'won':t['won'],'pnl':t.get('pnl_pct',0)})
+   204|    total_pnl = sum(t.get('pnl_pct',0) for t in trades)
+   205|    dates_json = json.dumps(dates)
+   206|    ohlcv_json = json.dumps(ohlcv_data)
+   207|    entry_json = json.dumps([{'name':'E'+str(e['num']),'coord':e['coord'],'value':'E'+str(e['num']),'itemStyle':{'color':'#3fb950' if e['won'] else '#f85149'},'symbol':'pin','symbolSize':32,'label':{'show':True,'formatter':'E'+str(e['num']),'fontSize':9,'color':'#fff','position':'top'}} for e in entry_pts])
+   208|    exit_json = json.dumps([{'coord':e['coord'],'value':str(e['pnl'])+'%','itemStyle':{'color':'#79c0ff' if e['pnl']>0 else '#d29922'},'symbol':'diamond','symbolSize':16} for e in exit_pts])
+   209|    opts_json = json.dumps({'dates':dates,'ohlcv':ohlcv_data},default=str)
+   210|
+   211|    options = ''.join(f'<option value="{s}"{" selected" if s==symbol else ""}>{s} ({V28_MAP[s]["data"]["n_trades"]}t)</option>' for s in sorted(V28_MAP.keys()))
+   212|
+   213|    return f'''<!DOCTYPE html><html><head><meta charset="utf-8"><title>{symbol} V1</title>
+   214|<style>*{{margin:0;padding:0;box-sizing:border-box}}body{{background:#0d1117;color:#c9d1d9;font-family:system-ui,sans-serif}}
+   215|.ctrl{{background:#161b22;padding:12px 20px;display:flex;align-items:center;gap:10px;}}
+   216|.ctrl select{{padding:8px 12px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;font-size:14px;}}
+   217|.ctrl .btn{{padding:8px 16px;background:#238636;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;}}
+   218|#chart{{width:100%;height:600px}}
+   219|.win{{color:#3fb950}}.loss{{color:#f85149}}
+   220|</style><script src="/echarts.min.js"></script></head><body>
+   221|{NAV}
+   222|<div class="ctrl">
+   223|<form method="get"><select name="s" onchange="this.form.submit()">{options}</select>
+   224|<input type="submit" class="btn" value="View"></form>
+   225|<span style="color:#8b949e;">{len(trades)} trades | WR={stock.get("win_rate","?")}% | P&L={total_pnl:+.2f}%</span>
+   226|</div>
+   227|<div id="chart"></div>
+   228|<script>
+   229|var dom=document.getElementById("chart");var chart=echarts.init(dom,"dark");
+   230|var dates={dates_json};var ohlcvData={ohlcv_json};
+   231|var entryPts={entry_json};var exitPts={exit_json};
+   232|chart.setOption({{
+   233|animation:false,backgroundColor:"#0d1117",
+   234|tooltip:{{trigger:"axis",axisPointer:{{type:"cross"}}}},
+   235|dataZoom:[{{type:"inside",start:0,end:100}},{{type:"slider",start:0,end:100,bottom:10,height:25,borderColor:"#30363d",backgroundColor:"#161b22"}}],
+   236|grid:{{left:"5%",right:"5%",bottom:"15%",top:"5%"}},
+   237|xAxis:{{type:"category",data:dates,axisLine:{{lineStyle:{{color:"#30363d"}}}},axisLabel:{{rotate:45,fontSize:10,interval:30,color:"#8b949e"}},splitLine:{{show:false}}}},
+   238|yAxis:{{scale:true,splitLine:{{lineStyle:{{color:"#21262d",type:"dashed"}}}},axisLabel:{{color:"#8b949e",fontSize:11}}}},
+   239|series:[{{name:"K线",type:"candlestick",data:ohlcvData,
+   240|itemStyle:{{color:"#f85149",color0:"#3fb950",borderColor:"#f85149",borderColor0:"#3fb950"}},
+   241|markPoint:{{data:entryPts.concat(exitPts)}} }}]
+   242|}});
+   243|window.addEventListener("resize",function(){{chart.resize()}});
+   244|</script></body></html>'''
+   245|
+   246|# ═══════════════════════════════════════════════════
+   247|# V2 — 13 SMC信号 K线查看器
+   248|# ═══════════════════════════════════════════════════
+   249|def build_v2(symbol):
+   250|    ohlcv = load_ohlcv(symbol)
+   251|    if not ohlcv: return NAV+'<p style="padding:20px;color:#8b949e;">No data for '+symbol+'</p>'
+   252|    info = V28_MAP.get(symbol)
+   253|    trades = info['trades'] if info else []
+   254|    stock = info['data'] if info else {}
+   255|
+   256|    try:
+   257|        result = detect_all_signals_v11(ohlcv)
+   258|        all_sigs = result.get('all',[])
+   259|    except:
+   260|        all_sigs = []
+   261|
+   262|    dates = [str(b.get('date',b.get('t',''))) for b in ohlcv]
+   263|    dates_short = [str(b.get('_date',fmt_date(b.get('date',b.get('t',''))))[:10]) for b in ohlcv]
+   264|    ohlcv_data = [[b['o'],b['c'],b['l'],b['h']] for b in ohlcv]
+   265|
+   266|    sig_counter=0
+   267|    numbered_sigs=[]
+   268|    for sig in all_sigs:
+   269|        sig_counter+=1
+   270|        sig['seq']=sig_counter
+   271|        numbered_sigs.append(sig)
+   272|
+   273|    max_idx=len(dates)-1
+   274|    mark_areas,mark_lines,mark_points=[],[],[]
+   275|
+   276|    for sig in numbered_sigs:
+   277|        stype=sig['type'];style=SIG_STYLE.get(stype,{});family=SIG_FAMILY.get(stype,'other')
+   278|        seq=sig['seq'];label=style.get('label',stype[:4]);sname=f"{seq}{label}"
+   279|        idx=sig['idx']
+   280|        if idx<0 or idx>=len(dates): continue
+   281|        sig_date=dates_short[idx] if idx<len(dates_short) else ''
+   282|        sig_upper=sig.get('upper',0);sig_lower=sig.get('lower',0);sig_price=sig.get('price',0)
+   283|        sig_strength=sig.get('strength',0);sig_conf=sig.get('confidence',0);sig_dir=sig.get('direction','neutral')
+   284|        tt=f'Signal #{seq}: {stype}<br/>Date: {sig_date}<br/>Direction: {sig_dir}<br/>Strength: {sig_strength:.1f}<br/>Confidence: {sig_conf:.2f}'
+   285|        if sig_upper>0 and sig_lower>0: tt+=f'<br/>Range: {sig_lower:.2f} - {sig_upper:.2f}'
+   286|        if sig_price>0: tt+=f'<br/>Price: {sig_price:.2f}'
+   287|
+   288|        if 'fill' in style:
+   289|            upper=sig.get('upper',0);lower=sig.get('lower',0)
+   290|            if upper>0 and lower>0 and upper!=lower:
+   291|                end_x=dates[min(idx+10,max_idx)]
+   292|                mark_areas.append({'family':family,'signal':stype,'seq':seq,'_tooltip':tt,'data':[{'xAxis':dates[idx],'yAxis':lower,'itemStyle':{'color':style['fill'],'borderColor':style['stroke'],'borderWidth':1 if upper-lower>0.01 else 0,'opacity':0.8}},{'xAxis':end_x,'yAxis':upper}]})
+   293|
+   294|        if 'stroke' in style and 'fill' not in style:
+   295|            price=sig.get('price',0)
+   296|            if price==0: price=sig.get('upper',0)
+   297|            if price<=0: continue
+   298|            end_x=dates[min(idx+20,max_idx)]
+   299|            mark_lines.append({'signal':stype,'family':family,'seq':seq,'_tooltip':tt,'_pair':[{'xAxis':dates[idx],'yAxis':price},{'xAxis':end_x,'yAxis':price}],'lineStyle':{'color':style['stroke'],'type':style.get('type','dashed'),'width':style.get('width',1),'opacity':0.6},'label':{'show':True,'formatter':sname,'color':style['stroke'],'fontSize':9,'position':'start'}})
+   300|
+   301|        price=sig.get('price',sig.get('upper',0))
+   302|        if price>0:
+   303|            c_map={'FVG_Bull':'#9C27B0','FVG_Bear':'#E91E63','OB_Bull':'#2196F3','OB_Bear':'#F44336','SweepDown':'#FFEB3B','SweepUp':'#FF9800','CHOCH_Bull':'#00BCD4','CHOCH_Bear':'#E91E63','MSS_Bull':'#4FC3F7','MSS_Bear':'#4FC3F7','EQL_High':'#B0BEC5','EQL_Low':'#B0BEC5','OTE_Bull':'#4CAF50','OTE_Bear':'#4CAF50','PO3_Acc':'#2196F3','PO3_Man':'#F44336','PO3_DIS':'#4CAF50','LiquidityVoid':'#9E9E9E','Rejection_Resistance':'#FF9800','Rejection_Support':'#FF9800','BreakerBlock_Bull':'#9C27B0','BreakerBlock_Bear':'#9C27B0'}
+   304|            color=c_map.get(stype,'#888')
+   305|            mark_points.append({'signal':stype,'family':family,'seq':seq,'name':sname,'coord':[dates[idx],price],'value':f'{seq}','_tooltip':tt,'symbol':'circle','symbolSize':8,'itemStyle':{'color':color,'borderColor':'#fff','borderWidth':1},'label':{'show':True,'formatter':f'{seq}','color':'#fff','fontSize':8,'fontWeight':'bold','position':'right'}})
+   306|
+   307|    entry_pts,exit_pts,sl_pts=[],[],[]
+   308|    entry_sig_labels=[]
+   309|    for i,t in enumerate(trades):
+   310|        entry_idx=t['entry_idx'];entry_price=t['entry_price']
+   311|        nearby=[s for s in numbered_sigs if abs(s['idx']-entry_idx)<=5]
+   312|        ct=list(dict.fromkeys(s['type'] for s in nearby[:5]))
+   313|        cs=[]
+   314|        for c in ct:
+   315|            base=short_label(c)
+   316|            cs.append(base)
+   317|        combo='→'.join(cs) if cs else ''
+   318|        entry_pts.append({'idx':t['entry_idx'],'price':t['entry_price'],'won':t['won'],'rr':t.get('rr',0),'pnl':t.get('pnl_pct',0),'num':i+1,'combo':combo or f'E{i+1}'})
+   319|        exit_pts.append({'idx':t['exit_idx'],'price':t['exit_price'],'pnl':t.get('pnl_pct',0)})
+   320|        sl_price=t.get('sl',0)
+   321|        if sl_price==0:
+   322|            sl_price,_=compute_sl_tp(numbered_sigs,entry_idx,entry_price,'bull')
+   323|        sl_pts.append({'entry_idx':t['entry_idx'],'sl':sl_price})
+   324|
+   325|    weekly=[]
+   326|    for i in range(0,len(ohlcv),5):
+   327|        ch=ohlcv[i:i+5]
+   328|        if not ch: continue
+   329|        weekly.append({'o':ch[0]['o'],'h':max(b['h'] for b in ch),'l':min(b['l'] for b in ch),'c':ch[-1]['c'],'start_date':str(ch[0].get('date',ch[0].get('t','')))})
+   330|    total_pnl=sum(t.get('pnl_pct',0) for t in trades)
+   331|    stock_list=sorted(V28_MAP.keys())
+   332|
+   333|    # Pre-build dynamic parts
+   334|    stock_options = ''.join(f'<option value="{s}"{" selected" if s==symbol else ""}>{s}</option>' for s in stock_list)
+   335|    sig_map = {'fvg':'fvg','ifvg':'ifvg','ob':'ob','sweep':'sweep','choch':'choch','mss':'mss','ote':'ote','eql':'eql','po3':'po3','lv':'lv','rb':'rb','brk':'brk'}
+   336|    trade_rows = []
+   337|    for ti, t in enumerate(trades):
+   338|        entry_t = dates[t['entry_idx']]; exit_t = dates[t['exit_idx']]
+   339|        nearby = [x for x in numbered_sigs if abs(x['idx']-t['entry_idx'])<=5][:6]
+   340|        sigs_html = ''.join(f'<span class="signals sig-{sig_map.get(s["type"].split("_")[0].lower(),"fvg")}">{s["seq"]}{short_label(s["type"])}</span>' for s in nearby)
+   341|        pnl_c = 'win' if t.get('pnl_pct',0) > 0 else 'loss'
+   342|        wl_c = 'win' if t['won'] else 'loss'
+   343|        wl_t = 'W' if t['won'] else 'L'
+   344|        trade_rows.append(f'<tr><td>{ti+1}</td><td>{entry_t}</td><td>{exit_t}</td><td>{t["entry_price"]:.2f}</td><td>{t["exit_price"]:.2f}</td><td>{sigs_html}</td><td class="{pnl_c}">{t.get("pnl_pct",0):+.2f}%</td><td class="{wl_c}">{wl_t}</td><td>{t.get("rr",0):.1f}x</td></tr>')
+   345|    rows_html = ''.join(trade_rows)
+   346|
+   347|    dates_j = json.dumps(dates)
+   348|    ohlcv_j = json.dumps(ohlcv_data)
+   349|    entry_j = json.dumps(entry_pts)
+   350|    exit_j = json.dumps(exit_pts)
+   351|    sl_j = json.dumps(sl_pts)
+   352|    areas_j = json.dumps(mark_areas)
+   353|    lines_j = json.dumps(mark_lines)
+   354|    points_j = json.dumps(mark_points)
+   355|    sym_j = json.dumps(symbol)
+   356|    weekly_j = json.dumps(weekly)
+   357|    stocks_j = json.dumps(stock_list)
+   358|
+   359|    return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>{symbol} V2</title>
+   360|<style>
+   361|*{{margin:0;padding:0;box-sizing:border-box}}body{{background:#0d1117;color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}}
+   362|.header{{background:#161b22;padding:15px 20px;border-bottom:1px solid #30363d}}
+   363|.header h1{{font-size:22px;color:#f0f6fc}}
+   364|.header .sub{{color:#8b949e;font-size:13px;margin-top:4px}}
+   365|.controls{{background:#161b22;padding:12px 20px;border-bottom:1px solid #30363d;display:flex;align-items:center;gap:15px;flex-wrap:wrap}}
+   366|.controls select{{padding:8px 12px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;font-size:14px;min-width:200px}}
+   367|.controls .btn{{padding:8px 16px;background:#238636;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px}}
+   368|.controls .btn-secondary{{background:#21262d;color:#c9d1d9}}
+   369|.controls .btn-secondary:hover{{background:#30363d}}
+   370|.win{{color:#3fb950}}.loss{{color:#f85149}}
+   371|#chart{{width:100%;height:600px}}
+   372|.filters{{background:#161b22;padding:8px 20px;border-bottom:1px solid #30363d;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px}}
+   373|.filters label{{display:flex;align-items:center;gap:4px;cursor:pointer;padding:3px 8px;border-radius:4px;background:#0d1117;border:1px solid #30363d}}
+   374|.filters input{{margin:0}}
+   375|.detail{{padding:20px;max-width:1400px;margin:0 auto}}
+   376|.detail h2{{font-size:16px;margin-bottom:10px;color:#f0f6fc}}
+   377|table{{width:100%;border-collapse:collapse;font-size:12px}}
+   378|th{{background:#161b22;padding:10px 8px;text-align:left;color:#8b949e;font-weight:600;border-bottom:2px solid #30363d;position:sticky;top:0}}
+   379|td{{padding:8px;border-bottom:1px solid #21262d}}
+   380|tr:hover{{background:#161b22}}
+   381|.signals{{display:inline-block;padding:2px 4px;border-radius:3px;font-size:10px;margin:0 1px}}
+   382|.sig-fvg{{background:#9C27B044;color:#CE93D8}}.sig-ifvg{{background:#7B1FA244;color:#CE93D8}}
+   383|.sig-ob{{background:#2196F344;color:#90CAF9}}.sig-sweep{{background:#FF980044;color:#FFCC80}}
+   384|.sig-choch{{background:#00BCD444;color:#80DEEA}}.sig-mss{{background:#4FC3F744;color:#B3E5FC}}
+   385|.sig-ote{{background:#4CAF5044;color:#A5D6A7}}.sig-eql{{background:#B0BEC544;color:#CFD8DC}}
+   386|.sig-po3{{background:#7C4DFF44;color:#B388FF}}.sig-lv{{background:#9E9E9E44;color:#BDBDBD}}
+   387|.sig-rb{{background:#FF980044;color:#FFCC80}}.sig-brk{{background:#9C27B044;color:#CE93D8}}
+   388|.search-wrap{{position:relative;display:inline-block}}
+   389|.search-wrap input{{padding:8px 12px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;font-size:14px;width:220px}}
+   390|.search-wrap .dropdown{{position:absolute;top:100%;left:0;right:0;background:#161b22;border:1px solid #30363d;border-top:none;border-radius:0 0 6px 6px;max-height:300px;overflow-y:auto;z-index:1000;display:none}}
+   391|.search-wrap .dropdown div{{padding:6px 12px;cursor:pointer;font-size:13px;color:#c9d1d9}}
+   392|.search-wrap .dropdown div:hover{{background:#1f6feb33}}
+   393|</style>
+   394|<script src="/echarts.min.js"></script></head><body>
+   395|{NAV}
+   396|<div class="header"><h1>{symbol} V2 Signal Viewer</h1>
+   397|<div class="sub">{len(trades)} trades | WR={stock.get('win_rate','?')}% | RR={stock.get('avg_rr','?'):.1f}x | PF={stock.get('profit_factor','?')} | P&L={total_pnl:+.2f}% | Signals: {len(numbered_sigs)}</div></div>
+   398|<div class="controls">
+   399|<form method="get" style="display:flex;align-items:center;gap:10px;">
+   400|<div class="search-wrap"><input type="text" id="stockSearch" placeholder="Search stock..." autocomplete="off"><div class="dropdown" id="searchDropdown"></div></div>
+   401|<select name="s" onchange="this.form.submit()">{stock_options}</select>
+   402|<input type="submit" class="btn" value="View">
+   403|</form>
+   404|</div>
+   405|<div class="filters">
+   406|<span style="color:#8b949e;font-weight:bold;">Filter:</span>
+   407|<label><input type="checkbox" class="sig-filter" data-family="fvg" checked> FVG</label>
+   408|<label><input type="checkbox" class="sig-filter" data-family="ifvg" checked> IFVG</label>
+   409|<label><input type="checkbox" class="sig-filter" data-family="ob" checked> OB</label>
+   410|<label><input type="checkbox" class="sig-filter" data-family="sweep" checked> Sweep</label>
+   411|<label><input type="checkbox" class="sig-filter" data-family="choch" checked> CHOCH</label>
+   412|<label><input type="checkbox" class="sig-filter" data-family="mss" checked> MSS</label>
+   413|<label><input type="checkbox" class="sig-filter" data-family="ote" checked> OTE</label>
+   414|<label><input type="checkbox" class="sig-filter" data-family="eql" checked> EQL</label>
+   415|<label><input type="checkbox" class="sig-filter" data-family="po3" checked> PO3</label>
+   416|<label><input type="checkbox" class="sig-filter" data-family="bpr" checked> BPR</label>
+   417|<label><input type="checkbox" class="sig-filter" data-family="lv" checked> LV</label>
+   418|<label><input type="checkbox" class="sig-filter" data-family="rb" checked> RB</label>
+   419|<label><input type="checkbox" class="sig-filter" data-family="brk" checked> BRK</label>
+   420|<label class="toggle-wrap"><input type="checkbox" id="show60min" onchange="toggle60min()"> 60min</label>
+   421|<button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;" onclick="document.querySelectorAll('.sig-filter').forEach(c=>c.checked=true);applyFilters();">All</button>
+   422|<button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;" onclick="document.querySelectorAll('.sig-filter').forEach(c=>c.checked=false);applyFilters();">None</button>
+   423|</div>
+   424|<div id="chart"></div>
+   425|<div class="detail"><h2>Trade Details</h2>
+   426|<div style="overflow-x:auto;"><table><tr><th>#</th><th>Entry</th><th>Exit</th><th>Entry</th><th>Exit</th><th>Signals</th><th>P&L%</th><th>W/L</th><th>RR</th></tr>{rows_html}</table></div></div>
+   427|<script>
+   428|var dom=document.getElementById('chart');var chart=echarts.init(dom,'dark');
+   429|var dates={dates_j};var ohlcvData={ohlcv_j};
+   430|var entryPts={entry_j};var exitPts={exit_j};
+   431|var slLines={sl_j};
+   432|var markAreas={areas_j};var markLines={lines_j};var markPoints={points_j};
+   433|var currentSymbol={sym_j};
+   434|var weeklyBars={weekly_j};
+   435|var allStocks={stocks_j};
+   436|var sixtyMinAreas=[];var sixtyMinLines=[];var sixtyMinPoints=[];var sixtyMinLoaded=false;
+   437|function getActiveFamilies(){{var a={{}};document.querySelectorAll('.sig-filter').forEach(function(c){{a[c.dataset.family]=c.checked;}});return a;}}
+   438|function getSeriesOptions(){{var a=getActiveFamilies();var fa=markAreas.filter(function(m){{return a[m.family]}}).map(function(m){{return m.data}});
+   439|var fl=markLines.filter(function(m){{return a[m.family]}}).map(function(m){{return m._pair||m}});
+   440|var fp=markPoints.filter(function(m){{return a[m.family]}});
+   441|var show60=document.getElementById('show60min');
+   442|if(show60&&show60.checked&&sixtyMinLoaded){{fa=fa.concat(sixtyMinAreas.filter(function(m){{return a[m.family]}}).map(function(m){{return m.data}}));fl=fl.concat(sixtyMinLines.filter(function(m){{return a[m.family]}}).map(function(m){{return m._pair||m}}));fp=fp.concat(sixtyMinPoints.filter(function(m){{return a[m.family]}}));}}
+   443|var em=[];entryPts.forEach(function(e){{em.push({{name:'E'+e.num,coord:[dates[e.idx],e.price],value:e.combo||'E'+e.num,itemStyle:{{color:e.won?'#3fb950':'#f85149'}},symbol:'pin',symbolSize:32,label:{{show:true,formatter:e.combo||('E'+e.num),fontSize:9,color:'#fff',position:'top'}}}});}});
+   444|var xm=[];exitPts.forEach(function(e){{xm.push({{coord:[dates[e.idx],e.price],value:e.pnl.toFixed(1)+'%',itemStyle:{{color:e.pnl>0?'#79c0ff':'#d29922'}},symbol:'diamond',symbolSize:16}});}});
+   445|var sm=[];slLines.forEach(function(sl){{sm.push({{yAxis:sl.sl,lineStyle:{{color:'#d29922',type:'dashed',width:1,opacity:0.6}},label:{{show:true,formatter:'SL '+sl.sl.toFixed(2),color:'#d29922',fontSize:10}}}});}});
+   446|return[{{name:'K线',type:'candlestick',data:ohlcvData,itemStyle:{{color:'#f85149',color0:'#3fb950',borderColor:'#f85149',borderColor0:'#3fb950'}},
+   447|markPoint:{{data:fp.concat(em),symbol:'pin',symbolSize:30,label:{{show:true,formatter:function(p){{return p.name}},fontSize:9,color:'#fff'}}}},
+   448|markArea:{{silent:false,data:fa,emphasis:{{itemStyle:{{opacity:0.5}}}}}},
+   449|markLine:{{silent:false,data:fl.concat(sm),emphasis:{{lineStyle:{{width:2}}}}}}}}];}}
+   450|function applyFilters(){{var s=getSeriesOptions();chart.setOption({{series:s}});}}
+   451|window.applyFilters=applyFilters;
+   452|function toggle60min(){{var cb=document.getElementById('show60min');if(!cb.checked){{applyFilters();return;}}
+   453|if(!sixtyMinLoaded){{fetch('/api/signals_60min?s='+encodeURIComponent(currentSymbol)).then(function(r){{return r.json()}}).then(function(d){{sixtyMinAreas=d.areas||[];sixtyMinLines=d.lines||[];sixtyMinPoints=d.points||[];sixtyMinLoaded=true;applyFilters();}}).catch(function(e){{sixtyMinLoaded=true;applyFilters();}});}}else{{applyFilters();}}}}
+   454|document.getElementById('stockSearch').addEventListener('input',function(){{var q=this.value.trim().toUpperCase();var dd=document.getElementById('searchDropdown');if(q.length<2){{dd.style.display='none';return;}}
+   455|var r=[];for(var i=0;i<allStocks.length;i++){{var s=allStocks[i];var c=s.split('.')[0];if(c===q)r.push(s);}}
+   456|if(r.length===0){{for(var i=0;i<allStocks.length;i++){{var s=allStocks[i];if(s.indexOf(q)>=0)r.push(s);}}}}
+   457|r=r.slice(0,20);if(r.length===0){{dd.style.display='none';return;}}
+   458|dd.innerHTML='';r.forEach(function(s){{var d=document.createElement('div');d.textContent=s;d.addEventListener('click',function(){{window.location.href='/v2?s='+encodeURIComponent(s);}});dd.appendChild(d);}});dd.style.display='block';}});
+   459|chart.setOption({{animation:false,backgroundColor:'#0d1117',tooltip:{{trigger:'axis',axisPointer:{{type:'cross'}}}},dataZoom:[{{type:'inside',start:0,end:100}},{{type:'slider',start:0,end:100,bottom:10,height:25,borderColor:'#30363d',backgroundColor:'#161b22'}}],grid:{{left:'5%',right:'5%',bottom:'15%',top:'5%'}},xAxis:{{type:'category',data:dates,axisLine:{{lineStyle:{{color:'#30363d'}}}},axisLabel:{{rotate:45,fontSize:10,interval:30,color:'#8b949e'}},splitLine:{{show:false}}}},yAxis:{{scale:true,splitLine:{{lineStyle:{{color:'#21262d',type:'dashed'}}}},axisLabel:{{color:'#8b949e',fontSize:11}}}},series:[{{name:'K线',type:'candlestick',data:ohlcvData,itemStyle:{{color:'#f85149',color0:'#3fb950',borderColor:'#f85149',borderColor0:'#3fb950'}},markPoint:{{data:[],symbol:'pin',symbolSize:30,label:{{show:true}}}},markArea:{{silent:false,data:[]}},markLine:{{silent:false,data:[]}}}}]}});
+   460|setTimeout(applyFilters,100);
+   461|document.querySelectorAll('.sig-filter').forEach(function(cb){{cb.addEventListener('change',applyFilters);}});
+   462|window.addEventListener('resize',function(){{chart.resize();}});\n</script></body></html>"""
+   463|
+   464|def build_v2_60min(symbol):
+   465|    ohlcv_60m=load_60m(symbol)
+   466|    if not ohlcv_60m: return {'areas':[],'lines':[],'points':[]}
+   467|    try: result=detect_all_signals_v11(ohlcv_60m,tf='60min'); all_sigs=result.get('all',[])
+   468|    except: return {'areas':[],'lines':[],'points':[]}
+   469|    if not all_sigs: return {'areas':[],'lines':[],'points':[]}
+   470|    daily=load_ohlcv(symbol)
+   471|    if not daily: return {'areas':[],'lines':[],'points':[]}
+   472|    dm={}
+   473|    for i,b in enumerate(daily):
+   474|        d=b.get('_date',fmt_date(b.get('date',b.get('t',''))))[:10]
+   475|        dm[d]=i
+   476|    dd=[str(b.get('date',b.get('t',''))) for b in daily]
+   477|    mx=len(dd)-1
+   478|    areas,lines,points=[],[],[]
+   479|    sc=0
+   480|    for sig in all_sigs:
+   481|        sd=fmt_date(sig.get('date',''))[:10]
+   482|        if not sd or sd not in dm:
+   483|            bi=sig.get('idx',0)
+   484|            if bi<len(ohlcv_60m):
+   485|                sd=ohlcv_60m[bi].get('_date','')[:10]
+   486|            if not sd or sd not in dm: continue
+   487|        di=dm[sd]; sc+=1
+   488|        stype=sig['type'];style=SIG_STYLE.get(stype,{});family=SIG_FAMILY.get(stype,'other')
+   489|        label=style.get('label',stype[:4]);sname=f"60m-{sc}{label}"
+   490|        if 'fill' in style:
+   491|            upper=sig.get('upper',0);lower=sig.get('lower',0)
+   492|            if upper>0 and lower>0 and upper!=lower:
+   493|                areas.append({'family':family,'signal':stype,'seq':sc,'data':[{'xAxis':dd[di],'yAxis':lower,'itemStyle':{'color':style.get('fill','rgba(255,255,255,0.08)').replace('0.2','0.08').replace('0.15','0.06').replace('0.12','0.05'),'borderColor':style.get('stroke','rgba(255,255,255,0.3)'),'borderWidth':1 if upper-lower>0.01 else 0,'borderType':'dashed','opacity':0.5}},{'xAxis':dd[min(di+5,mx)],'yAxis':upper}]})
+   494|        if 'stroke' in style and 'fill' not in style:
+   495|            price=sig.get('price',0)
+   496|            if price==0: price=sig.get('upper',0)
+   497|            if price<=0: continue
+   498|            lines.append({'signal':stype,'family':family,'seq':sc,'_pair':[{'xAxis':dd[di],'yAxis':price},{'xAxis':dd[min(di+10,mx)],'yAxis':price}],'lineStyle':{'color':style.get('stroke','#888'),'type':style.get('type','dashed'),'width':1,'opacity':0.3},'label':{'show':True,'formatter':sname,'color':style.get('stroke','#888'),'fontSize':8,'position':'start'}})
+   499|        price=sig.get('price',sig.get('upper',0))
+   500|        if price>0:
+   501|

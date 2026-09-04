@@ -1,0 +1,208 @@
+{
+  "date": "20260605",
+  "generated_at": "2026-06-05T09:07:22",
+  "source": "auto_daily",
+  "added": 0,
+  "buy_added": 0,
+  "pending_count": 0,
+  "active_count": 2,
+  "categories": {
+    "FVG": [
+      {
+        "id": "94d2a1d2-fa8a-5481-b3d4-129889221892",
+        "source": "auto_daily",
+        "status": "OPEN",
+        "created_at": "2026-06-05T09:07:22",
+        "pick_date": "20260604",
+        "symbol": "300295.SZ",
+        "name": "",
+        "category": [
+          "FVG"
+        ],
+        "entry_price": 11.81,
+        "execution_price_source": "tencent_last",
+        "sl_price": 11.5112,
+        "tp1_price": 12.262,
+        "risk_pct": 2.53,
+        "zone_type": "FVG_Bull",
+        "conf_type": "CHOCH_Bull",
+        "entry_type": null,
+        "seq": "->->FVG_Bull->CHOCH_Bull",
+        "zone_idx": null,
+        "conf_index": null,
+        "operator_note": "",
+        "raw_pick": {
+          "symbol": "300295.SZ",
+          "engine": "V66_FULL_MARKET_SCAN",
+          "definition_version": "V66_FULL_MARKET_SCAN_SAME_GATE",
+          "entry_date": "20260604",
+          "entry_idx": 749,
+          "pick_date": "20260604",
+          "select_date": "20260604",
+          "zone_date": "20260513",
+          "confirm_date": "20260603",
+          "price": 12.02,
+          "entry_price": 12.02,
+          "zone_type": "FVG_Bull",
+          "zone_bar": 733,
+          "zone_age": 15,
+          "conf_type": "CHOCH_Bull",
+          "ctx_seq": "FVG_Bull → CHOCH_Bull",
+          "detail": "FVG_Bull → CHOCH_Bull",
+          "seq": "->->FVG_Bull->CHOCH_Bull",
+          "dz_low": 12.69,
+          "dz_high": 12.85,
+          "zone_low": 12.69,
+          "zone_high": 12.85,
+          "retrace_pct": -5.3,
+          "entry_quality": "ELITE",
+          "quality_tier": "A_NORMAL",
+          "score": 10,
+          "breakout_quality_score": 72.863,
+          "breakout_quality_detail": {
+            "body_ratio": 0.365,
+            "trend_ctx": {
+              "atr": 0.614,
+              "near_high_pct": 9.735,
+              "range_atr": 4.039,
+              "slope20": 0.757
+            }
+          },
+          "v59_setup_family": "REENTRY_SETUP",
+          "source": "full_market_kline_scan",
+          "pick_scope": "ACTIVE_CANDIDATE",
+          "is_active_pick": true,
+          "reject_reason": "",
+          "v25_sl_price": 11.72,
+          "v25_sl_pct": 2.53,
+          "v25_tp_tiers": [
+            {
+              "price": 12.48,
+              "pct": 3.8,
+              "type": "TP1",
+              "alloc": 0.4
+            },
+            {
+              "price": 12.75,
+              "pct": 6.1,
+              "type": "TP2",
+              "alloc": 0.3
+            }
+          ],
+          "v25_atr": 0.61,
+          "v25_atr_pct": 5.1,
+          "v25_vol_class": "HIGH",
+          "v25_cost_line": 12.69,
+          "regime": "HIGH_VOLATILITY",
+          "sl_initial_pct": 2.53,
+          "tp_tiers": [
+            3.8,
+            6.1
+          ],
+          "sl": 11.72,
+          "tp1": 12.48,
+          "tp2": 12.75,
+          "risk_pct": 2.53
+        }
+      },
+      {
+        "id": "5ef7757b-327d-53d9-aa5c-2272e6745aac",
+        "source": "auto_daily",
+        "status": "OPEN",
+        "created_at": "2026-06-05T09:07:22",
+        "pick_date": "20260604",
+        "symbol": "600368.SH",
+        "name": "",
+        "category": [
+          "FVG"
+        ],
+        "entry_price": 3.97,
+        "execution_price_source": "tencent_last",
+        "sl_price": 3.8513,
+        "tp1_price": 4.1478,
+        "risk_pct": 2.99,
+        "zone_type": "FVG_Bull",
+        "conf_type": "CHOCH_Bull",
+        "entry_type": null,
+        "seq": "->->FVG_Bull->CHOCH_Bull",
+        "zone_idx": null,
+        "conf_index": null,
+        "operator_note": "",
+        "raw_pick": {
+          "symbol": "600368.SH",
+          "engine": "V66_FULL_MARKET_SCAN",
+          "definition_version": "V66_FULL_MARKET_SCAN_SAME_GATE",
+          "entry_date": "20260604",
+          "entry_idx": 749,
+          "pick_date": "20260604",
+          "select_date": "20260604",
+          "zone_date": "20260602",
+          "confirm_date": "20260603",
+          "price": 4.02,
+          "entry_price": 4.02,
+          "zone_type": "FVG_Bull",
+          "zone_bar": 747,
+          "zone_age": 1,
+          "conf_type": "CHOCH_Bull",
+          "ctx_seq": "FVG_Bull → CHOCH_Bull",
+          "detail": "FVG_Bull → CHOCH_Bull",
+          "seq": "->->FVG_Bull->CHOCH_Bull",
+          "dz_low": 3.94,
+          "dz_high": 3.96,
+          "zone_low": 3.94,
+          "zone_high": 3.96,
+          "retrace_pct": 2.0,
+          "entry_quality": "ELITE",
+          "quality_tier": "A_NORMAL",
+          "score": 10,
+          "breakout_quality_score": 74.763,
+          "breakout_quality_detail": {
+            "body_ratio": 0.429,
+            "trend_ctx": {
+              "atr": 0.076,
+              "near_high_pct": 2.644,
+              "range_atr": 4.079,
+              "slope20": 1.036
+            }
+          },
+          "v59_setup_family": "REENTRY_SETUP",
+          "source": "full_market_kline_scan",
+          "pick_scope": "ACTIVE_CANDIDATE",
+          "is_active_pick": true,
+          "reject_reason": "",
+          "v25_sl_price": 3.9,
+          "v25_sl_pct": 2.99,
+          "v25_tp_tiers": [
+            {
+              "price": 4.2,
+              "pct": 4.5,
+              "type": "TP1",
+              "alloc": 0.4
+            },
+            {
+              "price": 4.26,
+              "pct": 6.0,
+              "type": "TP2",
+              "alloc": 0.3
+            }
+          ],
+          "v25_atr": 0.08,
+          "v25_atr_pct": 2.0,
+          "v25_vol_class": "MEDIUM",
+          "v25_cost_line": 3.94,
+          "regime": "STRONG_TREND_UP",
+          "sl_initial_pct": 2.99,
+          "tp_tiers": [
+            4.5,
+            6.0
+          ],
+          "sl": 3.9,
+          "tp1": 4.2,
+          "tp2": 4.26,
+          "risk_pct": 2.99
+        }
+      }
+    ]
+  },
+  "positions": []
+}

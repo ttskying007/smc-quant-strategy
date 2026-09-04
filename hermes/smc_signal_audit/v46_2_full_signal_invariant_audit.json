@@ -1,0 +1,18 @@
+{
+  "n_files": 4649,
+  "n_errors": 0,
+  "n_problem_symbols": 0,
+  "total_issues": 0,
+  "issue_kinds": {},
+  "count_sums": {
+    "n_bars": 3416020,
+    "n_swing_pivots": 439675,
+    "n_wave_ref_pivots": 386048,
+    "n_structure": 245540,
+    "n_swing_structure": 169525,
+    "n_mss": 76015,
+    "n_obs": 169525,
+    "n_sweeps": 202448
+  },
+  "problem_samples": []
+}
