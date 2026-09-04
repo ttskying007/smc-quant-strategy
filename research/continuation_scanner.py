@@ -94,7 +94,11 @@ for p in sorted(os.listdir(KT)):
         continue
     sl_tmp = None
     sl_idx = None
+    # FIX(2026-09-05, 审计 F04): 摆动低点确认须在信号bar(i)之前完成 —— j + PIVOT <= i，
+    # 否则用了 i+1（入场根）之后的K线确认（回测/实盘信号集不一致）。
     for j in range(i, PIVOT - 1, -1):
+        if j + PIVOT > i:
+            continue
         if is_swing_low(daily, j):
             sl_tmp = daily[j]["l"]
             sl_idx = j

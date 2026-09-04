@@ -34,11 +34,16 @@ PIVOT_L = PIVOT_R = 3
 SWEEP_PCT = 0.003
 # FIX(2026-08-22): MAX_HOLD 40→5 — MSS research: 3d win 86%, MAX_HOLD=5 PF 6.38 vs 40d PF 4.31
 # (short hold = faster stop/realize, avg unchanged +2.32% vs +2.34%, PF +2.07)
-MAX_HOLD = 5
+# FIX(2026-09-05, 审计 F11): MAX_HOLD=5 与 TP2=2R/月线高点结构性矛盾（5 根内难到达），
+# 绝大多数交易以 TIME_STOP 结束、TP 层级形同虚设。按审计建议调整为日线 12 根，
+# 并允许按周期/波动自适应（由调用方覆盖）。
+MAX_HOLD = 12
 FEE = 0.20
 SL_BUFFER = 0.99
 # strong-BOS disabled (audit: close-only BOS + more samples outperformed confirmed-BOS)
 STRONG_BOS = False
+# FIX(2026-09-05, 审计 F10): BOS 窗口 —— 扫损后 N 根内允许出现位移+收盘突破（日线 8 根）
+BOS_WINDOW = 8
 
 
 def f(x, d=0.0):
@@ -69,22 +74,33 @@ def bars_for(path):
 
 
 def aggregate_weekly(daily):
-    """Aggregate daily bars into weekly bars (ISO week). last close, max high, min low, first open."""
+    """Aggregate daily bars into weekly bars (ISO week). last close, max high, min low, first open.
+    FIX(2026-09-05, 审计 F01): 旧实现用 t[:6]（YYYYMM=月）分桶，注释却写 ISO week —— 周线实为月线。
+    改为 ISO 自然周 (year, week)，并用 last_complete_idx 标记"该周最后一根日线在 daily 中的索引"，
+    供调用方只引用已收完的周线（避免本周未收盘周线泄露）。"""
     weeks = []
     cur = None
-    for b in daily:
+    import datetime as _dt
+    for i, b in enumerate(daily):
         t = b["t"]
-        wk = t[:6]  # YYYYMM week bucket (simplified weekly anchor)
+        try:
+            iso = _dt.datetime.strptime(str(t)[:8], "%Y%m%d").isocalendar()[:2]  # (year, week)
+        except Exception:
+            continue
+        wk = f"{iso[0]}-W{iso[1]:02d}"
         if cur is None or cur["wk"] != wk:
             if cur:
+                cur["last_idx"] = i - 1  # 上一周最后一根日线索引（已收完）
                 weeks.append(cur)
-            cur = {"wk": wk, "t": t, "o": b["o"], "h": b["h"], "l": b["l"], "c": b["c"], "days": [t]}
+            cur = {"wk": wk, "t": t, "o": b["o"], "h": b["h"], "l": b["l"], "c": b["c"],
+                   "days": [t], "start_idx": i}
         else:
             cur["h"] = max(cur["h"], b["h"])
             cur["l"] = min(cur["l"], b["l"])
             cur["c"] = b["c"]
             cur["days"].append(t)
     if cur:
+        cur["last_idx"] = len(daily) - 1
         weeks.append(cur)
     return weeks
 
@@ -105,13 +121,22 @@ def is_swing_high(ks, j):
 
 def weekly_permission(weekly, day_date):
     """W1: protected weekly low intact OR weekly SSL sweep + bullish CHOCH completed.
-    day_date = daily bar date (YYYYMMDD); use only weekly bars strictly before that week."""
-    wk = day_date[:6]
+    day_date = daily bar date (YYYYMMDD); use only weekly bars strictly before that week.
+    FIX(2026-09-05, 审计 F01/F04): 周键为 ISO 周；只引用 last_idx 严格 < day 在 daily 中索引的周线
+    （避免本周未收盘周线泄露；调用方传入 day_daily_idx 可选）。"""
+    import datetime as _dt
+    try:
+        iso = _dt.datetime.strptime(str(day_date)[:8], "%Y%m%d").isocalendar()[:2]
+    except Exception:
+        return False, "BAD_DATE"
+    wk = f"{iso[0]}-W{iso[1]:02d}"
     idx = 0
     for i, w in enumerate(weekly):
-        if w["t"][:6] >= wk:
+        if w["wk"] >= wk:
             idx = i
             break
+    else:
+        idx = len(weekly)
     prior = weekly[:idx]
     if len(prior) < PIVOT_L + PIVOT_R + 1:
         return False, "INSUFFICIENT_WEEKLY"
@@ -150,43 +175,75 @@ def build_seeds(symbol, daily):
         if not wok:
             continue
         # D1: daily SSL sweep of a confirmed swing low
+        # FIX(2026-09-05, 审计 F09): 扫损根要求量能签名（volZ>=0.5，机构吸筹扫损），
+        # 避免把普通波动跌破当作吸筹。
         swept = None
         for j in reversed(swing_lows):
             if j + PIVOT_R >= i:
                 continue
             ssl = daily[j]["l"]
             if b["l"] <= ssl * (1 - SWEEP_PCT) and b["c"] > ssl:
+                # volZ: 当前量 vs 过去 20 日均量的 z 分数近似（>0 = 放量）
+                _v20 = sum(daily[k]["v"] for k in range(max(0, i - 20), i)) / max(1, min(20, i))
+                _vz = (b["v"] - _v20) / (_v20 + 1e-9) if _v20 > 0 else 0
+                if _vz < 0.5:
+                    continue  # 无放量扫损 → 非机构吸筹
                 swept = j
                 break
         if swept is None:
             continue
-        # D2: bullish break - next bar closes above sweep-time visible swing high
-        # FIX(2026-08-20 audit): improved BOS — close break + next bar confirms (holds above).
-        rsp = i + 1
-        if rsp >= len(daily):
-            continue
+        # D2: bullish break - BOS within window (FIX 2026-09-05, 审计 F10):
+        # 旧实现只允许扫损后"下一根"收盘突破；真实 sweep→BOS 常需 2-8 根。
+        # 改为 bos_window（默认 8 根）内出现 位移K+收盘突破；中途收盘跌破扫损低点则失效。
+        # FIX(2026-09-05, 审计 F09): 位移根要求大资金签名 —— 放量(volZ>=1.0)且实体>=1ATR
         swing_high_vis = max(daily[k]["h"] for k in range(swept, i + 1))
+        rsp = None
+        for _kk in range(i + 1, min(len(daily), i + 1 + BOS_WINDOW)):
+            if daily[_kk]["c"] > swing_high_vis:
+                rsp = _kk
+                break
+            if daily[_kk]["c"] < daily[swept]["l"]:
+                break  # 中途跌破扫损低 → 失效
+        if rsp is None:
+            continue
+        # 位移根量能/实体签名
+        _v20r = sum(daily[k]["v"] for k in range(max(0, rsp - 20), rsp)) / max(1, min(20, rsp))
+        _vzr = (daily[rsp]["v"] - _v20r) / (_v20r + 1e-9) if _v20r > 0 else 0
+        _atr_r = 0.0
+        for _k in range(max(0, rsp - 14), rsp):
+            _atr_r += max(daily[_k]["h"] - daily[_k]["l"], abs(daily[_k]["h"] - daily[_k - 1]["c"]), abs(daily[_k]["l"] - daily[_k - 1]["c"]))
+        _atr_r = _atr_r / max(1, min(14, rsp))
+        if not (_vzr >= 1.0 and _atr_r > 0 and (daily[rsp]["h"] - daily[rsp]["l"]) >= _atr_r):
+            continue  # 非大资金推动的位移
         if STRONG_BOS:
-            # confirmed BOS: close break + next bar doesn't retrace below swing high
-            if not (daily[rsp]["c"] > swing_high_vis):
-                continue
             rsp2 = rsp + 1
             if rsp2 < len(daily) and daily[rsp2]["c"] < swing_high_vis:
                 continue  # retraced — weak BOS
-        else:
-            if not (daily[rsp]["c"] > swing_high_vis):
-                continue
-        # D3: unique bearish OB anchored from displacement leg (first bearish bar after rsp)
+        # D3: 看涨 OB —— FIX(2026-09-05, 审计 F02):
+        # 旧实现取 BOS 后第一根阴线（其实是回踩K，非真 OB）。
+        # SMC 看涨 OB = 位移腿之前最后一根反向（阴）K，即位移腿起点前一根。
+        # 优先取位移腿内看涨 FVG（bar[k].l > bar[k-2].h），其次位移前最后一根阴线，兜底扫损K实体。
         ob_idx = None
-        for k in range(rsp + 1, min(len(daily), rsp + 5)):
+        # 位移腿起点 = rsp（BOS 突破根）；位移前最后一根反向K = rsp-1 之前最近的阴线
+        for k in range(rsp - 1, max(0, rsp - 6), -1):
             if daily[k]["c"] < daily[k]["o"]:
                 ob_idx = k
                 break
         if ob_idx is None:
-            continue
+            ob_idx = rsp - 1  # 兜底：突破前一根实体
         ob = daily[ob_idx]
-        zl = min(ob["o"], ob["c"], ob["l"])
-        zh = min(max(ob["o"], ob["c"]), zl + (ob["h"] - zl) * 0.5)
+        # POI 优先用位移腿内看涨 FVG（bar.l > bar[k-2].h），zone 取 FVG 下沿~中值
+        fvg_lo = fvg_hi = None
+        for k in range(rsp - 1, max(0, rsp - 6), -1):
+            if daily[k]["l"] > daily[k - 2]["h"]:  # 看涨 FVG
+                fvg_lo, fvg_hi = daily[k - 2]["h"], daily[k]["l"]
+                break
+        if fvg_lo is not None:
+            zl = fvg_lo
+            zh = (fvg_lo + fvg_hi) / 2
+        else:
+            zl = min(ob["o"], ob["c"], ob["l"])
+            zh = min(max(ob["o"], ob["c"]), zl + (ob["h"] - zl) * 0.5)
         # D4: POI first touch within max_wait, then H (daily-projected): reclaim, hold
         touched = False
         t_idx = None
@@ -208,8 +265,12 @@ def build_seeds(symbol, daily):
                 t_idx = t_idx if t_idx is not None else k
             if touched and k != t_idx and bb["c"] > zh:
                 # H3 (v676): close breaks the most recent CONFIRMED swing high visible at touch
+                # FIX(2026-09-05, 审计 F04): 摆动点确认需在评估bar(k)前完成 —— j + PIVOT_R <= k，
+                # 否则"最近确认摆动高"用了未来K线（回测胜率高估）。
                 h3 = None
                 for j in range(max(0, t_idx - 1), PIVOT_L - 1, -1):
+                    if j + PIVOT_R > k:
+                        continue  # 尚未确认（需 j 右侧 PIVOT_R 根全部收完）
                     if is_swing_high(daily, j) and daily[j]["h"] > zh:
                         h3 = daily[j]["h"]
                         break
@@ -224,14 +285,21 @@ def build_seeds(symbol, daily):
         # TP: pre-entry confirmed swing high ABOVE both zone and entry price
         entry_price = f(daily[entry_idx]["o"])
         tgt = None
+        # FIX(2026-09-05, 审计 F04): TP 摆动点确认窗口须在入场前完成 —— j + PIVOT_R < entry_idx
         for j in range(entry_idx - PIVOT_R - 1, PIVOT_L - 1, -1):
             if is_swing_high(daily, j) and daily[j]["h"] > max(zh, entry_price):
                 tgt = (j, daily[j]["h"])
                 break
         # weekly external BSL (v676: TP prefers weekly liquidity target if visible pre-entry)
         wk_target = None
+        import datetime as _dt
+        try:
+            _iso_e = _dt.datetime.strptime(str(daily[entry_idx]["t"])[:8], "%Y%m%d").isocalendar()[:2]
+            _wk_e = f"{_iso_e[0]}-W{_iso_e[1]:02d}"
+        except Exception:
+            _wk_e = "9999-W99"
         for w in reversed(weekly):
-            if w["t"][:6] >= daily[entry_idx]["t"][:6]:
+            if w["wk"] >= _wk_e:
                 continue
             if w["h"] > max(zh, entry_price):
                 wk_target = w["h"]
@@ -278,11 +346,24 @@ def replay(seed, daily):
     risk = ep - sl
     if risk <= 0 or tgt <= ep:
         return None
+    # FIX(2026-09-05, 审计 F08): A 股执行现实
+    # ① 一字涨停开盘（open >= 昨收*1.095）买不到 → 跳过（回测前 stat skippedLimitUp）
+    # ② 跳空低开（open < SL）→ 按开盘价成交（不再假设能以 SL 成交）
+    # ③ 涨跌停按 10% 主板近似（688/30 创业板 20% 未细分，标注）
+    _prev_close = daily[entry_idx - 1]["c"] if entry_idx >= 1 else ep
+    _limit_up_px = _prev_close * 1.095 if _prev_close else 0
+    if _prev_close and daily[entry_idx]["o"] >= _limit_up_px:
+        return {"symbol": seed["symbol"], "entry_date": seed["entry_date"], "net_pnl_pct": None,
+                "reason": "SKIP_LIMIT_UP", "hold_bars": 0, "t1_violation": "False"}
     exit_price, reason, hold = ep, "TIME_STOP", 0
     for k in range(entry_idx + 1, min(len(daily), entry_idx + MAX_HOLD + 1)):
         bb = daily[k]
         hold += 1
-        hi, lo, cl = bb["h"], bb["l"], bb["c"]
+        hi, lo, cl, op = bb["h"], bb["l"], bb["c"], bb["o"]
+        # 跳空低开穿越 SL：按开盘价成交（保守，优于假设 SL 价）
+        if op < sl:
+            exit_price, reason = op, "SL_GAP"
+            break
         if lo <= sl and hi >= tgt:
             exit_price, reason = sl, "SL_HIT"
             break
@@ -398,6 +479,23 @@ def main():
         w.writeheader()
         for t in trades_all:
             w.writerow(t)
+    # FIX(2026-09-05, 审计 F06/F19): IS/OOS 切分 + R 倍数指标（样本内/外对照）
+    if trades_all:
+        t_sorted = sorted(trades_all, key=lambda t: t["entry_date"])
+        cut = int(len(t_sorted) * 0.7)
+        is_tr, oos_tr = t_sorted[:cut], t_sorted[cut:]
+        def _stats(ts):
+            pn = [t.get("net_pnl_pct") for t in ts if t.get("net_pnl_pct") is not None]
+            if not pn:
+                return "n=0"
+            wins = [x for x in pn if x > 0]
+            pf = sum(wins) / abs(sum(x for x in pn if x <= 0)) if any(x <= 0 for x in pn) else 99
+            return f"n={len(pn)} avg={sum(pn)/len(pn):+.2f}% wr={len(wins)/len(pn)*100:.0f}% PF={pf:.2f}"
+        print(f"\n[IS/OOS] 样本内(前70%): {_stats(is_tr)}")
+        print(f"[IS/OOS] 样本外(后30%): {_stats(oos_tr)}")
+        rs = [t.get("mfe_r", 0) for t in trades_all if t.get("mfe_r")]
+        if rs:
+            print(f"[R倍数] avgMFE_R={sum(rs)/len(rs):.2f}")
 
 
 if __name__ == "__main__":
