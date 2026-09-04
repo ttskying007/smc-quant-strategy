@@ -2,13 +2,17 @@
 """Daily combo run: update klines (Tencent), scan events + SMC, refresh dashboard JSON.
 Designed for Windows Task Scheduler (see 每日自动化说明.md)."""
 import io, json, os, subprocess, sys, time
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG  # 审计 P1: 统一路径/解释器
 
 if __name__ == "__main__":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-ROOT = r"E:\test\smc_project"
-RESEARCH = os.path.join(ROOT, "research")
-WDH = os.path.join(ROOT, "wdh")
-PY = r"C:\Users\Administrator\AppData\Roaming\uv\python\cpython-3.12.13-windows-x86_64-none\python.exe"
+ROOT = CFG.PROJECT_ROOT
+RESEARCH = CFG.RESEARCH_DIR
+WDH = CFG.WDH_DIR
+PY = CFG.PY_PRODUCTION
+KT = CFG.KT_CACHE  # FIX(2026-09-04, 审计 P0/P1): 兜底分支此前引用未定义 KT —— 统一在此定义
+MIRROR_DIRS = CFG.MIRROR_DIRS
 
 def run(script, *args, timeout=1800, cwd=None):
     script_dir = cwd or RESEARCH
@@ -66,7 +70,7 @@ def main():
                 import shutil
                 for f in ("combo_dashboard.json", "paper_ledger.json"):
                     src = os.path.join(RESEARCH, f)
-                    for d in (os.path.join(ROOT, "hermes", "smc_monitor"), "E:\\root\\.hermes\\smc_monitor"):
+                    for d in MIRROR_DIRS:
                         dst = os.path.join(d, f)
                         os.makedirs(d, exist_ok=True)
                         shutil.copyfile(src, dst)
@@ -121,14 +125,10 @@ def _run_main_steps():
     rc4 = run("finalize_dashboard.py")
     step_status["dashboard"] = rc4
     import shutil
-    shutil.copyfile(os.path.join(RESEARCH, "combo_dashboard.json"),
-                    os.path.join(ROOT, "hermes", "smc_monitor", "combo_dashboard.json"))
-    shutil.copyfile(os.path.join(RESEARCH, "combo_dashboard.json"),
-                    os.path.join("E:\\root", ".hermes", "smc_monitor", "combo_dashboard.json"))
-    shutil.copyfile(os.path.join(RESEARCH, "paper_ledger.json"),
-                    os.path.join(ROOT, "hermes", "smc_monitor", "paper_ledger.json"))
-    shutil.copyfile(os.path.join(RESEARCH, "paper_ledger.json"),
-                    os.path.join("E:\\root", ".hermes", "smc_monitor", "paper_ledger.json"))
+    for f in ("combo_dashboard.json", "paper_ledger.json"):
+        for d in MIRROR_DIRS:
+            os.makedirs(d, exist_ok=True)
+            shutil.copyfile(os.path.join(RESEARCH, f), os.path.join(d, f))
     # FIX(2026-08-22): 运行状态记录（每步成功/失败 + 数据日期 + 兜底标注）
     _data_date = ""
     try:

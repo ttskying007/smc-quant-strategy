@@ -12,18 +12,20 @@
       status(PENDING_ORDER/FILLED/CLOSED/EXPIRED),filled_price,filled_at,exit_reason,pnl_pct
 """
 import io, json, os, sys, time, urllib.request
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG  # 审计 P1: 统一路径/参数
 
-ROOT = r"E:\test\smc_project\research"
-KT = r"E:\test\smc_project\hermes\kline_cache_tencent"
-LEDGER = os.path.join(ROOT, "paper_ledger.json")
+ROOT = CFG.RESEARCH_DIR
+KT = CFG.KT_CACHE
+LEDGER = CFG.LEDGER
 # FIX(2026-08-22): auto-sync to frontend mirrors on every save
-MIRRORS = [r"E:\test\smc_project\hermes\smc_monitor\paper_ledger.json", r"E:\root\.hermes\smc_monitor\paper_ledger.json"]
+MIRRORS = [os.path.join(m, "paper_ledger.json") for m in CFG.MIRROR_DIRS]
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Referer": "https://finance.sina.com.cn/"}
 PIVOT = 3
-FEE = 0.20
+FEE = CFG.FEE_PCT
 # FIX(2026-09-04, 策略层): 撮合加滑点（买入上浮 0.1%、卖出下浮 0.1%），
 # 消除"无滑点"造成的纸面收益系统性高估（审计发现）。
-SLIPPAGE = 0.001  # 0.1% 单边
+SLIPPAGE = CFG.SLIPPAGE  # 0.1% 单边
 
 
 def load_ledger():
@@ -75,7 +77,9 @@ def save_ledger(led):
 
 # ---------- realtime price (Sina) ----------
 def realtime_prices(codes):
-    """Fetch realtime current prices for codes (up to ~50 per request)."""
+    """Fetch realtime current prices for codes (up to ~50 per request).
+    FIX(2026-09-04, 审计 P2): 返回 {code: {"px": 当前价, "prev": 昨收}}，
+    供涨跌停/停牌判断；旧调用方取 .get(code) 仍得到价格（兼容）。"""
     syms = []
     for c in codes:
         ex = "sh" if c.startswith("6") else "sz"
@@ -97,14 +101,28 @@ def realtime_prices(codes):
                 if len(vals) > 5 and vals[3]:
                     try:
                         _px = float(vals[3])
+                        _prev = float(vals[2]) if len(vals) > 2 and vals[2] else 0.0
                         # FIX(2026-08-22): skip 0.00 prices (Sina off-hours / failure) — don't return 0
                         if _px > 0:
-                            out[sym[2:]] = _px
+                            out[sym[2:]] = {"px": _px, "prev": _prev}
                     except Exception:
                         pass
         except Exception:
             pass
     return out
+
+
+def _is_limit_up(px_info, side="buy"):
+    """粗略涨跌停判定（主板 10%；创业板 30/688 20% 在此简化按 10% 主板规则）。
+    返回 True 表示"无法成交"（买入时涨停、卖出时跌停）。无昨收时返回 False（不拦截）。"""
+    px = (px_info or {}).get("px")
+    prev = (px_info or {}).get("prev") or 0
+    if not px or prev <= 0:
+        return False
+    chg = (px / prev - 1)
+    if side == "buy":
+        return chg >= 0.095  # 触及涨停 ≈ 无法按市价买入
+    return chg <= -0.095  # 触及跌停 ≈ 无法按市价卖出
 
 
 # ---------- kline helpers (for structure SL/TP) ----------
@@ -131,7 +149,9 @@ def sub_signals_event(bs, i, sig_date):
 
 
 def sub_signals_cont(bs, entry_idx, support_date):
-    """Continuation-leg sub-signals: MARKUP 确认 / 支撑回踩 / VWAP≥5% / 入场."""
+    """Continuation-leg sub-signals: MARKUP 确认 / 支撑回踩 / VWAP≥10% / 入场.
+    FIX(2026-09-04, 审计 P2): VWAP 阈值统一为 10%（与生产回测/文档一致；
+    研究确认 VWAP10% = +8.56% 优于 5%，p2_cont_refresh/gen_cont_v20f 均为 10%）。"""
     dates = [b["t"] for b in bs]
     subs = []
     # MARKUP confirm (60d ret>0.2 + vol ratio>1.1)
@@ -147,14 +167,14 @@ def sub_signals_cont(bs, entry_idx, support_date):
             break
     if support_date:
         subs.append({"name": "结构支撑回踩", "date": support_date, "detail": "回踩 swing low 支撑后收回"})
-    # VWAP>=5%
+    # VWAP>=10%（生产口径，与回测一致）
     for k in range(max(20, entry_idx - 10), entry_idx + 1):
         pv = sum(bs[j]["c"] * bs[j]["v"] for j in range(k - 19, k + 1))
         vol = sum(bs[j]["v"] for j in range(k - 19, k + 1))
         if vol > 0:
             vw = pv / vol
-            if (bs[k]["c"] - vw) / vw >= 0.05:
-                subs.append({"name": "VWAP≥5% 确认", "date": dates[k], "detail": "强趋势偏离 VWAP"})
+            if (bs[k]["c"] - vw) / vw >= 0.10:
+                subs.append({"name": "VWAP≥10% 确认", "date": dates[k], "detail": "强趋势偏离 VWAP"})
                 break
     subs.append({"name": "入场(次日开盘)", "date": dates[entry_idx], "detail": "开盘买入 固定10日"})
     return subs
@@ -187,17 +207,25 @@ def stage_and_deep(bs, i):
 
 
 def weekly_trend_of(bs, i):
-    """周线趋势（5日聚合周线，MA10 周线上/下行）—— 研究：周线 down 事件 +7.50% vs up +1.00%"""
-    closes = []
-    j = i
-    while j >= 0 and len(closes) < 20:
-        closes.append(bs[j]["c"])
-        j -= 5
-    closes.reverse()
-    if len(closes) < 12:
+    """周线趋势（真实自然周聚合，MA10 周线上/下行）—— 研究：周线 down 事件 +7.50% vs up +1.00%
+    FIX(2026-09-04, 审计 P3): 旧实现每 5 根日线近似周线（非真实自然周），
+    改为按日期 ISO 自然周分组，取每周最后一个收盘价。"""
+    import datetime as _dt
+    week_map = {}   # (year, week) -> 该周最后一根收盘
+    for k in range(i, -1, -1):
+        t = str(bs[k]["t"])
+        try:
+            iso = _dt.datetime.strptime(t[:8], "%Y%m%d").isocalendar()[:2]
+        except Exception:
+            continue
+        week_map.setdefault(iso, bs[k]["c"])  # 从 i 往前遍历，首次遇到=该周最后收盘
+        if len(week_map) >= 20:
+            break
+    week_close = [week_map[k] for k in sorted(week_map.keys())]
+    if len(week_close) < 12:
         return None
-    ma10 = sum(closes[-10:]) / 10
-    ma_prev = sum(closes[-12:-2]) / 10
+    ma10 = sum(week_close[-10:]) / 10
+    ma_prev = sum(week_close[-12:-2]) / 10
     return "up" if ma10 > ma_prev else "down"
 
 
@@ -206,7 +234,11 @@ _MKT_SAMPLE = None
 _MKT_PROXY_CACHE = {}
 
 def _market_proxy(code):
-    """计算给定股票 signal 日期的市场状态（200 只采样 20 日平均涨跌，决策时点可得）"""
+    """计算给定股票 signal 日期的市场状态（200 只采样 20 日平均涨跌，决策时点可得）。
+    FIX(2026-09-04, 审计 P2):
+      ① 采样快照落盘 hermes/kline_cache_tencent/.mkt_sample.json —— 避免每个新交易日重读 200 个 JSON；
+      ② 标注幸存者偏差：采样来源是"当前缓存中存在 K 线"的股票（退市/长期停牌股无数据被排除），
+         因此 proxy 存在正向幸存者偏差，仅作相对强弱参考，不做绝对市场判断。"""
     global _MKT_SAMPLE, _MKT_PROXY_CACHE
     bs = bars_of(code)
     if not bs:
@@ -217,16 +249,29 @@ def _market_proxy(code):
     d8 = dates[-1]  # 当前数据日
     if d8 in _MKT_PROXY_CACHE:
         return _MKT_PROXY_CACHE[d8]
+    kt = r"E:\test\smc_project\hermes\kline_cache_tencent"
+    snap = os.path.join(kt, ".mkt_sample.json")
     if _MKT_SAMPLE is None:
-        import os, random
-        random.seed(42)
-        kt = r"E:\test\smc_project\hermes\kline_cache_tencent"
-        files = sorted(f for f in os.listdir(kt) if f.endswith("_daily_800.json"))
-        _MKT_SAMPLE = random.sample(files, min(200, len(files)))
+        # 优先读固定快照（跨进程/跨日稳定），无则采样一次并落盘
+        try:
+            _snap = json.load(open(snap, encoding="utf-8"))
+            if isinstance(_snap, list) and _snap:
+                _MKT_SAMPLE = _snap
+        except Exception:
+            pass
+        if _MKT_SAMPLE is None:
+            import random
+            random.seed(42)
+            files = sorted(f for f in os.listdir(kt) if f.endswith("_daily_800.json"))
+            _MKT_SAMPLE = random.sample(files, min(200, len(files)))
+            try:
+                json.dump(_MKT_SAMPLE, open(snap, "w", encoding="utf-8"), ensure_ascii=False)
+            except Exception:
+                pass
     rets = []
     for f in _MKT_SAMPLE:
         try:
-            raw = json.load(open(os.path.join(r"E:\test\smc_project\hermes\kline_cache_tencent", f), encoding="utf-8"))
+            raw = json.load(open(os.path.join(kt, f), encoding="utf-8"))
             b2 = []
             for r in raw:
                 t = "".join(c for c in str(r.get("t") or "") if c.isdigit())[:8]
@@ -628,7 +673,9 @@ def realtime_monitor():
     n_fill = 0
     n_close = 0
     for t in targets:
-        cur_px = px.get(t["code"])
+        _info = px.get(t["code"])
+        # 兼容新旧结构：dict（新，含 prev）或 float（旧）
+        cur_px = _info.get("px") if isinstance(_info, dict) else _info
         # FIX(2026-08-22): skip 0/None prices — Sina returns 0.00 off-hours/failure;
         # treating 0 as "break SL" caused mass -100% SL_HIT on all positions.
         if cur_px is None or cur_px <= 0:
@@ -642,6 +689,9 @@ def realtime_monitor():
             if (t.get("filled_price") or t.get("entry_price")) else None,
         })
         if t["status"] == "PENDING_ORDER":
+            # FIX(2026-09-04, 审计 P2): 涨停无法买入（挂单不成交，等待回落）
+            if _is_limit_up(_info, side="buy"):
+                continue
             # FIX(2026-08-22): retrace limit fill (研究: +0.47pp vs pure open)
             # fill at limit if price retraces to it; else fallback to T+1 open
             # FIX(2026-09-04): 成交价加买入滑点 (× (1+SLIPPAGE))，对齐实盘成本
@@ -685,6 +735,9 @@ def realtime_monitor():
                     "trigger": t.get("trigger", "T+1开盘/回踩"), "pnl_pct": None,
                 })
         elif t["status"] == "FILLED":
+            # FIX(2026-09-04, 审计 P2): 跌停无法卖出（跳过平仓判定，避免按跌停价错误成交）
+            if _is_limit_up(_info, side="sell"):
+                continue
             ep = t["filled_price"] or t["entry_price"]
             # FIX(2026-09-04, 策略层): 卖出执行价 = 实时价 × (1 - SLIPPAGE)（卖出滑点）
             _sell_px = cur_px * (1 - SLIPPAGE)

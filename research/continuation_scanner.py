@@ -5,10 +5,12 @@ import io, json, os, sys
 from collections import defaultdict
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, r"E:\test\smc_project\wdh")
 import wdh_engine as we
+import config as CFG  # 审计 P1: 统一路径
 
-KT = r"E:\test\smc_project\hermes\kline_cache_tencent"
+KT = CFG.KT_CACHE
 PIVOT = 3
 
 
