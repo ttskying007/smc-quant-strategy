@@ -21,25 +21,56 @@ MIRRORS = [r"E:\test\smc_project\hermes\smc_monitor\paper_ledger.json", r"E:\roo
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Referer": "https://finance.sina.com.cn/"}
 PIVOT = 3
 FEE = 0.20
+# FIX(2026-09-04, 策略层): 撮合加滑点（买入上浮 0.1%、卖出下浮 0.1%），
+# 消除"无滑点"造成的纸面收益系统性高估（审计发现）。
+SLIPPAGE = 0.001  # 0.1% 单边
 
 
 def load_ledger():
-    try:
-        return json.load(open(LEDGER, encoding="utf-8"))
-    except Exception:
+    """读取账本。FIX(2026-09-04, P0): 解析失败返回 [] 会让主流程用空账本覆盖全部持仓。
+    语义：文件不存在（首次运行）→ 返回 []；文件存在但解析失败 → 抛异常（保留原文件待人工恢复）。"""
+    if not os.path.exists(LEDGER):
         return []
+    try:
+        with open(LEDGER, encoding="utf-8") as fh:
+            data = json.load(fh)
+        if not isinstance(data, list):
+            raise ValueError("账本格式错误（应为 list）")
+        return data
+    except Exception as e:
+        # 保留损坏文件以便人工恢复，绝不静默返回 []
+        raise RuntimeError(f"paper_ledger.json 读取/解析失败，已保留原文件待人工恢复: {e}") from e
+
+
+def _atomic_write_json(path, obj):
+    """原子写：先写临时文件再 os.replace，避免中途被杀产生半截 JSON。"""
+    import tempfile
+    d = os.path.dirname(path)
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".ledger_", suffix=".tmp", dir=d)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(obj, fh, ensure_ascii=False, indent=2)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except Exception:
+            pass
+        raise
 
 
 def save_ledger(led):
-    with open(LEDGER, "w", encoding="utf-8") as fh:
-        json.dump(led, fh, ensure_ascii=False, indent=2)
+    """FIX(2026-09-04, P0): 原子写主文件 + 镜像；任一镜像失败不阻断主流程但告警。"""
+    _atomic_write_json(LEDGER, led)
     # FIX(2026-08-22): auto-sync to frontend mirrors (was only main file — frontend showed stale data)
     for _m in MIRRORS:
         try:
-            with open(_m, "w", encoding="utf-8") as fh:
-                json.dump(led, fh, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+            _atomic_write_json(_m, led)
+        except Exception as e:
+            print(f"镜像同步失败(继续): {_m}: {e}", flush=True)
 
 
 # ---------- realtime price (Sina) ----------
@@ -613,33 +644,34 @@ def realtime_monitor():
         if t["status"] == "PENDING_ORDER":
             # FIX(2026-08-22): retrace limit fill (研究: +0.47pp vs pure open)
             # fill at limit if price retraces to it; else fallback to T+1 open
+            # FIX(2026-09-04): 成交价加买入滑点 (× (1+SLIPPAGE))，对齐实盘成本
             _was_pending = True
             if t.get("entry_mode") == "retrace":
                 if cur_px <= t["entry_price"]:
                     t["status"] = "FILLED"
-                    t["filled_price"] = t.get("entry_price")
+                    t["filled_price"] = round(t.get("entry_price") * (1 + SLIPPAGE), 3)
                     t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
                     n_fill += 1
                 elif t.get("t1_open") and not t.get("_retrace_open_done"):
                     # first check after open with no retrace → fallback to T+1 open
                     t["status"] = "FILLED"
-                    t["filled_price"] = t.get("t1_open")
+                    t["filled_price"] = round(t.get("t1_open") * (1 + SLIPPAGE), 3)
                     t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
                     n_fill += 1
                 elif not t.get("_retrace_open_done"):
                     # no t1_open known → fill at current
                     t["status"] = "FILLED"
-                    t["filled_price"] = cur_px
+                    t["filled_price"] = round(cur_px * (1 + SLIPPAGE), 3)
                     t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
                     n_fill += 1
             elif t.get("entry_mode") == "next_open":
                 t["status"] = "FILLED"
-                t["filled_price"] = t.get("entry_price")
+                t["filled_price"] = round(t.get("entry_price") * (1 + SLIPPAGE), 3)
                 t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
                 n_fill += 1
             elif cur_px <= t["entry_price"]:
                 t["status"] = "FILLED"
-                t["filled_price"] = cur_px
+                t["filled_price"] = round(cur_px * (1 + SLIPPAGE), 3)
                 t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
                 n_fill += 1
             # FIX(2026-08-22): 买入交易日志（时间/信号/动作/TP/SL）
@@ -654,6 +686,8 @@ def realtime_monitor():
                 })
         elif t["status"] == "FILLED":
             ep = t["filled_price"] or t["entry_price"]
+            # FIX(2026-09-04, 策略层): 卖出执行价 = 实时价 × (1 - SLIPPAGE)（卖出滑点）
+            _sell_px = cur_px * (1 - SLIPPAGE)
             # FIX(2026-08-22): A股 T+1 规则 —— 买入当日不可卖出，TP/SL 无法生效
             _today = time.strftime("%Y-%m-%d")
             if t.get("filled_at") and str(t["filled_at"])[:10] == _today:
@@ -679,7 +713,7 @@ def realtime_monitor():
                     if days >= hold:
                         t["status"] = "CLOSED"
                         t["exit_reason"] = "HOLD_EXIT"
-                        t["pnl_pct"] = round((cur_px / ep - 1) * 100 - FEE, 4)
+                        t["pnl_pct"] = round((_sell_px / ep - 1) * 100 - FEE, 4)
                         n_close += 1
                 except Exception:
                     pass
@@ -714,7 +748,7 @@ def realtime_monitor():
                                 t["status"] = "CLOSED"
                                 t["exit_reason"] = "TIME_STOP"
                                 _rem = 1.0
-                                t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + _rem * (cur_px / ep - 1) * 100 - FEE * _rem, 4)
+                                t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + _rem * (_sell_px / ep - 1) * 100 - FEE * _rem, 4)
                                 n_close += 1
                     except Exception:
                         pass
@@ -722,7 +756,7 @@ def realtime_monitor():
                     t["status"] = "CLOSED"
                     t["exit_reason"] = "SL_HIT"
                     _rem = 0.7 if t.get("tp1_hit") else 1.0
-                    t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + _rem * (cur_px / ep - 1) * 100 - FEE * _rem, 4)
+                    t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + _rem * (_sell_px / ep - 1) * 100 - FEE * _rem, 4)
                     n_close += 1
                 elif not t.get("tp1_hit") and tp1 > 0 and cur_px >= tp1:
                     t["tp1_hit"] = True
@@ -739,7 +773,7 @@ def realtime_monitor():
                 elif t.get("tp3_hit") and tp4 > 0 and cur_px >= tp4:
                     t["status"] = "CLOSED"
                     t["exit_reason"] = "TP4_RUNNER"
-                    t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + 0.7 * (tp4 / ep - 1) * 100 - FEE * 0.7, 4)
+                    t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + 0.7 * (_sell_px / ep - 1) * 100 - FEE * 0.7, 4)
                     n_close += 1
             t["mark_price"] = cur_px
             t["mark_pnl_pct"] = round((cur_px / ep - 1) * 100, 4)

@@ -28,23 +28,39 @@ def bars(path):
     for r in raw if isinstance(raw, list) else []:
         t = "".join(c for c in str(r.get("t") or "") if c.isdigit())[:8]
         o, h, l, c = we.f(r.get("o")), we.f(r.get("h")), we.f(r.get("l")), we.f(r.get("c"))
+        v = we.f(r.get("v"))
         if t and o and h and l and c:
-            out.append({"t": t, "o": o, "h": h, "l": l, "c": c})
+            out.append({"t": t, "o": o, "h": h, "l": l, "c": c, "v": v})
     out.sort(key=lambda b: b["t"])
     return out
 
 
 def market_latest():
-    """Determine latest trading date from Sina realtime (authoritative)."""
+    """Determine latest trading date from Sina realtime (authoritative).
+    FIX(2026-09-04, P1): 旧实现请求了 Sina 却丢弃结果、硬编码兜底 20260819。
+    现在解析 hq_str 第 31 个字段（日期）作为权威最新交易日；失败再回退本地缓存。"""
+    import urllib.request
+    UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://finance.sina.com.cn/"}
     try:
-        import urllib.request
-        UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://finance.sina.com.cn/"}
         req = urllib.request.Request("https://hq.sinajs.cn/list=sh600519", headers=UA)
         with urllib.request.urlopen(req, timeout=10) as r:
             b = r.read().decode("gbk", errors="replace")
-        # var hq_str_sh600519="name,open,prevclose,current,..." -> date is not in quote; use date via kline instead
-    except Exception:
-        pass
+        # hq_str_sh600519="贵州茅台,open,prevclose,current,high,low,...,date,time,..."
+        # 第 31 个字段（index 30）为日期 YYYY-MM-DD（部分源无日期，则用最后 4 字段时间推断）
+        m = b.split('"')[1] if '"' in b else ""
+        parts = m.split(",")
+        if len(parts) > 30 and len(parts[30]) == 10 and parts[30][:4].isdigit():
+            date = parts[30].replace("-", "")
+            print(f"市场最新交易日(Sina 权威): {date}", flush=True)
+            return date
+        # 若 Sina 无日期字段，取行情时间字段（第 31 位 YYYY-MM-DD HH:MM:SS 的前半）
+        if len(parts) > 31 and len(parts[31]) >= 10:
+            date = parts[31][:10].replace("-", "")
+            if date[:4].isdigit():
+                print(f"市场最新交易日(Sina 时间字段): {date}", flush=True)
+                return date
+    except Exception as e:
+        print(f"Sina 最新交易日获取失败，回退本地缓存: {e}", flush=True)
     # fallback: latest date across kline files that are fresh (from Sina refresh)
     latest = ""
     for f in os.listdir(KT):
@@ -53,7 +69,16 @@ def market_latest():
         bs = bars(os.path.join(KT, f))
         if bs and bs[-1]["t"] > latest:
             latest = bs[-1]["t"]
-    return latest or "20260819"
+    if latest:
+        print(f"市场最新交易日(本地缓存回退): {latest}", flush=True)
+        return latest
+    # 最后一个兜底：取当前日期（周一~五），避免 20260819 这种过期硬编码
+    import datetime
+    _today = datetime.date.today()
+    while _today.weekday() >= 5:  # 周末回退到周五
+        _today -= datetime.timedelta(days=1)
+    print(f"市场最新交易日(日期兜底): {_today.strftime('%Y%m%d')}", flush=True)
+    return _today.strftime("%Y%m%d")
 
 
 def refresh_key_stocks():
@@ -91,10 +116,12 @@ def scan_one(p, latest):
         entry_idx = int(sd["entry_idx"])
         if entry_idx < 61:
             continue
-        w60 = daily[entry_idx - 60:entry_idx]
-        ret60 = w60[-1]["c"] / w60[0]["c"] - 1
-        if ret60 <= 0:
-            continue  # UPTREND/MARKUP proxy (needs volume check for MARKUP)
+        # FIX(2026-09-04, 策略层): 旧实现用 ret60>0 代理阶段（注释自认缺量能检查），
+        # 与回测口径 stage_and_deep 不一致。现直接复用 paper_sim.stage_and_deep（含量能 vt 判断）。
+        import paper_sim as _ps
+        _stage, _deep = _ps.stage_and_deep(daily, entry_idx)
+        if _stage not in ("UPTREND", "MARKUP"):
+            continue
         has_fvg = any(daily[k]["h"] < daily[k - 2]["l"] for k in range(max(3, entry_idx - 12), entry_idx))
         if not has_fvg:
             continue
@@ -103,7 +130,7 @@ def scan_one(p, latest):
                     "zone_low": sd["zone_low"], "zone_high": sd["zone_high"],
                     "entry_price": sd["entry_price"], "target": sd["target"],
                     "w_permission": sd["w_permission"], "r20": r20, "last": last,
-                    "stage": "UPTREND/MARKUP", "bear_fvg": True, "fvg_cnt": fvg_cnt})
+                    "stage": _stage, "bear_fvg": True, "fvg_cnt": fvg_cnt})
     return (out if out else None), last
 
 if __name__ == "__main__":
@@ -142,11 +169,15 @@ if __name__ == "__main__":
     all_dates = sorted(b["t"] for b in rep) if rep else []
     last5 = all_dates[-5:]
     print(f"\n=== B) 最近 5 个交易日: {last5} ===")
+    # FIX(2026-09-04, 策略层): LIKE '%增持%' 会命中"终止增持""增持完毕"等噪声；
+    # 排除含 终止/完毕/解除/计划(仅计划未实施)/调整 等否定词的标题；去掉 LIMIT 10 截断。
+    _neg = ("终止", "完毕", "解除", "取消", "结束", "调整", "变更", "进展", "补充协议", "届满", "减持")
     for d in last5:
         dd = f"{d[:4]}-{d[4:6]}-{d[6:8]}"
-        cur.execute("SELECT stock_code, stock_name, title FROM announce WHERE date=? AND (title LIKE '%增持%' OR title LIKE '%回购%') LIMIT 10", (dd,))
+        cur.execute("SELECT stock_code, stock_name, title FROM announce WHERE date=? AND (title LIKE '%增持%' OR title LIKE '%回购%')", (dd,))
         rows = cur.fetchall()
-        print(f"  {dd}: {len(rows)} 增持/回购事件")
+        rows = [r for r in rows if not any(n in str(r[2]) for n in _neg)]
+        print(f"  {dd}: {len(rows)} 增持/回购事件（已滤除终止/完毕等噪声）")
         for code, name, title in rows[:5]:
             print(f"    {code} {name}: {str(title)[:50]}")
     conn.close()
