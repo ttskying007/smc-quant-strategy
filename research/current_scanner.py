@@ -11,11 +11,15 @@ import io, json, os, sys, subprocess
 from collections import defaultdict
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, r"E:\test\smc_project\wdh")
 import wdh_engine as we
+import config as CFG  # 审计 P1: 统一路径/解释器
 
-KT = r"E:\test\smc_project\hermes\kline_cache_tencent"
-OUT = r"E:\test\smc_project\research"
+KT = CFG.KT_CACHE
+OUT = CFG.RESEARCH_DIR
+ANNOUNCE_DB = CFG.ANNOUNCE_DB
+PY = CFG.PY_PRODUCTION
 os.makedirs(OUT, exist_ok=True)
 
 
@@ -84,10 +88,9 @@ def market_latest():
 def refresh_key_stocks():
     """Force-refresh holdings + recent-event stocks from Sina (small set, fast serial)."""
     try:
-        PY = r"C:\Users\Administrator\AppData\Roaming\uv\python\cpython-3.12.13-windows-x86_64-none\python.exe"
         subprocess.run([PY, r"E:\test\smc_project\wdh\refresh_holdings_sina.py"], timeout=1200, capture_output=True)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"关键股刷新失败(继续): {e}", flush=True)
 
 
 # A) SMC candidates: seeds whose entry_date == next trading day after last bar (i.e., signal just completed)
@@ -159,7 +162,7 @@ if __name__ == "__main__":
 
     # B) recent insider events: query announce DB for last 5 trading days
     import sqlite3
-    conn = sqlite3.connect(r"E:\test\smc_project\announce\smc_announce.db")
+    conn = sqlite3.connect(ANNOUNCE_DB)
     cur = conn.cursor()
     rep = None
     for f in os.listdir(KT):
