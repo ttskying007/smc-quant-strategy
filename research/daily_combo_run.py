@@ -15,7 +15,11 @@ def run(script, *args, timeout=1800, cwd=None):
     cmd = [PY, os.path.join(script_dir, script)] + list(args)
     print(f"==> {' '.join(cmd[:3])}...", flush=True)
     t0 = time.time()
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=script_dir, encoding="utf-8", errors="replace")
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=script_dir, encoding="utf-8", errors="replace")
+    except subprocess.TimeoutExpired:
+        print(f"    TIMEOUT after {timeout}s: {os.path.basename(script)}（已超时终止）", flush=True)
+        return 124  # 超时按失败处理（124 = timeout 惯例），不让流水线崩溃
     print(f"    exit={r.returncode} ({time.time()-t0:.0f}s)", flush=True)
     if r.returncode != 0:
         print("    stderr:", r.stderr[-500:], flush=True)
@@ -52,22 +56,40 @@ def main():
         # 8:00 兜底：检查昨天 15:30 的 run_status，若数据未完整更新则补跑选股+dashboard
         try:
             _rs = json.load(open(os.path.join(RESEARCH, "run_status.json"), encoding="utf-8"))
+            KT = os.path.join(ROOT, "hermes", "kline_cache_tencent")
             _days = [x for x in sorted(os.listdir(KT)) if x.endswith("_daily_800.json")]
             if not _rs.get("data_complete") and _days:
                 print(f"兜底: 数据未完整更新(上次 {_rs.get('data_latest_date')})，补跑选股+dashboard", flush=True)
                 run("sim_scheduler.py", "--daily", timeout=1200)
                 run("finalize_dashboard.py")
-                # 同步镜像
+                # 同步镜像（注意：目标是文件路径，不能是目录）
                 import shutil
                 for f in ("combo_dashboard.json", "paper_ledger.json"):
+                    src = os.path.join(RESEARCH, f)
                     for d in (os.path.join(ROOT, "hermes", "smc_monitor"), "E:\\root\\.hermes\\smc_monitor"):
-                        shutil.copyfile(os.path.join(RESEARCH, f), d)
+                        dst = os.path.join(d, f)
+                        os.makedirs(d, exist_ok=True)
+                        shutil.copyfile(src, dst)
+                        print(f"  镜像同步: {src} -> {dst}", flush=True)
             else:
                 print(f"兜底: 数据已完整更新({_rs.get('data_latest_date')})，无需操作", flush=True)
         except Exception as e:
+            import traceback
             print(f"兜底异常: {e}", flush=True)
+            traceback.print_exc()
         return
     _pause_monitor()
+    try:
+        _run_main_steps()
+    except Exception as e:
+        import traceback
+        print(f"主流程异常（尝试恢复监控）: {e}", flush=True)
+        traceback.print_exc()
+    finally:
+        # FIX(2026-09-04, P1): 任何异常/超时都必须恢复实时监控，否则盘中监控静默停止
+        _resume_monitor()
+
+def _run_main_steps():
     step_status = {}
     # FIX(2026-08-22) P1-3: 数据源健康检查（失败告警）
     try:
@@ -124,7 +146,6 @@ def main():
                "note": ("数据未完整更新或选股失败，需兜底补跑" if not _data_complete else "数据完整更新+选股成功")},
               open(os.path.join(RESEARCH, "run_status.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
     print(f"DONE: batch={rc0} refresh={rc} scan={rc2} sim={rc3} dashboard={rc4}", flush=True)
-    _resume_monitor()
 
 if __name__ == "__main__":
     main()
