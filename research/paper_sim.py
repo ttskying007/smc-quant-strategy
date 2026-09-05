@@ -189,101 +189,20 @@ def sub_signals_cont(bs, entry_idx, support_date):
 
 
 def stage_and_deep(bs, i):
-    """Behavior stage + DEEP flag (backtest-consistent quality filter, FIX 2026-08-22)."""
-    if i < 91:
-        return None, False
-    w90 = bs[i - 90:i]
-    w60 = bs[i - 60:i]
-    w20 = bs[i - 20:i]
-    ret90 = w90[-1]["c"] / w90[0]["c"] - 1
-    ret60 = w60[-1]["c"] / w60[0]["c"] - 1
-    v20 = sum(b["v"] for b in w20) / len(w20)
-    v60 = sum(b["v"] for b in w60) / len(w60)
-    v90 = sum(b["v"] for b in w90) / len(w90)
-    vt60 = v20 / v60 if v60 else 1
-    vt90 = v20 / v90 if v90 else 1
-    deep = ret90 < -0.20 and vt90 < 0.75
-    if ret60 < -0.15 and vt60 < 0.9:
-        return "ACCUM", deep
-    if ret60 > 0.30 and vt60 > 1.3:
-        return "DISTRIB", deep
-    if ret60 > 0.20 and vt60 > 1.1:
-        return "MARKUP", deep
-    if ret60 > 0:
-        return "UPTREND", deep
-    return "DOWNTREND", deep
+    """FIX(2026-09-05, 审计 F14): 引用 core.structure（消除重复实现）。"""
+    return _csd(bs, i)
 
 
 def stage_and_deep_quantile(bs, i):
-    """FIX(2026-09-05, 审计 F12): 阶段识别分位化 —— 用每股自身滚动分位代替全市场硬阈值。
-    对每根 bar 计算过去 250 根内 ret60 的分位与 量比 的分位：
-      - ret60 分位 < 0.25 且 量比分位 < 0.40 → ACCUM（吸筹）
-      - ret60 分位 > 0.75 且 量比分位 > 0.70 → MARKUP（拉升）
-      - ret60 分位 > 0.55 → UPTREND
-      - ret60 分位 < 0.40 → DOWNTREND
-    兼容旧签名：返回 (stage, deep)。"""
-    if i < 91:
-        return None, False
-    w90 = bs[i - 90:i]
-    w60 = bs[i - 60:i]
-    w20 = bs[i - 20:i]
-    ret60 = w60[-1]["c"] / w60[0]["c"] - 1
-    ret90 = w90[-1]["c"] / w90[0]["c"] - 1
-    v20 = sum(b["v"] for b in w20) / len(w20)
-    v60 = sum(b["v"] for b in w60) / len(w60)
-    v90 = sum(b["v"] for b in w90) / len(w90)
-    vt60 = v20 / v60 if v60 else 1
-    vt90 = v20 / v90 if v90 else 1
-    deep = ret90 < -0.20 and vt90 < 0.75
-    # 每股自身滚动分位（过去 250 根）
-    hist_ret = []
-    hist_vt = []
-    for k in range(max(90, i - 250), i):
-        w60k = bs[k - 60:k]
-        w20k = bs[k - 20:k]
-        if len(w60k) < 60 or len(w20k) < 20:
-            continue
-        r60 = w60k[-1]["c"] / w60k[0]["c"] - 1
-        v2 = sum(x["v"] for x in w20k) / len(w20k)
-        v6 = sum(x["v"] for x in w60k) / len(w60k)
-        hist_ret.append(r60)
-        hist_vt.append(v2 / v6 if v6 else 1)
-    if len(hist_ret) < 30:
-        return None, deep
-    ret_pct = sum(1 for x in hist_ret if x < ret60) / len(hist_ret)
-    vt_pct = sum(1 for x in hist_vt if x < vt60) / len(hist_vt)
-    if ret_pct < 0.25 and vt_pct < 0.40:
-        return "ACCUM", deep
-    if ret_pct > 0.75 and vt_pct > 0.70:
-        return "MARKUP", deep
-    if ret_pct > 0.55:
-        return "UPTREND", deep
-    if ret_pct < 0.40:
-        return "DOWNTREND", deep
-    return "UPTREND", deep
+    """FIX(2026-09-05, 审计 F12/F14): 分位化阶段，引用 core.structure。"""
+    return _csdq(bs, i)
 
 
 def weekly_trend_of(bs, i):
-    """周线趋势（真实自然周聚合，MA10 周线上/下行）—— 研究：周线 down 事件 +7.50% vs up +1.00%
-    FIX(2026-09-04, 审计 P3): 旧实现每 5 根日线近似周线（非真实自然周），
-    改为按日期 ISO 自然周分组，取每周最后一个收盘价。"""
-    import datetime as _dt
-    week_map = {}   # (year, week) -> 该周最后一根收盘
-    for k in range(i, -1, -1):
-        t = str(bs[k]["t"])
-        try:
-            iso = _dt.datetime.strptime(t[:8], "%Y%m%d").isocalendar()[:2]
-        except Exception:
-            continue
-        week_map.setdefault(iso, bs[k]["c"])  # 从 i 往前遍历，首次遇到=该周最后收盘
-        if len(week_map) >= 20:
-            break
-    week_close = [week_map[k] for k in sorted(week_map.keys())]
-    if len(week_close) < 12:
-        return None
-    ma10 = sum(week_close[-10:]) / 10
-    ma_prev = sum(week_close[-12:-2]) / 10
-    return "up" if ma10 > ma_prev else "down"
+    """FIX(2026-09-05, 审计 P3/F14): 自然周趋势，引用 core.structure。"""
+    return _cwt(bs, i)
+
+
 
 
 # FIX(2026-08-22) 审计: 全市场代理（200 只采样 20 日平均涨跌）—— 弱市是抄底甜蜜区，强市(proxy>2%)事件无 alpha
@@ -404,16 +323,18 @@ def bars_of(code):
     return bs
 
 
+# FIX(2026-09-05, 审计 F14): 结构/阶段统一引用 core.structure（消除重复实现）
+from core.structure import (is_swing_high as _csh, is_swing_low as _csl,
+                            stage_and_deep as _csd, stage_and_deep_quantile as _csdq,
+                            weekly_trend_of as _cwt)
+
+
 def is_swing_high(bs, j):
-    if j < PIVOT or j + PIVOT >= len(bs):
-        return False
-    return bs[j]["h"] > max(bs[k]["h"] for k in range(j - PIVOT, j)) and bs[j]["h"] >= max(bs[k]["h"] for k in range(j + 1, j + PIVOT + 1))
+    return _csh(bs, j, PIVOT)
 
 
 def is_swing_low(bs, j):
-    if j < PIVOT or j + PIVOT >= len(bs):
-        return False
-    return bs[j]["l"] < min(bs[k]["l"] for k in range(j - PIVOT, j)) and bs[j]["l"] <= min(bs[k]["l"] for k in range(j + 1, j + PIVOT + 1))
+    return _csl(bs, j, PIVOT)
 
 
 def structural_sltp(code, signal_date, src='EVENT', stage='DOWNTREND', adx=0.0):
