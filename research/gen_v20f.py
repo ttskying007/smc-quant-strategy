@@ -228,13 +228,27 @@ for t in ev + cont:
     seen_c.add(k)
     combo.append(t)
 
+# FIX(2026-09-05, 审计集中度): 按月 cap=500 分散约束 —— 202402 单月曾占 31.2%（1433笔），
+# 单月极端行情主导收益。保留每月 rank 最高的前 500 笔，显著降低集中风险。
+# 研究: cap=500 → n=3663 avg+6.30% PF6.98（vs 无cap n=4596 avg+8.97% PF11.43，集中度下降）
+COMBO_MONTH_CAP = 500
+from collections import defaultdict
+by_month_combo = defaultdict(list)
+for t in combo:
+    by_month_combo[str(t["entry_date"])[:6]].append(t)
+combo_capped = []
+for m, v in sorted(by_month_combo.items()):
+    v_sorted = sorted(v, key=lambda t: -(float(t.get("rank") or 0)))
+    combo_capped.extend(v_sorted[:COMBO_MONTH_CAP])
+combo = combo_capped
+
 out_path = r"E:\test\smc_project\research\combo_v20f_trades.csv"
 with open(out_path, "w", encoding="utf-8-sig", newline="") as fh:
     w = csv.DictWriter(fh, fieldnames=["symbol", "entry_date", "src", "net_pnl_pct", "rank"])
     w.writeheader()
     for t in combo:
         w.writerow(t)
-print(f"v20f CSV(无泄漏): {len(combo)} 笔 → {out_path}")
+print(f"v20f CSV(无泄漏+月度cap={COMBO_MONTH_CAP}): {len(combo)} 笔 → {out_path}")
 
 # quick stats
 import statistics
