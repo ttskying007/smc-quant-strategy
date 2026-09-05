@@ -130,6 +130,10 @@ def scan_one(p, latest):
             continue
         fvg_cnt = sum(1 for k in range(max(3, entry_idx - 12), entry_idx) if daily[k]["l"] > daily[k - 2]["h"])
         out.append({"symbol": sym, "event_date": sd["event_date"], "entry_date": sd["entry_date"],
+                    # FIX(2026-09-05, 蓝图迭代三): 事件状态机时间字段透传（因果链可追溯）
+                    "detected_at": sd.get("detected_at", sd["sweep_date"]),
+                    "confirmed_at": sd.get("confirmed_at", sd["entry_date"]),
+                    "tradable_at": sd.get("tradable_at", sd["entry_date"]),
                     "zone_low": sd["zone_low"], "zone_high": sd["zone_high"],
                     "entry_price": sd["entry_price"], "target": sd["target"],
                     "w_permission": sd["w_permission"], "r20": r20, "last": last,
