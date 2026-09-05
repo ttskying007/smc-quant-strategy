@@ -59,7 +59,8 @@ def fmt(s):
         s["n"], s["avg"], s["win"]*100, s["pf"], s["payoff"]) if s else "n=0"
 
 if __name__ == "__main__":
-    files = sorted(f for f in os.listdir(KLINE) if f.endswith("_daily_750.json"))[:LIMIT]
+    # 信号充足分散池（顺序取前 N 只常为低波动 000xxx，信号少；间隔抽样覆盖各代码段）
+    files = sorted(f for f in os.listdir(KLINE) if f.endswith("_daily_750.json"))[::11]
     daily_map = {}
     for p in files:
         daily = load_daily(os.path.join(KLINE, p))
