@@ -38,3 +38,4 @@ PY_RESEARCH = r"C:\Users\Administrator\.workbuddy\binaries\python\versions\3.13.
 # ---- 撮合参数 ----
 FEE_PCT = 0.20          # 双边费用 %
 SLIPPAGE = 0.001        # 单边滑点 0.1%
+MAX_HOLD = 12           # 日线最长持有（审计 F11: 5→12）
