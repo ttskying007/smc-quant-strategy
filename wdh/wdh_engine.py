@@ -231,15 +231,18 @@ def build_seeds(symbol, daily):
                 break  # 中途跌破扫损低 → 失效
         if rsp is None:
             continue
-        # 位移根量能/实体签名
+        # 位移根量能/实体/收盘位置签名（FIX 2026-09-05, 规范 DISPLACEMENT）
         _v20r = sum(daily[k]["v"] for k in range(max(0, rsp - 20), rsp)) / max(1, min(20, rsp))
         _vzr = (daily[rsp]["v"] - _v20r) / (_v20r + 1e-9) if _v20r > 0 else 0
         _atr_r = 0.0
         for _k in range(max(0, rsp - 14), rsp):
             _atr_r += max(daily[_k]["h"] - daily[_k]["l"], abs(daily[_k]["h"] - daily[_k - 1]["c"]), abs(daily[_k]["l"] - daily[_k - 1]["c"]))
         _atr_r = _atr_r / max(1, min(14, rsp))
-        if not (_vzr >= 1.0 and _atr_r > 0 and (daily[rsp]["h"] - daily[rsp]["l"]) >= _atr_r):
-            continue  # 非大资金推动的位移
+        # 收盘在上35%：close 位于当日 (low..high) 区间上 35%
+        _rng = (daily[rsp]["h"] - daily[rsp]["l"]) if daily[rsp]["h"] > daily[rsp]["l"] else 0
+        _pos_35 = _rng > 0 and (daily[rsp]["c"] - daily[rsp]["l"]) / _rng >= 0.65
+        if not (_vzr >= 1.0 and _atr_r > 0 and _rng >= _atr_r and _pos_35):
+            continue  # 非大资金推动的位移（需放量+实体≥ATR+收盘上35%）
         if STRONG_BOS:
             rsp2 = rsp + 1
             if rsp2 < len(daily) and daily[rsp2]["c"] < swing_high_vis:
@@ -305,8 +308,15 @@ def build_seeds(symbol, daily):
                         h3 = daily[j]["h"]
                         break
                 # 主确认：回踩后阳线收过 前一根高点 且 收过 POI 上沿（折价区入场）
+                # FIX(2026-09-05, 规范 RETEST): 要求收盘不失守 zl − k·ATR（k=0.5）
+                _atr_k = 0.0
+                for _kk in range(max(0, k - 14), k):
+                    _atr_k += max(daily[_kk]["h"] - daily[_kk]["l"], abs(daily[_kk]["h"] - daily[_kk - 1]["c"]), abs(daily[_kk]["l"] - daily[_kk - 1]["c"]))
+                _atr_k = _atr_k / max(1, min(14, k))
+                _zl_floor = zl - 0.5 * _atr_k
                 _prev_high = daily[k - 1]["h"] if k >= 1 else zh
-                _reclaim = bb["c"] > max(_prev_high, zh) and bb["c"] > bb["o"]
+                _reclaim = (bb["c"] > max(_prev_high, zh) and bb["c"] > bb["o"]
+                            and (bb["c"] > _zl_floor))  # RETEST: 收盘守位（不失守 POI 下沿−0.5ATR）
                 if h3 is not None and bb["c"] > h3:
                     h3_break = True  # 强趋势变体：收盘创新高（保留，但非强制）
                 if _reclaim or h3_break:
