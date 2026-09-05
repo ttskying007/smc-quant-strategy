@@ -89,8 +89,9 @@ def bars_for(path):
     for r in raw if isinstance(raw, list) else []:
         t = date8(r)
         o, h, l, c = f(r.get("o")), f(r.get("h")), f(r.get("l")), f(r.get("c"))
+        v = f(r.get("v"))  # FIX(2026-09-05, F09): 保留成交量供量能签名/阶段判定
         if t and o and h and l and c:
-            out.append({"t": t, "o": o, "h": h, "l": l, "c": c})
+            out.append({"t": t, "o": o, "h": h, "l": l, "c": c, "v": v})
     out.sort(key=lambda b: b["t"])
     return out
 
