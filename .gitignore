@@ -62,3 +62,4 @@ hermes/smc_monitor/*.txt
 hermes/scripts/list_all_secrets.py
 hermes/scripts/~/
 **/list_all_secrets*.py
+research/run_manifests/

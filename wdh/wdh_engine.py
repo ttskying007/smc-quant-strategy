@@ -361,6 +361,15 @@ def build_seeds(symbol, daily):
         seeds.append({
             "symbol": symbol,
             "identity": f"{symbol}|{daily[entry_idx]['t']}|{daily[i]['t']}",
+            # FIX(2026-09-05, 蓝图迭代三): 事件状态机时间字段（可追溯因果链）
+            # detected_at   = 扫损发生日（事件首次出现）
+            # confirmed_at  = 收回确认日（阳线收过前高+POI，信号生效）
+            # tradable_at   = 下一可成交日（T+1 开盘）
+            # invalid_at    = 空（未失效；结构破位时由调用方判定）
+            "detected_at": daily[swept]["t"],
+            "confirmed_at": daily[reclaim_idx]["t"] if reclaim_idx is not None else daily[i]["t"],
+            "tradable_at": daily[entry_idx]["t"],
+            "invalid_at": "",
             "w_permission": wwhy, "event_date": daily[i]["t"],
             "sweep_date": daily[swept]["t"], "sweep_low": round(daily[swept]["l"], 6),
             "ob_date": daily[ob_idx]["t"],

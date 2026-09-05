@@ -7,7 +7,7 @@ FIX(2026-08-19): freshness gate — only symbols whose kline latest == market la
 produce candidates (no stale-signal risk); key stocks (holdings + recent events)
 are force-refreshed from Sina before scanning when --refresh is passed.
 Output: candidate list with signal details, all research-only (no BUY)."""
-import io, json, os, sys, subprocess
+import io, json, os, sys, subprocess, time
 from collections import defaultdict
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -186,13 +186,38 @@ if __name__ == "__main__":
     conn.close()
 
     # save
+    result = {
+        "latest_date": latest,
+        "fresh_count": fresh_count,
+        "stale_count": len(files) - fresh_count,
+        "coverage_pct": round(100 * fresh_count / len(files), 1) if files else 0,
+        "smc_candidates": smc_cands,
+        "note": "research-only, no BUY; freshness gate: only latest-data signals; stale=数据未更新到最新（继续后台刷新中）"
+    }
     with open(os.path.join(OUT, "current_scanner_result.json"), "w", encoding="utf-8") as fh:
-        json.dump({
-            "latest_date": latest,
-            "fresh_count": fresh_count,
-            "stale_count": len(files) - fresh_count,
-            "coverage_pct": round(100 * fresh_count / len(files), 1) if files else 0,
-            "smc_candidates": smc_cands,
-            "note": "research-only, no BUY; freshness gate: only latest-data signals; stale=数据未更新到最新（继续后台刷新中）"
-        }, fh, ensure_ascii=False, indent=2)
+        json.dump(result, fh, ensure_ascii=False, indent=2)
     print("\nscanner result saved (freshness gate)")
+
+    # FIX(2026-09-05, 蓝图迭代二): 生成 run_manifest + 前端同步
+    try:
+        import core.manifest as CM
+        _m = CM.build_manifest(
+            run_id="scan-" + time.strftime("%Y%m%d-%H%M%S"),
+            strategy_id="smc_combined", strategy_version="v20f_scan",
+            params={"freshness": "strict", "min_len": 400},
+            data_asof=latest, data_snapshot_id="kline_tencent_" + latest,
+            artifact_paths=[os.path.join(OUT, "current_scanner_result.json")],
+            status="research", extra={"smc_candidates": len(smc_cands), "fresh": fresh_count})
+        _mp = CM.save_manifest(_m, os.path.join(OUT, "run_manifests"))
+        print(f"manifest: {_mp}")
+        # 前端同步（hermes/smc_monitor + E:\root\.hermes）
+        import shutil
+        for _d in (os.path.join(CFG.HERMES_DIR, "smc_monitor"), r"E:\root\.hermes\smc_monitor"):
+            try:
+                os.makedirs(_d, exist_ok=True)
+                shutil.copyfile(os.path.join(OUT, "current_scanner_result.json"),
+                                os.path.join(_d, "current_scanner_result.json"))
+            except Exception as _e:
+                print(f"前端同步警告 {_d}: {_e}", flush=True)
+    except Exception as _e:
+        print(f"manifest/同步失败(不阻断): {_e}", flush=True)
