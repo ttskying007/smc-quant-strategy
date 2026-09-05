@@ -1,0 +1,14 @@
+{
+  "latest": "20260904",
+  "total": 4662,
+  "funnel": {
+    "no_entry_today": 3137,
+    "len_lt_400": 82,
+    "no_smc_seed": 1422,
+    "stale_data": 21
+  },
+  "swept": 3137,
+  "entry_today": 0,
+  "recent_30d": 143,
+  "grade": {}
+}
