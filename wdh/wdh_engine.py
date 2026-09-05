@@ -381,6 +381,9 @@ def replay(seed, daily):
     risk = ep - sl
     if risk <= 0 or tgt <= ep:
         return None
+    # FIX(2026-09-05, 审计 F11 深化): TP 至少 1.5R（A/B: struct avgR0.46→min15 avgR1.56,
+    # payoff 0.38→1.29, PF 2.21→3.05）—— 避免 TP 太近导致 R 倍数<1
+    tgt = max(tgt, ep + 1.5 * risk)
     # FIX(2026-09-05, 审计 F08): A 股执行现实
     # ① 一字涨停开盘（open >= 昨收*1.095）买不到 → 跳过（回测前 stat skippedLimitUp）
     # ② 跳空低开（open < SL）→ 按开盘价成交（不再假设能以 SL 成交）
@@ -433,6 +436,7 @@ def replay_tp2(seed, daily):
     tp1 = ep + 1.0 * risk
     weekly_bsl = f(seed.get("weekly_target"))
     tp2_candidate = ep + 2.0 * risk
+    # FIX(2026-09-05, 审计 F11 深化): TP2 至少 2R（与 min15 方案一致，避免目标太近）
     tp2 = max(tp2_candidate, weekly_bsl) if weekly_bsl > tp2_candidate else tp2_candidate
     # tiered simulation
     remaining = 1.0
