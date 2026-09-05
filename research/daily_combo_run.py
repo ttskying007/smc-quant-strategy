@@ -145,6 +145,28 @@ def _run_main_steps():
                "fallback_used": bool(_failed) or not _data_complete,
                "note": ("数据未完整更新或选股失败，需兜底补跑" if not _data_complete else "数据完整更新+选股成功")},
               open(os.path.join(RESEARCH, "run_status.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    # FIX(2026-09-05, 蓝图迭代二): daily_combo_run 生成 run_manifest（版本合同+数据血缘）
+    try:
+        import core.manifest as _CM
+        _m = _CM.build_manifest(
+            run_id="daily-" + time.strftime("%Y%m%d-%H%M%S"),
+            strategy_id="smc_combined", strategy_version="v20f",
+            params={"steps": step_status},
+            data_asof=_data_date, data_snapshot_id="kline_tencent_" + _data_date,
+            artifact_paths=[os.path.join(RESEARCH, "combo_dashboard.json"),
+                            os.path.join(RESEARCH, "run_status.json")],
+            status="production" if _data_complete else "degraded",
+            extra={"data_complete": _data_complete, "fallback_used": bool(_failed)})
+        _mp = _CM.save_manifest(_m, os.path.join(RESEARCH, "run_manifests"))
+        for _d in MIRROR_DIRS:
+            try:
+                os.makedirs(_d, exist_ok=True)
+                shutil.copyfile(_mp, os.path.join(_d, "run_manifest.json"))
+            except Exception as _e:
+                print(f"manifest 前端同步警告 {_d}: {_e}", flush=True)
+        print(f"manifest: {_mp} (status={_m['status']})", flush=True)
+    except Exception as _e:
+        print(f"manifest 生成失败(不阻断): {_e}", flush=True)
     print(f"DONE: batch={rc0} refresh={rc} scan={rc2} sim={rc3} dashboard={rc4}", flush=True)
 
 if __name__ == "__main__":
