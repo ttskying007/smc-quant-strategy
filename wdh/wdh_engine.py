@@ -53,6 +53,28 @@ def f(x, d=0.0):
         return d
 
 
+def atr_of(daily, i, n=14):
+    """FIX(2026-09-05, 审计 F05): ATR(14) 辅助 —— 阈值以 ATR 为单位缩放，适配不同波动股票。"""
+    if i < n:
+        return None
+    trs = []
+    for k in range(i - n + 1, i + 1):
+        if k < 1:
+            continue
+        trs.append(max(daily[k]["h"] - daily[k]["l"],
+                       abs(daily[k]["h"] - daily[k - 1]["c"]),
+                       abs(daily[k]["l"] - daily[k - 1]["c"])))
+    return sum(trs) / len(trs) if trs else None
+
+
+def sweep_tol_of(daily, i, base=SWEEP_PCT):
+    """扫损容差 = max(0.3%, 0.5×ATR%)——高波动股用 ATR 缩放，低波动股用绝对下限。"""
+    _a = atr_of(daily, i)
+    if _a is None or daily[i]["c"] <= 0:
+        return base
+    return max(base, 0.5 * _a / daily[i]["c"])
+
+
 def date8(x):
     s = "".join(c for c in str(x or "") if c.isdigit())
     return s[:8] if len(s) >= 8 else ""
@@ -177,12 +199,14 @@ def build_seeds(symbol, daily):
         # D1: daily SSL sweep of a confirmed swing low
         # FIX(2026-09-05, 审计 F09): 扫损根要求量能签名（volZ>=0.5，机构吸筹扫损），
         # 避免把普通波动跌破当作吸筹。
+        # FIX(2026-09-05, 审计 F05): 扫损容差按 ATR 缩放（max(0.3%, 0.5×ATR%)）
         swept = None
+        _tol = sweep_tol_of(daily, i)
         for j in reversed(swing_lows):
             if j + PIVOT_R >= i:
                 continue
             ssl = daily[j]["l"]
-            if b["l"] <= ssl * (1 - SWEEP_PCT) and b["c"] > ssl:
+            if b["l"] <= ssl * (1 - _tol) and b["c"] > ssl:
                 # volZ: 当前量 vs 过去 20 日均量的 z 分数近似（>0 = 放量）
                 _v20 = sum(daily[k]["v"] for k in range(max(0, i - 20), i)) / max(1, min(20, i))
                 _vz = (b["v"] - _v20) / (_v20 + 1e-9) if _v20 > 0 else 0
@@ -267,14 +291,24 @@ def build_seeds(symbol, daily):
                 # H3 (v676): close breaks the most recent CONFIRMED swing high visible at touch
                 # FIX(2026-09-05, 审计 F04): 摆动点确认需在评估bar(k)前完成 —— j + PIVOT_R <= k，
                 # 否则"最近确认摆动高"用了未来K线（回测胜率高估）。
+                # FIX(2026-09-05, 审计 F20): 旧确认要求收盘突破"位移腿新高"，漏斗在 confirm 归零
+                # 且等价于追高。改为：POI 内回踩后 阳线收过前一根高点与 POI 上沿
+                # （LTF CHoCH 的日线投影），入场在折价区（POI 内回踩确认）。
+                # 保留"摆动高突破"作为强趋势变体（h3_break），但不再强制。
                 h3 = None
+                h3_break = False
                 for j in range(max(0, t_idx - 1), PIVOT_L - 1, -1):
                     if j + PIVOT_R > k:
                         continue  # 尚未确认（需 j 右侧 PIVOT_R 根全部收完）
                     if is_swing_high(daily, j) and daily[j]["h"] > zh:
                         h3 = daily[j]["h"]
                         break
+                # 主确认：回踩后阳线收过 前一根高点 且 收过 POI 上沿（折价区入场）
+                _prev_high = daily[k - 1]["h"] if k >= 1 else zh
+                _reclaim = bb["c"] > max(_prev_high, zh) and bb["c"] > bb["o"]
                 if h3 is not None and bb["c"] > h3:
+                    h3_break = True  # 强趋势变体：收盘创新高（保留，但非强制）
+                if _reclaim or h3_break:
                     entry_idx = k + 1
                     if entry_idx < len(daily):
                         entry = (entry_idx, k, t_idx)

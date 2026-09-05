@@ -214,6 +214,55 @@ def stage_and_deep(bs, i):
     return "DOWNTREND", deep
 
 
+def stage_and_deep_quantile(bs, i):
+    """FIX(2026-09-05, 审计 F12): 阶段识别分位化 —— 用每股自身滚动分位代替全市场硬阈值。
+    对每根 bar 计算过去 250 根内 ret60 的分位与 量比 的分位：
+      - ret60 分位 < 0.25 且 量比分位 < 0.40 → ACCUM（吸筹）
+      - ret60 分位 > 0.75 且 量比分位 > 0.70 → MARKUP（拉升）
+      - ret60 分位 > 0.55 → UPTREND
+      - ret60 分位 < 0.40 → DOWNTREND
+    兼容旧签名：返回 (stage, deep)。"""
+    if i < 91:
+        return None, False
+    w90 = bs[i - 90:i]
+    w60 = bs[i - 60:i]
+    w20 = bs[i - 20:i]
+    ret60 = w60[-1]["c"] / w60[0]["c"] - 1
+    ret90 = w90[-1]["c"] / w90[0]["c"] - 1
+    v20 = sum(b["v"] for b in w20) / len(w20)
+    v60 = sum(b["v"] for b in w60) / len(w60)
+    v90 = sum(b["v"] for b in w90) / len(w90)
+    vt60 = v20 / v60 if v60 else 1
+    vt90 = v20 / v90 if v90 else 1
+    deep = ret90 < -0.20 and vt90 < 0.75
+    # 每股自身滚动分位（过去 250 根）
+    hist_ret = []
+    hist_vt = []
+    for k in range(max(90, i - 250), i):
+        w60k = bs[k - 60:k]
+        w20k = bs[k - 20:k]
+        if len(w60k) < 60 or len(w20k) < 20:
+            continue
+        r60 = w60k[-1]["c"] / w60k[0]["c"] - 1
+        v2 = sum(x["v"] for x in w20k) / len(w20k)
+        v6 = sum(x["v"] for x in w60k) / len(w60k)
+        hist_ret.append(r60)
+        hist_vt.append(v2 / v6 if v6 else 1)
+    if len(hist_ret) < 30:
+        return None, deep
+    ret_pct = sum(1 for x in hist_ret if x < ret60) / len(hist_ret)
+    vt_pct = sum(1 for x in hist_vt if x < vt60) / len(hist_vt)
+    if ret_pct < 0.25 and vt_pct < 0.40:
+        return "ACCUM", deep
+    if ret_pct > 0.75 and vt_pct > 0.70:
+        return "MARKUP", deep
+    if ret_pct > 0.55:
+        return "UPTREND", deep
+    if ret_pct < 0.40:
+        return "DOWNTREND", deep
+    return "UPTREND", deep
+
+
 def weekly_trend_of(bs, i):
     """周线趋势（真实自然周聚合，MA10 周线上/下行）—— 研究：周线 down 事件 +7.50% vs up +1.00%
     FIX(2026-09-04, 审计 P3): 旧实现每 5 根日线近似周线（非真实自然周），
@@ -454,6 +503,45 @@ def structural_sltp(code, signal_date, src='EVENT', stage='DOWNTREND', adx=0.0):
 
 
 # ---------- selection (daily 0:00 trigger) ----------
+def _parse_insider_magnitude(title):
+    """FIX(2026-09-05, 审计 F17): 从公告标题解析增持/回购规模（金额、股数、占总股本比）。
+    返回 (amount_wan, shares_wan, pct, raw_hint)。解析失败返回 (None,None,None,'')。
+    A股公告常见格式："增持公司股份约 1.2亿元" / "增持 500万股，占总股本 0.35%" /
+    "回购金额不低于 3亿元不超过 5亿元" / "增持比例达到 1%"。
+    """
+    import re
+    s = str(title or "")
+    amount = None
+    shares = None
+    pct = None
+    # 金额：X亿元 / X万元（取首个明确数值）
+    m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*亿(?:元)?", s)
+    if m:
+        amount = float(m.group(1)) * 10000  # 万元
+    else:
+        m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*万(?:元)?", s)
+        if m:
+            amount = float(m.group(1))
+    # 股数：X万股 / X亿股
+    m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*万(?:股)?", s)
+    if m:
+        shares = float(m.group(1))  # 万股
+    else:
+        m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*亿(?:股)?", s)
+        if m:
+            shares = float(m.group(1)) * 10000
+    # 占比：X% / 达到 X% / 占总股本 X%
+    m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*%", s)
+    if m:
+        pct = float(m.group(1))
+    hint = []
+    if amount:
+        hint.append(f"金额≈{amount:.0f}万")
+    if shares:
+        hint.append(f"股数≈{shares:.0f}万")
+    if pct:
+        hint.append(f"占比{pct:.2f}%")
+    return amount, shares, pct, " ".join(hint)
 def daily_selection():
     """Scan new insider events -> create PENDING_ORDER entries.
     entry price = disclosure day close (limit order: buy only at or below)."""
@@ -563,6 +651,17 @@ def daily_selection():
             # limit = disclosure close × 0.99; if T+1 low <= limit → fill at limit; else fill at T+1 open
             limit_px = round(close_px * 0.99, 3)
             t1_open = round(entry_px, 3)
+            # FIX(2026-09-05, 审计 F17): 解析增持金额/占比，作为事件强度字段 + rank 加分
+            _amt, _shr, _pct, _mag_hint = _parse_insider_magnitude(title)
+            if _pct is not None and _pct >= 1.0:
+                rank_score += 1  # 实质增持（≥1%）
+            if _amt is not None and _amt >= 10000:  # ≥1亿元
+                rank_score += 1
+            # FIX(2026-09-05, 审计 F18): 风险归一仓位 —— 固定风险预算 / (入场-SL)，替代等权
+            _risk_budget = 0.01  # 单笔账户风险 1%
+            _risk_dist = (limit_px - sl1) if sl1 and limit_px > sl1 else None
+            _position_pct = round(_risk_budget / (_risk_dist / limit_px), 4) if _risk_dist else 0.01
+            _position_pct = min(_position_pct, 0.25)  # 单票上限 25%
             led.append({
                 "code": code, "name": name, "signal_combo": sig,
                 "signal_date": dd, "trigger": f"回踩挂单(披露收盘×0.99={limit_px})，回落成交；否则开盘({t1_open})兜底",
@@ -573,6 +672,8 @@ def daily_selection():
                 "created_at": time.strftime("%Y-%m-%d"), "pick_date": time.strftime("%Y-%m-%d"),
                 "sub_signals": subs, "stage": st, "v_ratio": v_ratio, "rank_score": rank_score,
                 "stage_span": _stage_span, "adx_span": _adx_span, "weekly_trend": _wt,
+                "insider_amount_wan": _amt, "insider_pct": _pct, "insider_hint": _mag_hint,
+                "position_pct": _position_pct, "risk_dist_pct": round(_risk_dist / limit_px * 100, 2) if _risk_dist else None,
                 "filled_price": None, "filled_at": None,
                 "exit_reason": None, "pnl_pct": None, "entry_mode": "retrace", "t1_open": t1_open,
             })
