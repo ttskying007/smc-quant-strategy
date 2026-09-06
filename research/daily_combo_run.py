@@ -129,6 +129,21 @@ def _run_main_steps():
         for d in MIRROR_DIRS:
             os.makedirs(d, exist_ok=True)
             shutil.copyfile(os.path.join(RESEARCH, f), os.path.join(d, f))
+    # FIX(2026-09-06, Shadow 生产化): 每日 Shadow 运行 —— 事件腿受控 shadow + 对账 + kill switch
+    rc5 = run("shadow_sim.py", timeout=600)
+    step_status["shadow"] = rc5
+    if rc5 == 0:
+        try:
+            _st = json.load(open(os.path.join(RESEARCH, "shadow_status.json"), encoding="utf-8"))
+            if _st.get("kill_switch_triggered"):
+                print("!! SHADOW KILL SWITCH TRIGGERED — 事件腿暂停, 需人工审查", flush=True)
+            else:
+                print(f"shadow OK: {_st.get('trades')}笔 PF={_st.get('pf')} MDD={_st.get('max_drawdown')}%", flush=True)
+        except Exception as _e:
+            print(f"shadow 状态读取失败: {_e}", flush=True)
+    # 每日对账（账本 vs simulate 重放）
+    rc6 = run("reconcile.py", timeout=600)
+    step_status["reconcile"] = rc6
     # FIX(2026-08-22): 运行状态记录（每步成功/失败 + 数据日期 + 兜底标注）
     _data_date = ""
     try:

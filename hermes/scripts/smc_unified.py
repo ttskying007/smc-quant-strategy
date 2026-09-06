@@ -3764,7 +3764,7 @@ def build_combo():
 def build_nav():
     if _production_empty_book():
         # FIX(2026-08-17): K线入口不再锁死 V517；EMPTY_BOOK 下由用户自由选择研究版本。
-        return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>冻结研究回测</a><a href='/monitor'>生产状态 / 冻结研究</a><a href='/combo'>研究组合</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收研究</a><a href='/docs'>文档</a></nav>"
+        return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>冻结研究回测</a><a href='/monitor'>生产状态 / 冻结研究</a><a href='/combo'>研究组合</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收研究</a><a href='/docs'>文档</a></nav>"
     return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>回测</a><a href='/monitor'>选股</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/uzi'>UZI评审</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/v45?ver=v45_5'>事件实验({FRONTEND_VERSION})</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收</a><a href='/docs'>文档</a></nav>"
 
 
@@ -4114,6 +4114,32 @@ def build_v45_page(version='v45_1'):
 <div class='card'><h2>Watchlist</h2><table><thead><tr>{''.join('<th>'+c+'</th>' for c in watch_cols)}</tr></thead><tbody>{list_rows(b.get('watchlist'), watch_cols)}</tbody></table></div>
 <div class='card'><h2>Trades</h2><table><thead><tr>{''.join('<th>'+c+'</th>' for c in trade_cols)}</tr></thead><tbody>{list_rows(b.get('trades'), trade_cols)}</tbody></table></div>
 </div></body></html>"""
+
+def build_shadow():
+    """Shadow 状态页（受控事件腿 Shadow，只读）。读取 research/shadow_status.json。"""
+    try:
+        with open(r"E:\test\smc_project\research\shadow_status.json", encoding="utf-8") as fh:
+            st = json.load(fh)
+    except Exception as e:
+        return f"<div class='container'><div class='card'><h2>Shadow 状态</h2><p>未找到 shadow_status.json（每日流水线生成）: {e}</p></div></div>"
+    kill = st.get("kill_switch_triggered", False)
+    action = st.get("action", "-")
+    rows = f"""
+    <div class='card' style="border-left:3px solid {'#f85149' if kill else '#3fb950'}">
+      <h2>受控 Shadow — 事件腿（只读，非实盘）</h2>
+      <p>run_id: <b>{st.get('run_id','-')}</b> | 状态: <b>{'KILL SWITCH ⛔' if kill else 'CONTINUE ✅'}</b> | 动作: {action}</p>
+      <table>
+        <tr><td>交易数</td><td>{st.get('trades','-')}</td></tr>
+        <tr><td>avg%</td><td>{st.get('avg_pct','-')}%</td></tr>
+        <tr><td>PF</td><td>{st.get('pf','-')}</td></tr>
+        <tr><td>累计净值</td><td>{st.get('equity_final','-')}</td></tr>
+        <tr><td>最大回撤</td><td>{st.get('max_drawdown','-')}%</td></tr>
+        <tr><td>容量占用</td><td>{st.get('capacity_used','-')}/50</td></tr>
+        <tr><td>生成时间</td><td>{st.get('created_at','-')}</td></tr>
+      </table>
+      <p style="color:#8b949e">配置: 3x成本 / 单日≤5开仓 / kill MDD 10% —— 受控 Shadow，不进入实盘。</p>
+    </div>"""
+    return f"<!doctype html><html lang='zh'><head><meta charset='utf-8'><title>Shadow 状态</title><style>{CSS}</style></head><body>{build_nav()}<div class='container'>{rows}</div></body></html>"
 
 def build_analysis(start='', end=''):
     if _production_empty_book():
@@ -5773,6 +5799,8 @@ class Handler(BaseHTTPRequestHandler):
             self._html(build_v144_preview())
         elif path == '/analysis':
             self._html(build_analysis(qs.get('start', [''])[0], qs.get('end', [''])[0]))
+        elif path == '/shadow':
+            self._html(build_shadow())
         elif path == '/stoploss':
             self._html(build_stoploss())
         elif path == '/v45':
