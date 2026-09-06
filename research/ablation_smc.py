@@ -18,7 +18,7 @@ import wdh_engine as WE
 import core.execution as EX
 from core.metrics import stats_of
 
-KLINE = r"E:\test\smc_project\hermes\kline_cache"
+KLINE = r"E:\test\smc_project\hermes\kline_cache_tencent"
 LIMIT = 800  # 800 只控制运行时间
 
 def load_daily(path):
@@ -55,7 +55,7 @@ def fmt(s):
 
 if __name__ == "__main__":
     # 数据加载
-    files = sorted(f for f in os.listdir(KLINE) if f.endswith("_daily_750.json"))[:LIMIT]
+    files = sorted(f for f in os.listdir(KLINE) if f.endswith("_daily_800.json"))[:LIMIT]
     daily_map = {}
     for p in files:
         daily = load_daily(os.path.join(KLINE, p))
