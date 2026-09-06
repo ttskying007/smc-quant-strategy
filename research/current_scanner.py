@@ -110,13 +110,21 @@ def scan_one(p, latest):
     last = daily[-1]["t"]
     out = []
     for sd in seeds:
-        if int(sd["entry_idx"]) != len(daily) - 1:
+        # FIX(2026-09-05, 审计 G12): 追赶池 —— 允许 entry_idx ∈ [len-3, len-1] 且现价未超入场价×1.02
+        # （原严格 ==len-1，流水线超时/限流即候选永久丢失 → 长期零候选）
+        entry_idx = int(sd["entry_idx"])
+        if entry_idx < len(daily) - 3 or entry_idx >= len(daily):
             continue
+        _catchup = entry_idx != len(daily) - 1
+        if _catchup:
+            _last_close = daily[-1]["c"]
+            _ep = float(sd.get("entry_price") or 0)
+            if not (_ep > 0 and _last_close <= _ep * 1.02):
+                continue  # 现价已超入场价+2% → 放弃追赶
         r20 = sd.get("r20")
         if r20 == "" or r20 is None or not (0 <= float(r20) < 0.15):
             continue
         # v17 SMC leg filters: behavior stage UPTREND/MARKUP + bearish FVG
-        entry_idx = int(sd["entry_idx"])
         if entry_idx < 61:
             continue
         # FIX(2026-09-04, 策略层): 旧实现用 ret60>0 代理阶段（注释自认缺量能检查），
@@ -137,7 +145,8 @@ def scan_one(p, latest):
                     "zone_low": sd["zone_low"], "zone_high": sd["zone_high"],
                     "entry_price": sd["entry_price"], "target": sd["target"],
                     "w_permission": sd["w_permission"], "r20": r20, "last": last,
-                    "stage": _stage, "bull_fvg": True, "fvg_cnt": fvg_cnt})
+                    "stage": _stage, "bull_fvg": True, "fvg_cnt": fvg_cnt,
+                    "catchup": _catchup})
     return (out if out else None), last
 
 if __name__ == "__main__":
