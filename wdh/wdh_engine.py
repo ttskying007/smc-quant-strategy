@@ -21,6 +21,20 @@ NOTE: true 60min layer is data-constrained (local cache 2025-10..2026-05 only);
 """
 import csv, io, json, os, sys
 
+# FIX(2026-09-05, 审计 G19): core.structure 单一实现收敛 —— 优先引用 core（摆动点/ATR/扫损容差）
+# 独立运行/路径异常时回退本地实现（见下方 conditional def）
+try:
+    _CORE_RESEARCH = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep + "research"
+    if _CORE_RESEARCH not in sys.path:
+        sys.path.insert(0, _CORE_RESEARCH)
+    from core.structure import is_swing_low as _core_swing_low
+    from core.structure import is_swing_high as _core_swing_high
+    from core.structure import atr_of as _core_atr_of
+    from core.structure import sweep_tol_of as _core_sweep_tol_of
+    _USE_CORE = True
+except Exception:
+    _USE_CORE = False
+
 if __name__ == "__main__":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 HERMES = r"E:\test\smc_project\hermes"
@@ -53,26 +67,33 @@ def f(x, d=0.0):
         return d
 
 
-def atr_of(daily, i, n=14):
-    """FIX(2026-09-05, 审计 F05): ATR(14) 辅助 —— 阈值以 ATR 为单位缩放，适配不同波动股票。"""
-    if i < n:
-        return None
-    trs = []
-    for k in range(i - n + 1, i + 1):
-        if k < 1:
-            continue
-        trs.append(max(daily[k]["h"] - daily[k]["l"],
-                       abs(daily[k]["h"] - daily[k - 1]["c"]),
-                       abs(daily[k]["l"] - daily[k - 1]["c"])))
-    return sum(trs) / len(trs) if trs else None
+if _USE_CORE:
+    def atr_of(daily, i, n=14):
+        """FIX(2026-09-05, 审计 G19): 转发 core.structure.atr_of（单一实现）。"""
+        return _core_atr_of(daily, i, n)
 
+    def sweep_tol_of(daily, i, base=SWEEP_PCT):
+        return _core_sweep_tol_of(daily, i, base)
+else:
+    def atr_of(daily, i, n=14):
+        """ATR(14) 辅助（本地回退，core 不可用时）。"""
+        if i < n:
+            return None
+        trs = []
+        for k in range(i - n + 1, i + 1):
+            if k < 1:
+                continue
+            trs.append(max(daily[k]["h"] - daily[k]["l"],
+                           abs(daily[k]["h"] - daily[k - 1]["c"]),
+                           abs(daily[k]["l"] - daily[k - 1]["c"])))
+        return sum(trs) / len(trs) if trs else None
 
-def sweep_tol_of(daily, i, base=SWEEP_PCT):
-    """扫损容差 = max(0.3%, 0.5×ATR%)——高波动股用 ATR 缩放，低波动股用绝对下限。"""
-    _a = atr_of(daily, i)
-    if _a is None or daily[i]["c"] <= 0:
-        return base
-    return max(base, 0.5 * _a / daily[i]["c"])
+    def sweep_tol_of(daily, i, base=SWEEP_PCT):
+        """扫损容差 = max(0.3%, 0.5×ATR%)。"""
+        _a = atr_of(daily, i)
+        if _a is None or daily[i]["c"] <= 0:
+            return base
+        return max(base, 0.5 * _a / daily[i]["c"])
 
 
 def date8(x):
@@ -128,18 +149,25 @@ def aggregate_weekly(daily):
     return weeks
 
 
-def is_swing_low(ks, j):
-    if j < PIVOT_L or j + PIVOT_R >= len(ks):
-        return False
-    lo = ks[j]["l"]
-    return lo < min(ks[k]["l"] for k in range(j - PIVOT_L, j)) and lo <= min(ks[k]["l"] for k in range(j + 1, j + PIVOT_R + 1))
+if _USE_CORE:
+    def is_swing_low(ks, j):
+        """FIX(2026-09-05, 审计 G19): 转发 core.structure（单一实现）。"""
+        return _core_swing_low(ks, j, PIVOT_L)
 
+    def is_swing_high(ks, j):
+        return _core_swing_high(ks, j, PIVOT_L)
+else:
+    def is_swing_low(ks, j):
+        if j < PIVOT_L or j + PIVOT_R >= len(ks):
+            return False
+        lo = ks[j]["l"]
+        return lo < min(ks[k]["l"] for k in range(j - PIVOT_L, j)) and lo <= min(ks[k]["l"] for k in range(j + 1, j + PIVOT_R + 1))
 
-def is_swing_high(ks, j):
-    if j < PIVOT_L or j + PIVOT_R >= len(ks):
-        return False
-    hi = ks[j]["h"]
-    return hi > max(ks[k]["h"] for k in range(j - PIVOT_L, j)) and hi >= max(ks[k]["h"] for k in range(j + 1, j + PIVOT_R + 1))
+    def is_swing_high(ks, j):
+        if j < PIVOT_L or j + PIVOT_R >= len(ks):
+            return False
+        hi = ks[j]["h"]
+        return hi > max(ks[k]["h"] for k in range(j - PIVOT_L, j)) and hi >= max(ks[k]["h"] for k in range(j + 1, j + PIVOT_R + 1))
 
 
 def weekly_permission(weekly, day_date):
@@ -419,36 +447,50 @@ def replay(seed, daily):
     # FIX(2026-09-05, 审计 F11 深化): TP 至少 1.5R（A/B: struct avgR0.46→min15 avgR1.56,
     # payoff 0.38→1.29, PF 2.21→3.05）—— 避免 TP 太近导致 R 倍数<1
     tgt = max(tgt, ep + 1.5 * risk)
-    # FIX(2026-09-05, 审计 F08): A 股执行现实
-    # ① 一字涨停开盘（open >= 昨收*1.095）买不到 → 跳过（回测前 stat skippedLimitUp）
-    # ② 跳空低开（open < SL）→ 按开盘价成交（不再假设能以 SL 成交）
-    # ③ 涨跌停按 10% 主板近似（688/30 创业板 20% 未细分，标注）
+    # FIX(2026-09-05, 审计 F08/G18): A 股执行现实
+    # ① 一字涨停开盘买不到 → 跳过（按板块涨跌停幅度 limit_pct_for）
+    # ② 跳空低开（open < SL）→ 按开盘价成交
+    _code6 = str(seed["symbol"]).split(".")[0]
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep + "research")
+        from core.execution import limit_pct_for
+    except Exception:
+        # 局部兜底（不破坏独立运行）：主板 10%，创业板/科创 20%
+        def limit_pct_for(c):
+            return 0.20 if str(c).startswith(("300", "301", "688")) else 0.10
     _prev_close = daily[entry_idx - 1]["c"] if entry_idx >= 1 else ep
-    _limit_up_px = _prev_close * 1.095 if _prev_close else 0
+    _limit_pct = limit_pct_for(_code6)
+    _limit_up_px = _prev_close * (1 + _limit_pct - 0.005) if _prev_close else 0
     if _prev_close and daily[entry_idx]["o"] >= _limit_up_px:
         return {"symbol": seed["symbol"], "entry_date": seed["entry_date"], "net_pnl_pct": None,
                 "reason": "SKIP_LIMIT_UP", "hold_bars": 0, "t1_violation": "False"}
     exit_price, reason, hold = ep, "TIME_STOP", 0
-    for k in range(entry_idx + 1, min(len(daily), entry_idx + MAX_HOLD + 1)):
-        bb = daily[k]
-        hold += 1
-        hi, lo, cl, op = bb["h"], bb["l"], bb["c"], bb["o"]
-        # 跳空低开穿越 SL：按开盘价成交（保守，优于假设 SL 价）
-        if op < sl:
-            exit_price, reason = op, "SL_GAP"
-            break
-        if lo <= sl and hi >= tgt:
-            exit_price, reason = sl, "SL_HIT"
-            break
-        if lo <= sl:
-            exit_price, reason = sl, "SL_HIT"
-            break
-        if hi >= tgt:
-            exit_price, reason = tgt, "TP_STRUCTURAL"
-            break
-        exit_price = cl
+    # FIX(2026-09-05, 审计 G20): 入场日开盘后先查 SL（不查 TP 保守）—— 原从 entry_idx+1 跳过入场日
+    _entry_o = daily[entry_idx]["o"]
+    if _entry_o < sl:
+        exit_price, reason = _entry_o, "SL_GAP"
+    else:
+        for k in range(entry_idx + 1, min(len(daily), entry_idx + MAX_HOLD + 1)):
+            bb = daily[k]
+            hold += 1
+            hi, lo, cl, op = bb["h"], bb["l"], bb["c"], bb["o"]
+            # 跳空低开穿越 SL：按开盘价成交（保守，优于假设 SL 价）
+            if op < sl:
+                exit_price, reason = op, "SL_GAP"
+                break
+            if lo <= sl and hi >= tgt:
+                exit_price, reason = sl, "SL_HIT"
+                break
+            if lo <= sl:
+                exit_price, reason = sl, "SL_HIT"
+                break
+            if hi >= tgt:
+                exit_price, reason = tgt, "TP_STRUCTURAL"
+                break
+            exit_price = cl
     if reason == "TIME_STOP":
-        exit_price = daily[min(len(daily), entry_idx + MAX_HOLD) - 1]["c"]
+        # FIX(2026-09-05, 审计 G20): 用循环最后一根收盘（entry_idx+MAX_HOLD），原取 -1 倒数第二根
+        exit_price = daily[min(len(daily), entry_idx + MAX_HOLD + 1) - 1]["c"]
     gross = (exit_price / ep - 1) * 100
     return {"symbol": seed["symbol"], "entry_date": seed["entry_date"],
             "net_pnl_pct": round(gross - FEE, 4), "reason": reason, "hold_bars": hold,

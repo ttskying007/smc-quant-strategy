@@ -16,16 +16,30 @@ SLIPPAGE = CFG.SLIPPAGE
 MAX_HOLD_DEFAULT = CFG.MAX_HOLD if hasattr(CFG, "MAX_HOLD") else 12
 
 
-def entry_ok(daily, entry_idx, ep, sl, prev_close=None):
-    """A 股入场约束（F08）：
-    ① 一字涨停开盘买不到 → 返回 (False, 'SKIP_LIMIT_UP')
+def limit_pct_for(code):
+    """FIX(2026-09-05, 审计 G18): 涨跌停幅度按板块/代码规则。
+    主板(60x/000/001/002) 10% | 创业板(300/301) 20% | 科创板(688) 20% |
+    北交所(4/8/9开头,BJ) 30% | ST 5%（由调用方在名称中判定, 此处按代码）。
+    返回 0.10 / 0.20 / 0.30。"""
+    s = str(code or "")
+    if s.startswith(("300", "301", "688")):
+        return 0.20
+    if s.startswith(("4", "8", "9")) and len(s) == 6:
+        return 0.30
+    return 0.10
+
+
+def entry_ok(daily, entry_idx, ep, sl, prev_close=None, code=None):
+    """A 股入场约束（F08/G18）：
+    ① 一字涨停开盘买不到 → 返回 (False, 'SKIP_LIMIT_UP')（按板块涨跌停幅度）
     ② 入场价无效 → (False, 'BAD_ENTRY')
     prev_close 缺省时用 entry_idx-1 收盘。
     """
     if entry_idx < 0 or entry_idx >= len(daily):
         return False, "BAD_ENTRY"
     pc = prev_close or (daily[entry_idx - 1]["c"] if entry_idx >= 1 else ep)
-    if pc and daily[entry_idx]["o"] >= pc * 1.095:
+    _lmt = limit_pct_for(code) if code else 0.10
+    if pc and daily[entry_idx]["o"] >= pc * (1 + _lmt - 0.005):
         return False, "SKIP_LIMIT_UP"
     if ep <= 0 or sl >= ep:
         return False, "BAD_ENTRY"
@@ -38,14 +52,16 @@ def is_suspended(px_info):
     return vol == 0
 
 
-def is_limit_up(px_info, side="buy"):
-    """涨跌停判定（主板 10% 近似）。buy 触及涨停无法买入；sell 触及跌停无法卖出。"""
+def is_limit_up(px_info, side="buy", code=None):
+    """涨跌停判定（FIX G18: 按板块幅度）。buy 触及涨停无法买入；sell 触及跌停无法卖出。"""
     px = (px_info or {}).get("px")
     prev = (px_info or {}).get("prev") or 0
     if not px or prev <= 0:
         return False
     chg = px / prev - 1
-    return chg >= 0.095 if side == "buy" else chg <= -0.095
+    _lmt = limit_pct_for(code) if code else 0.10
+    _thr = _lmt - 0.005  # 略低于停板价判定（触及即不可成交）
+    return chg >= _thr if side == "buy" else chg <= -_thr
 
 
 def simulate(daily, entry_idx, ep, sl, tp1=None, tp2=None, max_hold=None,

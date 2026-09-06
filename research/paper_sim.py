@@ -497,8 +497,18 @@ def daily_selection():
                   "skipped_strong": 0, "skipped_nodata": 0, "skipped_dup": 0}
     _skipped_detail = []  # FIX(2026-08-26): 跳过明细（代码/名称/原因）
     for dd in recent_days:
-        cur.execute("SELECT stock_code, stock_name, title FROM announce WHERE date=? AND (title LIKE '%增持%' OR title LIKE '%回购%') AND title NOT LIKE '%完成%' AND title NOT LIKE '%进度%' AND title NOT LIKE '%前十名%'", (dd,))
+        # FIX(2026-09-05, 审计 G25): 改为全量拉取增持/回购候选，Python 端用 core.events.classify_title
+        # 统一过滤（否定词全集：终止/完毕/解除/…/减持/完成/进度/前十名，scanner 与 selection 同一套）
+        cur.execute("SELECT stock_code, stock_name, title FROM announce WHERE date=? AND (title LIKE '%增持%' OR title LIKE '%回购%')", (dd,))
         for code, name, title in cur.fetchall():
+            try:
+                from core.events import classify_title
+                _is_ev, _kind, _pol, _amt2, _pct2 = classify_title(title)
+                if not _is_ev or _pol < 0:
+                    _sel_stats["skipped_noise"] = _sel_stats.get("skipped_noise", 0) + 1
+                    continue
+            except Exception:
+                pass
             _sel_stats["scanned"] += 1
             d8 = str(dd).replace("-", "")
             if (code, dd) in known or (code, dd) in seen_orders:
@@ -579,12 +589,13 @@ def daily_selection():
             # FIX(2026-08-22): 连续放量 +1（大资金持续入场，研究 iter_vol_cont: 连续放量 PF 10.48）
             if v2_ratio and v_ratio >= 1.5 and v2_ratio >= 1.5:
                 rank_score += 1
-            # FIX(2026-08-22) 审计: 强市过滤（proxy>2% 时事件腿跳过，弱市是抄底甜蜜区 +10.39% vs 强市 +1.04%）
+            # FIX(2026-08-22) 审计: 强市过滤 —— 改为仓位系数（G11 软化）：
+            # proxy>2% 不跳过，而是降仓（position × clip(1-(proxy-0.02)/0.04, 0.3, 1)）
             _pr = _market_proxy(code)
+            _risk_coef = 1.0
             if _pr is not None and _pr > 0.02:
-                _sel_stats["skipped_strong"] += 1
-                _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": f"强市proxy={_pr:.1%}>2%"})
-                continue  # 强市事件无 alpha（研究：+1.04% 无意义）
+                _risk_coef = max(0.3, 1.0 - (_pr - 0.02) / 0.04)
+                _sel_stats["scaled_strong"] = _sel_stats.get("scaled_strong", 0) + 1
             # FIX(2026-08-22): 回踩挂单（披露日收盘×0.99，回落成交；否则 T+1 开盘兜底）—— 研究 +0.47pp
             # limit = disclosure close × 0.99; if T+1 low <= limit → fill at limit; else fill at T+1 open
             limit_px = round(close_px * 0.99, 3)
@@ -600,6 +611,8 @@ def daily_selection():
             _risk_dist = (limit_px - sl1) if sl1 and limit_px > sl1 else None
             _position_pct = round(_risk_budget / (_risk_dist / limit_px), 4) if _risk_dist else 0.01
             _position_pct = min(_position_pct, 0.25)  # 单票上限 25%
+            # FIX(2026-09-05, 审计 G11): 强市降仓系数（不跳过，保留信号但控风险）
+            _position_pct = round(_position_pct * _risk_coef, 4)
             led.append({
                 "code": code, "name": name, "signal_combo": sig,
                 "signal_date": dd, "trigger": f"回踩挂单(披露收盘×0.99={limit_px})，回落成交；次日开盘兜底(实时open)",
@@ -905,7 +918,10 @@ def realtime_monitor():
                         if _fd in _ds:
                             _fi = _ds.index(_fd)
                             _today = _ds[-1] if _ds else ""
-                            if _fi + 5 < len(_ds) and _ds[_fi + 5] <= _today:
+                            # FIX(2026-09-05, 审计 G08): 持有期统一为 config.MAX_HOLD(12交易日)，
+                            # 原 5 日 TIME_STOP 与回测(12/15根)不一致 → 实盘过早砍单
+                            _hold_max = int(getattr(CFG, "MAX_HOLD", 12))
+                            if _fi + _hold_max < len(_ds) and _ds[_fi + _hold_max] <= _today:
                                 t["status"] = "CLOSED"
                                 t["exit_reason"] = "TIME_STOP"
                                 _rem = 1.0
