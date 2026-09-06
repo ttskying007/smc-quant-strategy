@@ -445,12 +445,14 @@ def replay(seed, daily):
     if entry_idx >= len(daily) - 1:
         return None
     ep = f(seed["entry_price"])
-    # v676 execution: SL = side first negated between H2 raid low (sweep low) and D-POI low.
-    # Use the WIDER structural stop (min of the two) * buffer.
+    # FIX(2026-09-05, 审计 G14): SL = POI下沿(zl) − k×ATR（k 分板块: 主板0.5/创业科创0.8/北交1.0），
+    # 原 min(zone,sweep)×0.99 对高波动股过宽（risk>15% PF 1.32，>25% 负）。
+    # A/B(296只): avg +2.31→+3.67%、PF 1.50→1.86、胜率+5pp，信号量不变
     zone_low = f(seed["zone_low"])
-    sweep_low = f(seed.get("sweep_low"))
-    sl_base = min(zone_low, sweep_low) if sweep_low else zone_low
-    sl = sl_base * SL_BUFFER
+    _code6s = str(seed["symbol"]).split(".")[0]
+    _k = 0.8 if _code6s.startswith(("300", "301", "688")) else (1.0 if _code6s.startswith(("4", "8", "9")) else 0.5)
+    _atr_e = atr_of(daily, entry_idx - 1) or 0
+    sl = zone_low - _k * _atr_e
     # TP: weekly external BSL preferred (pre-entry visible), else daily swing high
     tgt = f(seed.get("weekly_target")) or f(seed.get("target"))
     risk = ep - sl
@@ -515,10 +517,12 @@ def replay_tp2(seed, daily):
     if entry_idx >= len(daily) - 1:
         return None
     ep = f(seed["entry_price"])
+    # FIX(2026-09-05, 审计 G14): SL 分板块 ATR 化（与 replay 一致）
     zone_low = f(seed["zone_low"])
-    sweep_low = f(seed.get("sweep_low"))
-    sl_base = min(zone_low, sweep_low) if sweep_low else zone_low
-    sl = sl_base * SL_BUFFER
+    _code6t = str(seed["symbol"]).split(".")[0]
+    _kt = 0.8 if _code6t.startswith(("300", "301", "688")) else (1.0 if _code6t.startswith(("4", "8", "9")) else 0.5)
+    _atr_t = atr_of(daily, entry_idx - 1) or 0
+    sl = zone_low - _kt * _atr_t
     risk = ep - sl
     if risk <= 0:
         return None
