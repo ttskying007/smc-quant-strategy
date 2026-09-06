@@ -96,6 +96,27 @@ def simulate(daily, entry_idx, ep, sl, tp1=None, tp2=None, max_hold=None,
         hi, lo, cl, op = bb["h"], bb["l"], bb["c"], bb["o"]
         mfe = max(mfe, (hi / ep - 1))
         mae = min(mae, (lo / ep - 1))
+        # FIX(2026-09-05, 审计 G15): 结构追踪 —— TP1 后 SL 上移至"最近已确认 swing low − 0.3ATR"
+        # （不低于保本），减少"MFE≥1R 却 TIME_STOP 卖飞"；需 run_sim 传入 track_after_tp1
+        if be_active and track_after_tp1 and k >= 3:
+            _trail = ep
+            _n = 0
+            for _j in range(k - 1, max(0, k - 8), -1):
+                if (_j - 1 >= 0 and _j + 1 < len(daily)
+                        and daily[_j]["l"] < daily[_j - 1]["l"] and daily[_j]["l"] <= daily[_j + 1]["l"]):
+                    _atr_k = 0.0
+                    for _q in range(max(0, _j - 14), _j):
+                        _atr_k += max(daily[_q]["h"] - daily[_q]["l"],
+                                      abs(daily[_q]["h"] - daily[_q - 1]["c"]),
+                                      abs(daily[_q]["l"] - daily[_q - 1]["c"]))
+                    _atr_k = _atr_k / max(1, min(14, _j))
+                    _cand = daily[_j]["l"] - 0.3 * _atr_k
+                    if _cand > _trail:
+                        _trail = _cand
+                    _n += 1
+                    if _n >= 2:
+                        break
+            last_sl = max(last_sl, _trail)
         stop = (ep if be_active else last_sl)
         # 跳空低开穿越止损 → 按开盘价（保守）
         if op < stop:

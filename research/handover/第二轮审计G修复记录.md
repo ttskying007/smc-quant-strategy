@@ -92,3 +92,8 @@ G23 W层方向 / G24 portfolio层 / G25 事件分类统一
 ### 待 D5 重构后评估（G16 BOS严格 / G23 W层方向）
 - G23 证据：W1_PROTECTED_LOW 占 97%（周线不过滤确认）；位置分桶样本极端无法定论
 - G16/G23 与入场重构强耦合，孤立修改无法正确评估 → 标记待 D5 后验证
+
+### G15 ✅ 结构追踪止盈
+- core.execution.simulate: track_after_tp1 —— TP1 后 SL 上移至"最近已确认 swing low − 0.3ATR"（≥保本）
+- 减少"MFE≥1R 却 TIME_STOP 卖飞"（审计: 672笔 MFE≥1R 平均-1.2%离场）
+- tests_execution 15/15 无回归；构造回踩场景验证利润保护
