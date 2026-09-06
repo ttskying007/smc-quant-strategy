@@ -1,0 +1,40 @@
+{
+ "n": 50,
+ "match": 46,
+ "rate_pct": 92.0,
+ "diffs": [
+  {
+   "code": "002850",
+   "sig": "20260813",
+   "ledger": "TIME_STOP",
+   "replay": "SL_GAP",
+   "pnl_ledger": -1.4152,
+   "pnl_replay": -3.9664
+  },
+  {
+   "code": "688528",
+   "sig": "20260813",
+   "ledger": "SL_HIT",
+   "replay": "BE",
+   "pnl_ledger": 1.1728,
+   "pnl_replay": 0.2118
+  },
+  {
+   "code": "688619",
+   "sig": "20260812",
+   "ledger": "SL_HIT",
+   "replay": "BE",
+   "pnl_ledger": -0.14,
+   "pnl_replay": 3.3014
+  },
+  {
+   "code": "300296",
+   "sig": "20260819",
+   "ledger": "SL_HIT",
+   "replay": "TIME_STOP",
+   "pnl_ledger": -0.3972,
+   "pnl_replay": -0.7917
+  }
+ ],
+ "ok": false
+}
