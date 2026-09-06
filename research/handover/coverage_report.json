@@ -1,0 +1,177 @@
+{
+ "requested_start": "2024-01-01",
+ "requested_end": "2026-09-05",
+ "status": "PARTIAL_MULTI_TF",
+ "status_reason": [
+  "m60_end=2026-05-08 < requested_end=2026-09-05"
+ ],
+ "sources": {
+  "daily_ohlcv": {
+   "sample_count": 300,
+   "max_ts": "2026-09-04",
+   "fresh_ok": true
+  },
+  "m60_ohlcv": {
+   "sample_count": 150,
+   "max_ts": "2026-05-08",
+   "fresh_ok": false
+  },
+  "announcement": {
+   "max_ts": "2026-09-04",
+   "count": 981082,
+   "fresh_ok": false
+  }
+ },
+ "trade_coverage": {
+  "smc_latest_entry": "20260813",
+  "event_latest_entry": "20260812"
+ },
+ "monthly": {
+  "202309": {
+   "signal": 7,
+   "entry": 7
+  },
+  "202310": {
+   "signal": 9,
+   "entry": 9
+  },
+  "202311": {
+   "signal": 20,
+   "entry": 20
+  },
+  "202312": {
+   "signal": 266,
+   "entry": 266
+  },
+  "202401": {
+   "signal": 284,
+   "entry": 284
+  },
+  "202402": {
+   "signal": 507,
+   "entry": 507
+  },
+  "202403": {
+   "signal": 276,
+   "entry": 276
+  },
+  "202404": {
+   "signal": 180,
+   "entry": 180
+  },
+  "202405": {
+   "signal": 128,
+   "entry": 128
+  },
+  "202406": {
+   "signal": 242,
+   "entry": 242
+  },
+  "202407": {
+   "signal": 25,
+   "entry": 25
+  },
+  "202408": {
+   "signal": 222,
+   "entry": 222
+  },
+  "202409": {
+   "signal": 201,
+   "entry": 201
+  },
+  "202410": {
+   "signal": 314,
+   "entry": 314
+  },
+  "202411": {
+   "signal": 107,
+   "entry": 107
+  },
+  "202412": {
+   "signal": 33,
+   "entry": 33
+  },
+  "202501": {
+   "signal": 171,
+   "entry": 171
+  },
+  "202502": {
+   "signal": 84,
+   "entry": 84
+  },
+  "202503": {
+   "signal": 93,
+   "entry": 93
+  },
+  "202504": {
+   "signal": 58,
+   "entry": 58
+  },
+  "202505": {
+   "signal": 16,
+   "entry": 16
+  },
+  "202506": {
+   "signal": 156,
+   "entry": 156
+  },
+  "202507": {
+   "signal": 49,
+   "entry": 49
+  },
+  "202508": {
+   "signal": 53,
+   "entry": 53
+  },
+  "202509": {
+   "signal": 71,
+   "entry": 71
+  },
+  "202510": {
+   "signal": 39,
+   "entry": 39
+  },
+  "202511": {
+   "signal": 97,
+   "entry": 97
+  },
+  "202512": {
+   "signal": 39,
+   "entry": 39
+  },
+  "202601": {
+   "signal": 92,
+   "entry": 92
+  },
+  "202602": {
+   "signal": 57,
+   "entry": 57
+  },
+  "202603": {
+   "signal": 105,
+   "entry": 105
+  },
+  "202604": {
+   "signal": 29,
+   "entry": 29
+  },
+  "202605": {
+   "signal": 69,
+   "entry": 69
+  },
+  "202606": {
+   "signal": 238,
+   "entry": 238
+  },
+  "202607": {
+   "signal": 308,
+   "entry": 308
+  },
+  "202608": {
+   "signal": 103,
+   "entry": 103
+  }
+ },
+ "fully_realized_end": "20260813",
+ "open_position_asof": "2026-09-04"
+}
