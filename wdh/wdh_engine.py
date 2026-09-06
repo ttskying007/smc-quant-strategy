@@ -325,6 +325,7 @@ def build_seeds(symbol, daily):
         touched = False
         t_idx = None
         entry = None
+        entry_limit_fill = False
         for k in range(rsp + 1, min(len(daily) - 1, rsp + 1 + 12)):
             bb = daily[k]
             if bb["l"] <= zl and bb["c"] <= zh:
@@ -369,6 +370,9 @@ def build_seeds(symbol, daily):
                 if h3 is not None and bb["c"] > h3:
                     h3_break = True  # 强趋势变体：收盘创新高（保留，但非强制）
                 if _reclaim or h3_break:
+                    # FIX(2026-09-05, D5 实验后回退): 折价区限价入场(挂zh等回踩)实证净负 ——
+                    # 300只 seeds 80→39、avg +2.31→+0.25%、PF 1.50→1.06（弱回踩成交为主，强setup涨走不回头）。
+                    # 与8阶段严格化教训一致：更严/更折价≠更好。恢复次根开盘入场（折价语义由G01触碰窗保证）。
                     entry_idx = k + 1
                     if entry_idx < len(daily):
                         entry = (entry_idx, k, t_idx)
