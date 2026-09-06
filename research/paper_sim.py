@@ -676,52 +676,54 @@ def daily_selection():
     except Exception:
         pass
     # FIX(2026-09-05, 审计 G03): SMC 腿接入生产选股 —— 读取 smc_candidates → PENDING(next_open)
-    # （此前仅前端展示，未进交易路径；SMC 结构 SL/TP 来自 seed zone/sweep/target）
-    try:
-        scan = json.load(open(os.path.join(ROOT, "current_scanner_result.json"), encoding="utf-8"))
-        smc_cands = scan.get("smc_candidates") or []
-        for c in smc_cands:
-            code = str(c.get("symbol", "")).split(".")[0]
-            ev_d = str(c.get("event_date", ""))
-            sig_d = str(c.get("confirmed_at") or c.get("reclaim_date") or c.get("entry_date", ""))
-            if (code, ev_d) in known or (code, sig_d) in seen_orders:
-                continue
-            seen_orders.add((code, sig_d))
-            try:
-                ep = float(c.get("entry_price") or 0)
-                zl = float(c.get("zone_low") or 0)
-                sw = float(c.get("sweep_low") or 0)
-                tgt = float(c.get("target") or 0)
-                r20 = c.get("r20")
-                if not (ep > 0 and zl > 0):
+    # FIX(2026-09-05, 复审 P0-3): SMC 无稳定 OOS edge → 由 config.ENABLE_SMC_LEG 门控（默认禁用，
+    # 仅作 HTF_BIAS 研究特征，不独立开仓）
+    if getattr(CFG, "ENABLE_SMC_LEG", False):
+        try:
+            scan = json.load(open(os.path.join(ROOT, "current_scanner_result.json"), encoding="utf-8"))
+            smc_cands = scan.get("smc_candidates") or []
+            for c in smc_cands:
+                code = str(c.get("symbol", "")).split(".")[0]
+                ev_d = str(c.get("event_date", ""))
+                sig_d = str(c.get("confirmed_at") or c.get("reclaim_date") or c.get("entry_date", ""))
+                if (code, ev_d) in known or (code, sig_d) in seen_orders:
                     continue
-            except Exception:
-                continue
-            bs3 = bars_of(code)
-            dates3 = [b["t"] for b in bs3] if bs3 else []
-            sl_smc = (min(zl, sw) if sw else zl) * 0.99
-            risk = ep - sl_smc
-            if risk <= 0:
-                continue
-            tp_smc = max(tgt, ep + 1.5 * risk) if tgt > ep else ep + 1.5 * risk
-            _pos = min(0.01 / (risk / ep), 0.25) if risk > 0 else 0.01
-            led.append({
-                "code": code, "name": code, "signal_combo": "SMC_W1D1D4", "source": "SMC",
-                "signal_date": sig_d or ev_d, "trigger": "SMC: 扫损+位移+POI回踩确认(8阶段) → 次日开盘",
-                "valid_from": _next_td(dates3, (sig_d or ev_d).replace("-", "")),
-                "entry_price": round(ep, 3), "tp_price": round(tp_smc, 3), "sl_price": round(sl_smc, 3),
-                "tp1": round(ep + risk, 3), "tp2": round(tp_smc, 3),
-                "sl1": round(sl_smc, 3),
-                "status": "PENDING_ORDER", "paper": True,
-                "created_at": time.strftime("%Y-%m-%d"), "pick_date": time.strftime("%Y-%m-%d"),
-                "position_pct": round(_pos, 4),
-                "r20": r20, "filled_price": None, "filled_at": None,
-                "exit_reason": None, "pnl_pct": None, "entry_mode": "next_open",
-            })
-            new_orders.append((code, code, sig_d, ep))
-            _sel_stats["smc_selected"] = _sel_stats.get("smc_selected", 0) + 1
-    except Exception as _e:
-        print(f"SMC 腿接入失败(不阻断): {_e}", flush=True)
+                seen_orders.add((code, sig_d))
+                try:
+                    ep = float(c.get("entry_price") or 0)
+                    zl = float(c.get("zone_low") or 0)
+                    sw = float(c.get("sweep_low") or 0)
+                    tgt = float(c.get("target") or 0)
+                    r20 = c.get("r20")
+                    if not (ep > 0 and zl > 0):
+                        continue
+                except Exception:
+                    continue
+                bs3 = bars_of(code)
+                dates3 = [b["t"] for b in bs3] if bs3 else []
+                sl_smc = (min(zl, sw) if sw else zl) * 0.99
+                risk = ep - sl_smc
+                if risk <= 0:
+                    continue
+                tp_smc = max(tgt, ep + 1.5 * risk) if tgt > ep else ep + 1.5 * risk
+                _pos = min(0.01 / (risk / ep), 0.25) if risk > 0 else 0.01
+                led.append({
+                    "code": code, "name": code, "signal_combo": "SMC_W1D1D4", "source": "SMC",
+                    "signal_date": sig_d or ev_d, "trigger": "SMC: 扫损+位移+POI回踩确认(8阶段) → 次日开盘",
+                    "valid_from": _next_td(dates3, (sig_d or ev_d).replace("-", "")),
+                    "entry_price": round(ep, 3), "tp_price": round(tp_smc, 3), "sl_price": round(sl_smc, 3),
+                    "tp1": round(ep + risk, 3), "tp2": round(tp_smc, 3),
+                    "sl1": round(sl_smc, 3),
+                    "status": "PENDING_ORDER", "paper": True,
+                    "created_at": time.strftime("%Y-%m-%d"), "pick_date": time.strftime("%Y-%m-%d"),
+                    "position_pct": round(_pos, 4),
+                    "r20": r20, "filled_price": None, "filled_at": None,
+                    "exit_reason": None, "pnl_pct": None, "entry_mode": "next_open",
+                })
+                new_orders.append((code, code, sig_d, ep))
+                _sel_stats["smc_selected"] = _sel_stats.get("smc_selected", 0) + 1
+        except Exception as _e:
+            print(f'SMC 腿接入失败(不阻断): {_e}', flush=True)
     save_ledger(led)
     # FIX(2026-08-22): 选股结果日志（前端显示最新选股执行结果）
     _sel_stats["selected"] = len(new_orders)

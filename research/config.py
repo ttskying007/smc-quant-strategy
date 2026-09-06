@@ -39,3 +39,10 @@ PY_RESEARCH = r"C:\Users\Administrator\.workbuddy\binaries\python\versions\3.13.
 FEE_PCT = 0.20          # 双边费用 %
 SLIPPAGE = 0.001        # 单边滑点 0.1%
 MAX_HOLD = 12           # 日线最长持有（审计 F11: 5→12）
+
+# ---- 策略腿开关（复审 P0-3）----
+# SMC 腿经五重证据（去伪 OOS -0.60% / SL-ATR -0.94% / HHI 0.369 / WF 3正4负 / D5 净负）
+# 确认无稳定样本外 edge → 默认禁用独立开仓，仅作 HTF_BIAS 研究特征。
+# 事件腿（唯一有 OOS edge: +5.43% PF7.75, bootstrap CI[7.13,8.76]）为生产主腿。
+ENABLE_SMC_LEG = False
+ENABLE_EVENT_LEG = True
