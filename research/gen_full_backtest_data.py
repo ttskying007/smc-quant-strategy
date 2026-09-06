@@ -14,11 +14,11 @@ import core.execution as EX
 
 RESEARCH = r"E:\test\smc_project\research"
 WDH = r"E:\test\smc_project\wdh"
-KLINE = r"E:\test\smc_project\hermes\kline_cache"
+KLINE = r"E:\test\smc_project\hermes\kline_cache_tencent"
 OUT_DIR = os.path.join(RESEARCH, "handover", "最新回测数据")
 os.makedirs(OUT_DIR, exist_ok=True)
 
-code2file = {f.split("_")[0]: os.path.join(KLINE, f) for f in os.listdir(KLINE) if f.endswith("_daily_750.json")}
+code2file = {f.split("_")[0]: os.path.join(KLINE, f) for f in os.listdir(KLINE) if f.endswith("_daily_800.json")}
 
 def load_daily(path):
     raw = json.load(open(path, encoding="utf-8"))
