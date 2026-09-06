@@ -38,7 +38,7 @@ except Exception:
 if __name__ == "__main__":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 HERMES = r"E:\test\smc_project\hermes"
-KLINE = os.path.join(HERMES, "kline_cache")
+KLINE = os.path.join(HERMES, "kline_cache_tencent")
 OUT = r"E:\test\smc_project\wdh"
 os.makedirs(OUT, exist_ok=True)
 
@@ -561,13 +561,13 @@ def main():
     seeds_all, trades_all = [], []
     n = 0
     for p in sorted(os.listdir(KLINE)):
-        if not p.endswith("_daily_750.json"):
+        if not p.endswith("_daily_800.json"):
             continue
         n += 1
         daily = bars_for(os.path.join(KLINE, p))
         if len(daily) < 300:
             continue
-        sym = p.replace("_daily_750.json", "").replace("_", ".", 1)
+        sym = p.replace("_daily_800.json", "").replace("_", ".", 1)
         seeds = build_seeds(sym, daily)
         for sd in seeds:
             seeds_all.append(sd)
