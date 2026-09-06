@@ -465,54 +465,26 @@ def replay(seed, daily):
     # FIX(2026-09-05, 审计 F11 深化): TP 至少 1.5R（A/B: struct avgR0.46→min15 avgR1.56,
     # payoff 0.38→1.29, PF 2.21→3.05）—— 避免 TP 太近导致 R 倍数<1
     tgt = max(tgt, ep + 1.5 * risk)
-    # FIX(2026-09-05, 审计 F08/G18): A 股执行现实
-    # ① 一字涨停开盘买不到 → 跳过（按板块涨跌停幅度 limit_pct_for）
-    # ② 跳空低开（open < SL）→ 按开盘价成交
-    _code6 = str(seed["symbol"]).split(".")[0]
+    # FIX(2026-09-05, 复审 P1-1): 唯一执行内核 —— replay 全部委托 core.execution.simulate
+    # （与 paper_sim/回测共用同一撮合逻辑，消除三套 TP/SL 不一致）
     try:
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep + "research")
-        from core.execution import limit_pct_for
+        from core.execution import simulate as _sim, limit_pct_for as _lpf
     except Exception:
-        # 局部兜底（不破坏独立运行）：主板 10%，创业板/科创 20%
-        def limit_pct_for(c):
+        # 兜底：极简 fallback（独立运行）
+        def _sim(*a, **k):
+            return {"reason": "FALLBACK", "exit_price": ep, "hold_bars": 0,
+                    "mfe_pct": 0.0, "mae_pct": 0.0, "mfe_r": 0.0, "mae_r": 0.0,
+                    "skipped": True, "realized_partial": 0.0, "net_pnl_pct": 0.0}
+        def _lpf(c):
             return 0.20 if str(c).startswith(("300", "301", "688")) else 0.10
-    _prev_close = daily[entry_idx - 1]["c"] if entry_idx >= 1 else ep
-    _limit_pct = limit_pct_for(_code6)
-    _limit_up_px = _prev_close * (1 + _limit_pct - 0.005) if _prev_close else 0
-    if _prev_close and daily[entry_idx]["o"] >= _limit_up_px:
+    _r = _sim(daily, entry_idx, ep, sl, tp2=tgt, max_hold=MAX_HOLD, code=_code6s)
+    if _r.get("skipped"):
         return {"symbol": seed["symbol"], "entry_date": seed["entry_date"], "net_pnl_pct": None,
-                "reason": "SKIP_LIMIT_UP", "hold_bars": 0, "t1_violation": "False"}
-    exit_price, reason, hold = ep, "TIME_STOP", 0
-    # FIX(2026-09-05, 审计 G20): 入场日开盘后先查 SL（不查 TP 保守）—— 原从 entry_idx+1 跳过入场日
-    _entry_o = daily[entry_idx]["o"]
-    if _entry_o < sl:
-        exit_price, reason = _entry_o, "SL_GAP"
-    else:
-        for k in range(entry_idx + 1, min(len(daily), entry_idx + MAX_HOLD + 1)):
-            bb = daily[k]
-            hold += 1
-            hi, lo, cl, op = bb["h"], bb["l"], bb["c"], bb["o"]
-            # 跳空低开穿越 SL：按开盘价成交（保守，优于假设 SL 价）
-            if op < sl:
-                exit_price, reason = op, "SL_GAP"
-                break
-            if lo <= sl and hi >= tgt:
-                exit_price, reason = sl, "SL_HIT"
-                break
-            if lo <= sl:
-                exit_price, reason = sl, "SL_HIT"
-                break
-            if hi >= tgt:
-                exit_price, reason = tgt, "TP_STRUCTURAL"
-                break
-            exit_price = cl
-    if reason == "TIME_STOP":
-        # FIX(2026-09-05, 审计 G20): 用循环最后一根收盘（entry_idx+MAX_HOLD），原取 -1 倒数第二根
-        exit_price = daily[min(len(daily), entry_idx + MAX_HOLD + 1) - 1]["c"]
-    gross = (exit_price / ep - 1) * 100
+                "reason": _r.get("reason", "SKIP"), "hold_bars": 0, "t1_violation": "False"}
     return {"symbol": seed["symbol"], "entry_date": seed["entry_date"],
-            "net_pnl_pct": round(gross - FEE, 4), "reason": reason, "hold_bars": hold,
-            "t1_violation": "False"}
+            "net_pnl_pct": _r.get("net_pnl_pct"), "reason": _r.get("reason"),
+            "hold_bars": _r.get("hold_bars", 0), "t1_violation": "False"}
 
 
 def replay_tp2(seed, daily):

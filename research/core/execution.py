@@ -65,14 +65,15 @@ def is_limit_up(px_info, side="buy", code=None):
 
 
 def simulate(daily, entry_idx, ep, sl, tp1=None, tp2=None, max_hold=None,
-             partial_tp1=0.0, stop_to_be=False, prev_close=None, track_after_tp1=False):
+             partial_tp1=0.0, stop_to_be=False, prev_close=None, track_after_tp1=False,
+             code=None):
     """统一逐 bar 执行模拟（回测/纸面共用）。
 
     返回 dict: {reason, exit_price, hold_bars, mfe_pct, mae_pct, mfe_r, mae_r,
                 skipped, realized_partial}
     reason: TP_STRUCTURAL / TP1 / TP2_RUNNER / SL_HIT / SL_GAP / TIME_STOP / SKIP_LIMIT_UP
     """
-    ok, skip = entry_ok(daily, entry_idx, ep, sl, prev_close)
+    ok, skip = entry_ok(daily, entry_idx, ep, sl, prev_close, code)
     if not ok:
         return {"reason": skip, "exit_price": ep, "hold_bars": 0,
                 "mfe_pct": 0.0, "mae_pct": 0.0, "mfe_r": 0.0, "mae_r": 0.0,
