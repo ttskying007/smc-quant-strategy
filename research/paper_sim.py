@@ -103,9 +103,11 @@ def realtime_prices(codes):
                         _px = float(vals[3])
                         _prev = float(vals[2]) if len(vals) > 2 and vals[2] else 0.0
                         _vol = float(vals[8]) if len(vals) > 8 and vals[8] else 0.0
+                        # FIX(2026-09-05, 审计 G05): 返回今开 open（vals[1]），供 next_open 实时成交
+                        _open = float(vals[1]) if len(vals) > 1 and vals[1] else 0.0
                         # FIX(2026-08-22): skip 0.00 prices (Sina off-hours / failure) — don't return 0
                         if _px > 0:
-                            out[sym[2:]] = {"px": _px, "prev": _prev, "vol": _vol}
+                            out[sym[2:]] = {"px": _px, "prev": _prev, "vol": _vol, "open": _open}
                     except Exception:
                         pass
         except Exception:
@@ -364,8 +366,14 @@ def structural_sltp(code, signal_date, src='EVENT', stage='DOWNTREND', adx=0.0):
         i = dates.index(signal_date)
     highs = []
     lows = []
+    _sig_close = bs[i]["c"] if i < len(bs) else 0
+    # FIX(2026-09-05, 审计 G07): 摆动点须在 signal 日(i)前确认 —— j + PIVOT <= i，
+    # 原 is_swing_high(bs,j) 需要 j+1..j+3 即 i,i+1,i+2 的未来K（前视，与回测 gen_v20f 不同）
+    # 另：highs 只保留 > 信号收盘的结构位（TP 锚点必须在入场价上方，避免 tp1 < 入场价）
     for j in range(i - 1, max(0, i - 60), -1):
-        if len(highs) < 4 and is_swing_high(bs, j):
+        if j + PIVOT > i:
+            continue  # 尚未确认（需 j 右侧 PIVOT 根收完）
+        if len(highs) < 4 and is_swing_high(bs, j) and bs[j]["h"] > _sig_close:
             highs.append(bs[j]["h"])
         if len(lows) < 3 and is_swing_low(bs, j):
             lows.append(bs[j]["l"])
@@ -424,6 +432,15 @@ def structural_sltp(code, signal_date, src='EVENT', stage='DOWNTREND', adx=0.0):
 
 
 # ---------- selection (daily 0:00 trigger) ----------
+def _next_td(dates, d8):
+    """FIX(2026-09-05, 审计 G05/G09): signal_date(d8) 之后第一个交易日（T+1 可成交日）。"""
+    if d8 not in dates:
+        # signal_date 不在 K 线中（公告日非交易日）→ 取之后第一个交易日
+        return next((x for x in dates if x > d8), d8)
+    idx = dates.index(d8)
+    return dates[idx + 1] if idx + 1 < len(dates) else d8
+
+
 def _parse_insider_magnitude(title):
     """FIX(2026-09-05, 审计 F17): 从公告标题解析增持/回购规模（金额、股数、占总股本比）。
     返回 (amount_wan, shares_wan, pct, raw_hint)。解析失败返回 (None,None,None,'')。
@@ -585,7 +602,10 @@ def daily_selection():
             _position_pct = min(_position_pct, 0.25)  # 单票上限 25%
             led.append({
                 "code": code, "name": name, "signal_combo": sig,
-                "signal_date": dd, "trigger": f"回踩挂单(披露收盘×0.99={limit_px})，回落成交；否则开盘({t1_open})兜底",
+                "signal_date": dd, "trigger": f"回踩挂单(披露收盘×0.99={limit_px})，回落成交；次日开盘兜底(实时open)",
+                # FIX(2026-09-05, 审计 G05/G09): valid_from = signal_date 之后第一个交易日，
+                # monitor 只在该日开盘后以实时快照 open 成交（不再用 t1_open 历史价回退）
+                "valid_from": _next_td(dates, d8),
                 "entry_price": limit_px, "tp_price": round(tp4, 3), "sl_price": round(sl1, 3),
                 "tp1": round(tp1, 3), "tp2": round(tp2, 3), "tp3": round(tp3, 3), "tp4": round(tp4, 3),
                 "sl1": round(sl1, 3), "sl2": round(sl2, 3), "anchor_note": anchor_note,
@@ -596,7 +616,7 @@ def daily_selection():
                 "insider_amount_wan": _amt, "insider_pct": _pct, "insider_hint": _mag_hint,
                 "position_pct": _position_pct, "risk_dist_pct": round(_risk_dist / limit_px * 100, 2) if _risk_dist else None,
                 "filled_price": None, "filled_at": None,
-                "exit_reason": None, "pnl_pct": None, "entry_mode": "retrace", "t1_open": t1_open,
+                "exit_reason": None, "pnl_pct": None, "entry_mode": "retrace",
             })
             new_orders.append((code, name, dd, limit_px))
     conn.close()
@@ -616,6 +636,7 @@ def daily_selection():
             sl = support * 0.99 if support else (ep * 0.90 if ep else 0)
             bs2 = bars_of(code)
             subs2 = []
+            dates2 = []
             if bs2 and ep:
                 ed2 = str(c.get("entry_date", ""))
                 dates2 = [b["t"] for b in bs2]
@@ -624,18 +645,68 @@ def daily_selection():
                     subs2 = sub_signals_cont(bs2, ei2, str(c.get("signal_date", "")))
             led.append({
                 "code": code, "name": code, "signal_combo": "CONTINUATION_MARKUP",
-                "signal_date": sig_d, "trigger": "MARKUP结构支撑+VWAP5%+低波动：次日开盘直接买入，固定10日",
+                # FIX(2026-09-05, 审计 G04): 延续腿不再当日 FILLED —— 信号 bar 用 ≤signal 数据过滤，
+                # 次日开盘挂单(valid_from)由 monitor 以实时 open 成交，禁止"知今日涨9%按今开买"
+                "signal_date": sig_d, "trigger": "MARKUP结构支撑+VWAP10%+低波动：次日开盘买入，固定10日",
+                "valid_from": _next_td(dates2, sig_d.replace("-", "")) if (bs2 and ep) else "",
                 "entry_price": round(ep, 3) if ep else 0, "tp_price": round(tp, 3), "sl_price": round(sl, 3),
-                "status": "FILLED" if ep else "PENDING_ORDER", "paper": True, "source": "CONT",
+                "status": "PENDING_ORDER", "paper": True, "source": "CONT",
                 "created_at": time.strftime("%Y-%m-%d"), "pick_date": time.strftime("%Y-%m-%d"),
                 "sub_signals": subs2,
-                "filled_price": round(ep, 3) if ep else None,
-                "filled_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "filled_price": None,
+                "filled_at": None,
                 "exit_reason": None, "pnl_pct": None, "hold": 10,
             })
             new_orders.append((code, code, sig_d, ep))
     except Exception:
         pass
+    # FIX(2026-09-05, 审计 G03): SMC 腿接入生产选股 —— 读取 smc_candidates → PENDING(next_open)
+    # （此前仅前端展示，未进交易路径；SMC 结构 SL/TP 来自 seed zone/sweep/target）
+    try:
+        scan = json.load(open(os.path.join(ROOT, "current_scanner_result.json"), encoding="utf-8"))
+        smc_cands = scan.get("smc_candidates") or []
+        for c in smc_cands:
+            code = str(c.get("symbol", "")).split(".")[0]
+            ev_d = str(c.get("event_date", ""))
+            sig_d = str(c.get("confirmed_at") or c.get("reclaim_date") or c.get("entry_date", ""))
+            if (code, ev_d) in known or (code, sig_d) in seen_orders:
+                continue
+            seen_orders.add((code, sig_d))
+            try:
+                ep = float(c.get("entry_price") or 0)
+                zl = float(c.get("zone_low") or 0)
+                sw = float(c.get("sweep_low") or 0)
+                tgt = float(c.get("target") or 0)
+                r20 = c.get("r20")
+                if not (ep > 0 and zl > 0):
+                    continue
+            except Exception:
+                continue
+            bs3 = bars_of(code)
+            dates3 = [b["t"] for b in bs3] if bs3 else []
+            sl_smc = (min(zl, sw) if sw else zl) * 0.99
+            risk = ep - sl_smc
+            if risk <= 0:
+                continue
+            tp_smc = max(tgt, ep + 1.5 * risk) if tgt > ep else ep + 1.5 * risk
+            _pos = min(0.01 / (risk / ep), 0.25) if risk > 0 else 0.01
+            led.append({
+                "code": code, "name": code, "signal_combo": "SMC_W1D1D4", "source": "SMC",
+                "signal_date": sig_d or ev_d, "trigger": "SMC: 扫损+位移+POI回踩确认(8阶段) → 次日开盘",
+                "valid_from": _next_td(dates3, (sig_d or ev_d).replace("-", "")),
+                "entry_price": round(ep, 3), "tp_price": round(tp_smc, 3), "sl_price": round(sl_smc, 3),
+                "tp1": round(ep + risk, 3), "tp2": round(tp_smc, 3),
+                "sl1": round(sl_smc, 3),
+                "status": "PENDING_ORDER", "paper": True,
+                "created_at": time.strftime("%Y-%m-%d"), "pick_date": time.strftime("%Y-%m-%d"),
+                "position_pct": round(_pos, 4),
+                "r20": r20, "filled_price": None, "filled_at": None,
+                "exit_reason": None, "pnl_pct": None, "entry_mode": "next_open",
+            })
+            new_orders.append((code, code, sig_d, ep))
+            _sel_stats["smc_selected"] = _sel_stats.get("smc_selected", 0) + 1
+    except Exception as _e:
+        print(f"SMC 腿接入失败(不阻断): {_e}", flush=True)
     save_ledger(led)
     # FIX(2026-08-22): 选股结果日志（前端显示最新选股执行结果）
     _sel_stats["selected"] = len(new_orders)
@@ -725,33 +796,34 @@ def realtime_monitor():
             # FIX(2026-09-04, 审计 P2): 涨停无法买入（挂单不成交，等待回落）
             if _is_limit_up(_info, side="buy"):
                 continue
-            # FIX(2026-08-22): retrace limit fill (研究: +0.47pp vs pure open)
-            # fill at limit if price retraces to it; else fallback to T+1 open
-            # FIX(2026-09-04): 成交价加买入滑点 (× (1+SLIPPAGE))，对齐实盘成本
+            # FIX(2026-09-05, 审计 G05/G09): 未到 valid_from（signal_date 后首交易日）不可成交；
+            # 用实时快照 open 价成交，禁止 t1_open 历史价回退
+            _vf = t.get("valid_from", "")
+            _today = time.strftime("%Y%m%d")
+            if _vf and _today < _vf:
+                continue  # 尚未到可成交日
+            _open_px = _info.get("open") if isinstance(_info, dict) else None
             _was_pending = True
             if t.get("entry_mode") == "retrace":
                 if cur_px <= t["entry_price"]:
+                    # 限价触发：回落至 limit → 按 limit 成交
                     t["status"] = "FILLED"
                     t["filled_price"] = round(t.get("entry_price") * (1 + SLIPPAGE), 3)
                     t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
                     n_fill += 1
-                elif t.get("t1_open") and not t.get("_retrace_open_done"):
-                    # first check after open with no retrace → fallback to T+1 open
+                elif _open_px and _open_px > 0:
+                    # 次日开盘兜底：以实时开盘价成交（真实可执行，非历史价）
                     t["status"] = "FILLED"
-                    t["filled_price"] = round(t.get("t1_open") * (1 + SLIPPAGE), 3)
+                    t["filled_price"] = round(_open_px * (1 + SLIPPAGE), 3)
                     t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
                     n_fill += 1
-                elif not t.get("_retrace_open_done"):
-                    # no t1_open known → fill at current
-                    t["status"] = "FILLED"
-                    t["filled_price"] = round(cur_px * (1 + SLIPPAGE), 3)
-                    t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
-                    n_fill += 1
+                # else: 未回落且无开盘快照 → 继续等待（不成交）
             elif t.get("entry_mode") == "next_open":
-                t["status"] = "FILLED"
-                t["filled_price"] = round(t.get("entry_price") * (1 + SLIPPAGE), 3)
-                t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
-                n_fill += 1
+                if _open_px and _open_px > 0:
+                    t["status"] = "FILLED"
+                    t["filled_price"] = round(_open_px * (1 + SLIPPAGE), 3)
+                    t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                    n_fill += 1
             elif cur_px <= t["entry_price"]:
                 t["status"] = "FILLED"
                 t["filled_price"] = round(cur_px * (1 + SLIPPAGE), 3)
@@ -853,13 +925,19 @@ def realtime_monitor():
                     t["realized_pnl"] = 0.3 * (tp1 / ep - 1) * 100 - FEE * 0.3
                     t["note"] = (t.get("note", "") + " | TP1(swing high)触发：30%平仓+" + str(round((tp1/ep-1)*100,2)) + "%，SL移保本").strip()
                 elif not t.get("tp2_hit") and t.get("tp1_hit") and tp2 > 0 and cur_px >= tp2:
+                    # FIX(2026-09-05, 审计 G06): TP2 触发 = 剩余 70% 全平并 CLOSED ——
+                    # 原实现只记 realized_pnl 不置 CLOSED，后续 SL_HIT/TP4_RUNNER 又按 0.7 双计
                     t["tp2_hit"] = True
                     t["realized_pnl"] = (t.get("realized_pnl", 0) or 0) + 0.7 * (tp2 / ep - 1) * 100 - FEE * 0.7
-                    t["note"] = (t.get("note", "") + " | TP2(FVG/BSL)触发：70%平仓+" + str(round((tp2/ep-1)*100,2)) + "%").strip()
+                    t["status"] = "CLOSED"
+                    t["exit_reason"] = "TP2_RUNNER"
+                    t["pnl_pct"] = round(t.get("realized_pnl", 0), 4)
+                    t["note"] = (t.get("note", "") + " | TP2(FVG/BSL)触发：剩余70%平仓+%.2f%%（100%已平）" % ((tp2/ep-1)*100)).strip()
+                    n_close += 1
                 elif not t.get("tp3_hit") and t.get("tp2_hit") and tp3 > 0 and cur_px >= tp3:
                     t["tp3_hit"] = True
                     t["note"] = (t.get("note", "") + " | TP3(流动性池)触发").strip()
-                elif t.get("tp3_hit") and tp4 > 0 and cur_px >= tp4:
+                elif t.get("tp3_hit") and not t.get("tp2_hit") and tp4 > 0 and cur_px >= tp4:
                     t["status"] = "CLOSED"
                     t["exit_reason"] = "TP4_RUNNER"
                     t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + 0.7 * (_sell_px / ep - 1) * 100 - FEE * 0.7, 4)

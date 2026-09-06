@@ -190,6 +190,10 @@ def weekly_permission(weekly, day_date):
 def build_seeds(symbol, daily):
     weekly = aggregate_weekly(daily)
     seeds = []
+    # FIX(2026-09-05, 审计 G02): 去重 —— 同一 entry_idx 只产一个 seed；同一被扫低点只用一次；
+    # 入场后 5 根冷却（底部震荡区连续 sweep 重复产生同一笔）
+    used_entries = set()
+    used_swings = set()
     swing_lows = [j for j in range(PIVOT_L, len(daily) - PIVOT_R) if is_swing_low(daily, j)]
     for i in range(20, len(daily) - 3):
         b = daily[i]
@@ -252,8 +256,9 @@ def build_seeds(symbol, daily):
         # SMC 看涨 OB = 位移腿之前最后一根反向（阴）K，即位移腿起点前一根。
         # 优先取位移腿内看涨 FVG（bar[k].l > bar[k-2].h），其次位移前最后一根阴线，兜底扫损K实体。
         ob_idx = None
-        # 位移腿起点 = rsp（BOS 突破根）；位移前最后一根反向K = rsp-1 之前最近的阴线
-        for k in range(rsp - 1, max(0, rsp - 6), -1):
+        # 位移腿起点 = rsp（BOS 突破根）；位移前最后一根反向K = 扫损bar(i)~rsp-1 之间最近阴线
+        # FIX(2026-09-05, 审计 G01/F02): OB 搜索下限提到 sweep bar i（不允许落在 sweep 之前）
+        for k in range(rsp - 1, i - 1, -1):
             if daily[k]["c"] < daily[k]["o"]:
                 ob_idx = k
                 break
@@ -261,8 +266,9 @@ def build_seeds(symbol, daily):
             ob_idx = rsp - 1  # 兜底：突破前一根实体
         ob = daily[ob_idx]
         # POI 优先用位移腿内看涨 FVG（bar.l > bar[k-2].h），zone 取 FVG 下沿~中值
+        # FIX(2026-09-05, 审计 G01/F02): FVG 检测含 rsp bar 本身（k 从 rsp 起）
         fvg_lo = fvg_hi = None
-        for k in range(rsp - 1, max(0, rsp - 6), -1):
+        for k in range(rsp, max(i, 2) - 1, -1):
             if daily[k]["l"] > daily[k - 2]["h"]:  # 看涨 FVG
                 fvg_lo, fvg_hi = daily[k - 2]["h"], daily[k]["l"]
                 break
@@ -273,10 +279,13 @@ def build_seeds(symbol, daily):
             zl = min(ob["o"], ob["c"], ob["l"])
             zh = min(max(ob["o"], ob["c"]), zl + (ob["h"] - zl) * 0.5)
         # D4: POI first touch within max_wait, then H (daily-projected): reclaim, hold
+        # FIX(2026-09-05, 审计 G01): 触碰窗必须从 BOS 收盘确认(rsp)之后开始 —— 原从 ob_idx+1 起，
+        # 而 ob_idx∈[rsp-5,rsp-1]，触碰/收回可在 BOS 位移前完成、入场落 BOS bar 开盘（前视泄漏）。
+        # 现改为 rsp+1 起，保证 reclaim ≥ rsp+1、entry_idx ≥ rsp+2。
         touched = False
         t_idx = None
         entry = None
-        for k in range(ob_idx + 1, min(len(daily) - 1, ob_idx + 12)):
+        for k in range(rsp + 1, min(len(daily) - 1, rsp + 1 + 12)):
             bb = daily[k]
             if bb["l"] <= zl and bb["c"] <= zh:
                 if touched:
@@ -327,6 +336,9 @@ def build_seeds(symbol, daily):
         if entry is None:
             continue
         entry_idx, reclaim_idx, touch_idx = entry
+        # FIX(2026-09-05, 审计 G01): 前视断言 —— 所有锚点必须严格早于入场
+        if not (max(i, rsp, ob_idx, touch_idx, reclaim_idx) < entry_idx):
+            continue  # 结构锚点未全部在入场前确认 → 丢弃（防前视）
         # TP: pre-entry confirmed swing high ABOVE both zone and entry price
         entry_price = f(daily[entry_idx]["o"])
         tgt = None
@@ -358,6 +370,13 @@ def build_seeds(symbol, daily):
             c_prev = f(daily[entry_idx - 21]["c"])
             if c_now and c_prev:
                 r20 = round(c_now / c_prev - 1, 6)
+        # FIX(2026-09-05, 审计 G02): 去重门控 —— entry 已被更早 sweep 用过或扫损低点已用 → 跳过
+        if entry_idx in used_entries or swept in used_swings:
+            continue
+        if any(x in used_entries for x in range(max(0, entry_idx - 5), entry_idx)):
+            continue  # 5 根冷却
+        used_entries.add(entry_idx)
+        used_swings.add(swept)
         seeds.append({
             "symbol": symbol,
             "identity": f"{symbol}|{daily[entry_idx]['t']}|{daily[i]['t']}",
