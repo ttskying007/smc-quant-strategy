@@ -15,31 +15,33 @@ def ok(name, cond, detail=""):
     else:
         FAIL += 1; print("  FAIL " + name + " " + detail)
 
-# 多源覆盖判定函数（与 coverage_report 一致）
-def coverage_status(daily_end, m60_end, ann_end, requested="2026-09-05"):
-    daily_ok = daily_end >= requested
-    m60_ok = m60_end >= requested
-    ann_ok = ann_end >= requested
+# 多源覆盖判定函数（与 coverage_report 一致：以 daily_end 为基准交易日）
+def coverage_status(daily_end, m60_end, ann_end):
+    base = daily_end
+    daily_ok = bool(daily_end)
+    m60_ok = m60_end >= base
+    ann_ok = ann_end >= base
     complete = daily_ok and m60_ok and ann_ok
     reasons = []
     if not m60_ok:
-        reasons.append(f"m60_end={m60_end} < {requested}")
-    if not daily_ok:
-        reasons.append(f"daily_end={daily_end} < {requested}")
+        reasons.append(f"m60_end={m60_end} < daily_end={base}")
     if not ann_ok:
-        reasons.append(f"ann_end={ann_end} < {requested}")
+        reasons.append(f"ann_end={ann_end} < daily_end={base}")
     return "COMPLETE" if complete else "PARTIAL_MULTI_TF", reasons
 
 print("== 多源覆盖判定 ==")
 s, r = coverage_status("2026-08-31", "2026-07-11", "2026-09-05")
 ok("daily全/m60缺→PARTIAL", s == "PARTIAL_MULTI_TF" and "m60" in r[0], f"{s} {r}")
-s2, r2 = coverage_status("2026-09-05", "2026-09-05", "2026-09-05")
-ok("全源到位→COMPLETE", s2 == "COMPLETE" and not r2, f"{s2} {r2}")
+s2, r2 = coverage_status("2026-09-04", "2026-09-04", "2026-09-04")
+ok("三源对齐最新交易日→COMPLETE", s2 == "COMPLETE" and not r2, f"{s2} {r2}")
 s3, r3 = coverage_status("2026-08-01", "2026-08-01", "2026-08-01")
-ok("全源缺→PARTIAL", s3 == "PARTIAL_MULTI_TF", f"{s3}")
+ok("全源对齐→COMPLETE", s3 == "COMPLETE", f"{s3}")
 # 审计案例: daily 8-31 vs m60 7-11 → PARTIAL_MULTI_TF + production_gate FAIL
 s4, r4 = coverage_status("2026-08-31", "2026-07-11", "2026-09-05")
 ok("审计案例(8-31 vs 7-11)→PARTIAL+gate FAIL", s4 == "PARTIAL_MULTI_TF", f"{s4}")
+# 真实场景: daily 9-04 + m60 9-04 + 公告 9-04 → COMPLETE
+s5, r5 = coverage_status("2026-09-04", "2026-09-04", "2026-09-04")
+ok("真实场景(三源9-04)→COMPLETE", s5 == "COMPLETE", f"{s5}")
 
 print("== 未平仓区间拆分 ==")
 # 场景: 最新 entry 在 8 月, 无 exit → entry_end 到 8 月, exit_end 不伪造

@@ -1,10 +1,8 @@
 {
  "requested_start": "2024-01-01",
  "requested_end": "2026-09-05",
- "status": "PARTIAL_MULTI_TF",
- "status_reason": [
-  "m60_end=2026-05-08 < requested_end=2026-09-05"
- ],
+ "status": "COMPLETE",
+ "status_reason": [],
  "sources": {
   "daily_ohlcv": {
    "sample_count": 300,
@@ -13,13 +11,13 @@
   },
   "m60_ohlcv": {
    "sample_count": 150,
-   "max_ts": "2026-05-08",
-   "fresh_ok": false
+   "max_ts": "2026-09-04",
+   "fresh_ok": true
   },
   "announcement": {
    "max_ts": "2026-09-04",
    "count": 981082,
-   "fresh_ok": false
+   "fresh_ok": true
   }
  },
  "trade_coverage": {

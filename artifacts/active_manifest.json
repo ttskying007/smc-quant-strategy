@@ -1,7 +1,7 @@
 {
  "active": true,
- "strategy_commit": "3eefdedf87df89c330b4986f40bcc66f27029e55",
- "code_commit": "3eefdedf87df89c330b4986f40bcc66f27029e55",
+ "strategy_commit": "fa220b25da281cd66d96fdc3b074ed7fdda76797",
+ "code_commit": "fa220b25da281cd66d96fdc3b074ed7fdda76797",
  "data_snapshot_id": "snap-2026-09-04",
  "requested_range": {
   "start": "2024-01-01",
@@ -9,7 +9,7 @@
  },
  "data_ends": {
   "daily_end": "2026-09-04",
-  "m60_end": "2026-05-08",
+  "m60_end": "2026-09-04",
   "announcement_end": "2026-09-04",
   "signal_end": "20260813",
   "exit_end": "20260813"
@@ -19,10 +19,8 @@
   "paper_sim.py": "6457ea924b4bca8d",
   "config.py": "ff59dbb6d566e2c4"
  },
- "status": "PARTIAL_MULTI_TF",
- "status_reason": [
-  "m60_end=2026-05-08 < requested_end=2026-09-05"
- ],
+ "status": "COMPLETE",
+ "status_reason": [],
  "timezone": "Asia/Shanghai",
- "generated_at": "2026-09-06T16:19:35"
+ "generated_at": "2026-09-06T19:20:21"
 }

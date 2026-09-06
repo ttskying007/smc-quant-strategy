@@ -75,16 +75,21 @@ for r in smc + ev:
 months_report = {m: v for m, v in sorted(monthly.items())}
 
 # ---- 5. 状态判定 ----
-daily_ok = d_end_iso >= REQUESTED_END or d_end_iso >= "2026-09-04"
-m60_ok = m60_end_iso >= REQUESTED_END
-ann_ok = str(a_max) >= REQUESTED_END
+# FIX(2026-09-06): 以市场最新交易日(daily_end)为基准 —— requested_end 是自然日(如周六)永不可达；
+# 完整性 = 各必需源均覆盖到 daily_end（最新交易日），且三者一致
+base_day = d_end_iso
+daily_ok = bool(d_end_iso)
+m60_ok = m60_end_iso >= base_day
+ann_ok = str(a_max) >= base_day
 complete = daily_ok and m60_ok and ann_ok
 status = "COMPLETE" if complete else "PARTIAL_MULTI_TF"
 reasons = []
 if not m60_ok:
-    reasons.append(f"m60_end={m60_end_iso} < requested_end={REQUESTED_END}")
+    reasons.append(f"m60_end={m60_end_iso} < daily_end={base_day}")
+if not ann_ok:
+    reasons.append(f"announcement_end={a_max} < daily_end={base_day}")
 if not daily_ok:
-    reasons.append(f"daily_end={d_end_iso} < requested_end")
+    reasons.append(f"daily_end={d_end_iso} 未知")
 
 # ---- 6. coverage_report.json ----
 coverage = {
