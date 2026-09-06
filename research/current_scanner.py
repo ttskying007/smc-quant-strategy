@@ -211,7 +211,8 @@ if __name__ == "__main__":
         json.dump(result, fh, ensure_ascii=False, indent=2)
     print("\nscanner result saved (freshness gate)")
 
-    # FIX(2026-09-05, 蓝图迭代二): 生成 run_manifest + 前端同步
+    # FIX(2026-09-05, 复审 P0-1): manifest/artifact fail-closed —— 生产模式(--production)下
+    # manifest 生成失败或 artifact 缺失即阻断运行（禁止产出无血缘候选）
     try:
         import core.manifest as CM
         _m = CM.build_manifest(
@@ -221,6 +222,12 @@ if __name__ == "__main__":
             data_asof=latest, data_snapshot_id="kline_tencent_" + latest,
             artifact_paths=[os.path.join(OUT, "current_scanner_result.json")],
             status="research", extra={"smc_candidates": len(smc_cands), "fresh": fresh_count})
+        # artifact 校验：缺失/为空 → 生产模式阻断
+        _art_p = os.path.join(OUT, "current_scanner_result.json")
+        if not os.path.exists(_art_p) or os.path.getsize(_art_p) == 0:
+            if getattr(args, "production", False):
+                raise RuntimeError(f"production blocked: artifact missing/empty {_art_p}")
+            print(f"警告: artifact 缺失/为空 {_art_p}（研究模式继续）", flush=True)
         _mp = CM.save_manifest(_m, os.path.join(OUT, "run_manifests"))
         print(f"manifest: {_mp}")
         # 前端同步（hermes/smc_monitor + E:\root\.hermes）
@@ -231,6 +238,10 @@ if __name__ == "__main__":
                 shutil.copyfile(os.path.join(OUT, "current_scanner_result.json"),
                                 os.path.join(_d, "current_scanner_result.json"))
             except Exception as _e:
+                if getattr(args, "production", False):
+                    raise RuntimeError(f"production degraded: frontend sync failed {_d}: {_e}")
                 print(f"前端同步警告 {_d}: {_e}", flush=True)
     except Exception as _e:
-        print(f"manifest/同步失败(不阻断): {_e}", flush=True)
+        if getattr(args, "production", False):
+            raise  # 生产模式 fail-closed
+        print(f"manifest/同步失败(研究模式不阻断): {_e}", flush=True)

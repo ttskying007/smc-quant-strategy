@@ -166,7 +166,16 @@ def _run_main_steps():
                 print(f"manifest 前端同步警告 {_d}: {_e}", flush=True)
         print(f"manifest: {_mp} (status={_m['status']})", flush=True)
     except Exception as _e:
-        print(f"manifest 生成失败(不阻断): {_e}", flush=True)
+        # FIX(2026-09-05, 复审 P0-1): manifest 失败不静默 —— 标 run_status manifest_ok=false（DEGRADED）
+        print(f"manifest 生成失败: {_e}", flush=True)
+        try:
+            _rs_p = os.path.join(RESEARCH, "run_status.json")
+            _rs = json.load(open(_rs_p, encoding="utf-8")) if os.path.exists(_rs_p) else {}
+            _rs["manifest_ok"] = False
+            _rs["manifest_error"] = str(_e)
+            json.dump(_rs, open(_rs_p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+        except Exception:
+            pass
     print(f"DONE: batch={rc0} refresh={rc} scan={rc2} sim={rc3} dashboard={rc4}", flush=True)
 
 if __name__ == "__main__":
