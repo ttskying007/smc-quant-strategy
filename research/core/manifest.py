@@ -40,7 +40,24 @@ def file_hash(path):
 
 REQUIRED_FIELDS = ["run_id", "strategy_id", "strategy_version", "code_commit",
                    "parameter_profile", "data_snapshot_id", "data_asof",
-                   "cost_model_version", "execution_model_version", "created_at", "status"]
+                   "cost_model_version", "execution_model_version", "created_at", "status",
+                   "engine_sha256", "config_sha256"]
+
+
+def _engine_files():
+    """FIX(2026-09-06, 复审P0 版本脱钩): 执行内核+引擎哈希 —— 生产必须绑定。
+    返回 dict {relpath: sha256}。"""
+    base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    targets = {
+        "research/core/execution.py": os.path.join(base, "research", "core", "execution.py"),
+        "research/config.py": os.path.join(base, "research", "config.py"),
+        "wdh/wdh_engine.py": os.path.join(base, "wdh", "wdh_engine.py"),
+        "research/paper_sim.py": os.path.join(base, "research", "paper_sim.py"),
+    }
+    out = {}
+    for rel, p in targets.items():
+        out[rel] = file_hash(p)
+    return out
 
 
 def build_manifest(run_id, strategy_id, strategy_version, params=None,
@@ -55,6 +72,9 @@ def build_manifest(run_id, strategy_id, strategy_version, params=None,
         "strategy_id": strategy_id,
         "strategy_version": strategy_version,
         "code_commit": _git_head(repo),
+        # FIX(2026-09-06, 复审P0): 版本脱钩 —— engine/config 哈希绑定，HEAD 只是文档提交时仍可锁定策略
+        "engine_sha256": _engine_files()["research/core/execution.py"],
+        "config_sha256": _engine_files()["research/config.py"],
         "parameter_profile": param_hash(params),
         "data_snapshot_id": data_snapshot_id,
         "data_asof": data_asof,
