@@ -11,7 +11,9 @@ DB = r"E:\test\smc_project\announce\smc_announce.db"
 
 def fetch_notices(date):
     rows_all = []
-    for page in range(1, 7):  # FIX(2026-08-22): 8->6 pages (daily ~800 max, 6 pages covers most; faster)
+    # FIX(2026-09-05, 审计 G10): 分页到空为止（原 6 页×100=600 条截断，A股日均 2000-6000 条，
+    # 财报季漏检 40-80% —— "近月无新股"的原料端根因之一）
+    for page in range(1, 80):
         url = ("https://np-anotice-stock.eastmoney.com/api/security/ann?"
                f"sr=-1&page_size=100&page_index={page}&ann_type=A&client_source=web&"
                f"f_node=0&s_node=0&begin_time={urllib.parse.quote(date + ' 00:00:00')}&end_time={urllib.parse.quote(date + ' 23:59:59')}")
@@ -51,19 +53,12 @@ def main():
     cur_max = cur.fetchone()[0] or ""
     print(f"DB 当前最新: {cur_max}", flush=True)
     start = datetime.date.today() - datetime.timedelta(days=args.days)
-    # if DB already has today's, nothing to do
-    today = datetime.date.today().strftime("%Y-%m-%d")
-    if cur_max >= today:
-        print("公告已是最新，跳过", flush=True)
-        conn.close()
-        return
+    # FIX(2026-09-05, 审计 G09): 去掉"当日已最新则跳过"短路 —— 晚间公告(16:00-22:00)次日才可见
+    # 导致实盘 T+2 入场；改为始终拉取当天，(date,code,title) 增量去重，可 20:00/21:30 补拉
     d = start
     total = 0
     while d <= datetime.date.today():
         ds = d.strftime("%Y-%m-%d")
-        if ds <= cur_max:
-            d += datetime.timedelta(days=1)
-            continue
         rows = fetch_notices(ds)
         inserted = 0
         for a in rows:

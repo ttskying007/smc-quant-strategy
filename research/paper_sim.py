@@ -566,7 +566,9 @@ def daily_selection():
             avg_v = sum(bs[k]["v"] for k in range(i + 1 - 20, i + 1)) / 20 if i + 1 >= 20 else 0
             v_ratio = round(bs[entry_idx]["v"] / avg_v, 2) if (avg_v and entry_idx < len(bs)) else 1.0
             # FIX(2026-08-22): 连续放量（大资金持续入场，研究 iter_vol_cont: 连续放量 +15.55%/PF 9.30）
-            v2_ratio = round(bs[entry_idx + 1]["v"] / avg_v, 2) if (avg_v and entry_idx + 1 < len(bs)) else 0
+            # FIX(2026-09-05, 审计 G22): v2_ratio 用 bs[i-1]（signal 日前一日量，决策时点可得），
+            # 原 bs[entry_idx+1] 是未来量（T+2）→ 与回测 gen_v20f 口径不一致
+            v2_ratio = round(bs[i - 1]["v"] / avg_v, 2) if (avg_v and i >= 1) else 0
             # FIX(2026-08-22): 跨度特征加分（研究 iter_span_combo: 阶段6-15 +1 / ADX>15 +1 → 组合 +13.02%/PF 10.52）
             _stage_span = 0
             for _j in range(i, max(0, i - 60), -1):

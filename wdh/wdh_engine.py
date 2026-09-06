@@ -67,6 +67,19 @@ def f(x, d=0.0):
         return d
 
 
+def vol_z(daily, i, n=60):
+    """FIX(2026-09-05, 审计 G17): 真 z-score 量能 (v−μn)/σn —— 原"量比−1"对高/低换手股不等价。
+    返回 (z, mu)。样本不足返回 (0, 当前量)。"""
+    if i < n:
+        return 0.0, daily[i]["v"]
+    vals = [daily[k]["v"] for k in range(i - n, i)]
+    mu = sum(vals) / len(vals)
+    sd = (sum((x - mu) ** 2 for x in vals) / len(vals)) ** 0.5
+    if sd <= 0:
+        return 0.0, mu
+    return (daily[i]["v"] - mu) / sd, mu
+
+
 if _USE_CORE:
     def atr_of(daily, i, n=14):
         """FIX(2026-09-05, 审计 G19): 转发 core.structure.atr_of（单一实现）。"""
@@ -240,9 +253,8 @@ def build_seeds(symbol, daily):
                 continue
             ssl = daily[j]["l"]
             if b["l"] <= ssl * (1 - _tol) and b["c"] > ssl:
-                # volZ: 当前量 vs 过去 20 日均量的 z 分数近似（>0 = 放量）
-                _v20 = sum(daily[k]["v"] for k in range(max(0, i - 20), i)) / max(1, min(20, i))
-                _vz = (b["v"] - _v20) / (_v20 + 1e-9) if _v20 > 0 else 0
+                # FIX(2026-09-05, 审计 G17): 真 z-score（60日均值±标准差）替代"量比−1"
+                _vz, _ = vol_z(daily, i, 60)
                 if _vz < 0.5:
                     continue  # 无放量扫损 → 非机构吸筹
                 swept = j
@@ -264,8 +276,8 @@ def build_seeds(symbol, daily):
         if rsp is None:
             continue
         # 位移根量能/实体/收盘位置签名（FIX 2026-09-05, 规范 DISPLACEMENT）
-        _v20r = sum(daily[k]["v"] for k in range(max(0, rsp - 20), rsp)) / max(1, min(20, rsp))
-        _vzr = (daily[rsp]["v"] - _v20r) / (_v20r + 1e-9) if _v20r > 0 else 0
+        # FIX(2026-09-05, 审计 G17): 真 z-score 量能
+        _vzr, _ = vol_z(daily, rsp, 60)
         _atr_r = 0.0
         for _k in range(max(0, rsp - 14), rsp):
             _atr_r += max(daily[_k]["h"] - daily[_k]["l"], abs(daily[_k]["h"] - daily[_k - 1]["c"]), abs(daily[_k]["l"] - daily[_k - 1]["c"]))
