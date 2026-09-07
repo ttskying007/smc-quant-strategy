@@ -39,6 +39,7 @@ PY_RESEARCH = r"C:\Users\Administrator\.workbuddy\binaries\python\versions\3.13.
 FEE_PCT = 0.20          # 双边费用 %
 SLIPPAGE = 0.001        # 单边滑点 0.1%
 MAX_HOLD = 12           # 日线最长持有（审计 F11: 5→12）
+PENDING_EXPIRE_DAYS = 3  # PENDING 挂单 valid_from 后 N 交易日未成交 → EXPIRED（审计12: 防长期阻塞）
 
 # ---- 策略腿开关（复审 P0-3）----
 # SMC 腿经五重证据（去伪 OOS -0.60% / SL-ATR -0.94% / HHI 0.369 / WF 3正4负 / D5 净负）

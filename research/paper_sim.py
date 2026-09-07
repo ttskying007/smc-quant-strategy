@@ -752,6 +752,57 @@ def daily_selection():
                   ensure_ascii=False, indent=2)
     except Exception:
         pass
+    # FIX(2026-09-08, 审计方向7/漏斗归因): 完整每日选股漏斗 JSON ——
+    # 每层触发/拒绝计数 + 拒因分布，无新股时可定位"是市场没机会还是系统坏了"。
+    try:
+        from core.events import classify_title_detailed
+        _raw = _kline_hit = _ev_cnt = 0
+        _soft_delta = _hard = _soft = 0
+        import sqlite3 as _sq3
+        _c2 = _sq3.connect(r"E:\test\smc_project\announce\smc_announce.db")
+        _cur2 = _c2.cursor()
+        for _dd2 in recent_days:
+            _cur2.execute("SELECT title FROM announce WHERE date=? AND (title LIKE '%增持%' OR title LIKE '%回购%')", (_dd2,))
+            for (_tt,) in _cur2.fetchall():
+                _raw += 1
+                _l = classify_title_detailed(_tt)[5]
+                if _l == "HARD_REJECT":
+                    _hard += 1
+                elif _l == "PROGRESS_WITH_DELTA":
+                    _soft_delta += 1
+                elif _l == "SOFT_REJECT":
+                    _soft += 1
+                elif _l == "EVENT":
+                    _ev_cnt += 1
+        _c2.close()
+        funnel = {
+            "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "days": recent_days,
+            "raw_announcements": _raw,
+            "contains_buyback_or_increase": _raw,
+            "classified_positive": _ev_cnt,
+            "reject_by_reason": {
+                "event_filter_hard": _hard,
+                "event_filter_soft": _soft,
+                "event_filter_soft_with_delta_research": _soft_delta,
+                "stage": _sel_stats.get("skipped_stage", 0),
+                "adx": _sel_stats.get("skipped_adx", 0),
+                "nodata": _sel_stats.get("skipped_nodata", 0),
+                "dup": _sel_stats.get("skipped_dup", 0),
+            },
+            "orders_created": len(new_orders),
+            "note": "漏斗逐层：公告总数→含增持/回购→分类为正事件→去重→有K线→阶段→ADX→挂单。"
+                    "soft_with_delta 为研究候选（进展类含金额/比例增量），默认流仍拒绝。",
+        }
+        json.dump(funnel, open(os.path.join(ROOT, "selection_funnel.json"), "w", encoding="utf-8"),
+                  ensure_ascii=False, indent=2)
+        for _m in MIRRORS:
+            try:
+                _atomic_write_json(_m.replace("paper_ledger.json", "selection_funnel.json"), funnel)
+            except Exception:
+                pass
+    except Exception as _e:
+        print(f"漏斗生成失败(不阻断): {_e}", flush=True)
     return new_orders
 
 
@@ -823,45 +874,40 @@ def realtime_monitor():
             if (t.get("filled_price") or t.get("entry_price")) else None,
         })
         if t["status"] == "PENDING_ORDER":
-            # FIX(2026-09-04, 审计 P2): 停牌无法买入（量=0，跳过）
-            if _is_suspended(_info):
-                continue
-            # FIX(2026-09-04, 审计 P2): 涨停无法买入（挂单不成交，等待回落）
-            if _is_limit_up(_info, side="buy", code=t["code"]):
-                continue
-            # FIX(2026-09-05, 审计 G05/G09): 未到 valid_from（signal_date 后首交易日）不可成交；
-            # 用实时快照 open 价成交，禁止 t1_open 历史价回退
-            _vf = t.get("valid_from", "")
-            _today = time.strftime("%Y%m%d")
-            if _vf and _today < _vf:
-                continue  # 尚未到可成交日
-            _open_px = _info.get("open") if isinstance(_info, dict) else None
-            _was_pending = True
-            if t.get("entry_mode") == "retrace":
-                if cur_px <= t["entry_price"]:
-                    # 限价触发：回落至 limit → 按 limit 成交
-                    t["status"] = "FILLED"
-                    t["filled_price"] = round(t.get("entry_price") * (1 + SLIPPAGE), 3)
-                    t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
-                    n_fill += 1
-                elif _open_px and _open_px > 0:
-                    # 次日开盘兜底：以实时开盘价成交（真实可执行，非历史价）
-                    t["status"] = "FILLED"
-                    t["filled_price"] = round(_open_px * (1 + SLIPPAGE), 3)
-                    t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
-                    n_fill += 1
-                # else: 未回落且无开盘快照 → 继续等待（不成交）
-            elif t.get("entry_mode") == "next_open":
-                if _open_px and _open_px > 0:
-                    t["status"] = "FILLED"
-                    t["filled_price"] = round(_open_px * (1 + SLIPPAGE), 3)
-                    t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
-                    n_fill += 1
-            elif cur_px <= t["entry_price"]:
+            # FIX(2026-09-08, 审计 P0-4): 撮合判定统一委托 core.execution.try_fill
+            # （停牌/涨跌停(板块)/valid_from/入场模式 一套语义，回测与纸面共用；本处只管写账本）
+            from core.execution import try_fill as _core_fill
+            _snap = dict(_info or {})
+            _snap["today"] = time.strftime("%Y%m%d")
+            _fo = {"code": t["code"], "entry_mode": t.get("entry_mode") or "retrace",
+                   "reference_price": t.get("entry_price"),
+                   "planned_sl": t.get("sl1") or t.get("sl_price"),
+                   "planned_tp": t.get("tp2") or t.get("tp_price"),
+                   "valid_from": t.get("valid_from", "")}
+            _fr = _core_fill(_fo, _snap)
+            if _fr.get("filled"):
                 t["status"] = "FILLED"
-                t["filled_price"] = round(cur_px * (1 + SLIPPAGE), 3)
+                t["filled_price"] = _fr["price"]
                 t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
                 n_fill += 1
+            else:
+                # FIX(2026-09-08, 审计12): PENDING 过期机制 —— valid_from 后 PENDING_EXPIRE_DAYS
+                # 个交易日内未成交（停牌/涨停/未回落）→ EXPIRED，避免长期 pending 阻塞同代码后续信号
+                # （known/seen_orders 按.signal_date 去重，EXPIRED 后同代码新信号可正常进入）
+                try:
+                    _vf2 = t.get("valid_from", "")
+                    if _vf2:
+                        from datetime import date as _d2, timedelta as _td2
+                        _vd = _d2(int(_vf2[:4]), int(_vf2[4:6]), int(_vf2[6:8]))
+                        _cutoff = _vd + _td2(days=int(getattr(CFG, "PENDING_EXPIRE_DAYS", 3)) * 2)
+                        _today_d = _d2(int(_snap["today"][:4]), int(_snap["today"][4:6]), int(_snap["today"][6:8]))
+                        if _today_d > _cutoff and t.get("status") == "PENDING_ORDER":
+                            t["status"] = "EXPIRED"
+                            t["expire_reason"] = _fr.get("why") or "TIMEOUT"
+                            t["note"] = (t.get("note", "") + f" | PENDING过期(valid_from+{getattr(CFG, 'PENDING_EXPIRE_DAYS', 3)}交易日未成交: {_fr.get('why')})").strip()
+                except Exception:
+                    pass
+            # 未成交原因（停牌/涨停/未到日/待回落）由核心统一返回，本处不重复判定
             # FIX(2026-08-22): 买入交易日志（时间/信号/动作/TP/SL）
             if t["status"] == "FILLED" and not t.get("_trade_logged_buy"):
                 t["_trade_logged_buy"] = True
@@ -912,74 +958,55 @@ def realtime_monitor():
                 except Exception:
                     pass
             if t["status"] == "FILLED":
-                # FIX(2026-08-22): multi-tiered TP/SL (swing + FVG + BSL)
-                # FIX(2026-08-22): 合同对齐回测 —— TP1 30% 部分平仓（记录 realized_pnl），剩余 70% 继续
+                # FIX(2026-09-08, 审计 P0-4 完结): 离场判定统一委托 core.execution.try_exit。
+                # 判定顺序(T+1锁→SL/BE→TP1部分→TP2全平→时间止损)与 simulate 逐 bar 完全一致，
+                # 本处只负责账本语义（realized_pnl 分批、note、pnl 汇总），不再自行判 TP/SL。
+                from core.execution import try_exit as _core_exit
                 tp1 = t.get("tp1") or 0
                 tp2 = t.get("tp2") or 0
-                tp3 = t.get("tp3") or 0
-                tp4 = t.get("tp4") or t.get("tp_price") or 0
                 sl1 = t.get("sl1") or t.get("sl_price") or 0
-                sl2 = t.get("sl2") or 0
-                # FIX(2026-08-22) P1: SL 距离 >8% → 降仓标记（风险控制）
-                if not t.get("_sl_far_flagged") and (ep - sl1) / ep > 0.08:
-                    t["_sl_far_flagged"] = True
-                    t["position_scale"] = 0.5  # 降仓 50%
-                active_sl = sl1
-                if t.get("tp1_hit") and t.get("sl_price", 0) < ep:
-                    active_sl = ep  # breakeven after TP1
-                if t.get("tp2_hit") and t.get("sl_price", 0) < (tp1 or ep):
-                    active_sl = tp1 or ep  # lock TP1 profit after TP2
-                # FIX(2026-09-08, 审计 P0-4/P1-1): 重排退出判定顺序，对齐 core.execution.simulate。
-                # 原实现先判 TIME_STOP 再判 SL —— 同一根K线价格同时触及止损(含保本)与持有到期时，
-                # 纸面记 TIME_STOP 而回测记 BE/SL，造成 reconcile 不一致。现改为与回测一致：
-                # ① 先判 SL/BE 止损 → ② 再判 TP1/TP2 → ③ 最后判时间止损。
-                # 且保本止损(active_sl==ep, 已触TP1)记录为 BE 与回测标签一致。
-                is_be = bool(t.get("tp1_hit")) and abs(active_sl - ep) < 1e-6
-                if cur_px <= active_sl:
+                # bars_since_fill：filled 日到最新K线日的交易日数（供时间止损判定）
+                _bars_sf = None
+                try:
+                    _bs2 = bars_of(t["code"])
+                    _ds2 = [b["t"] for b in _bs2]
+                    _fd2 = str(t["filled_at"])[:10].replace("-", "")
+                    if _fd2 in _ds2:
+                        _bars_sf = len(_ds2) - 1 - _ds2.index(_fd2)
+                except Exception:
+                    pass
+                _pos4core = {"code": t["code"], "filled_price": ep, "sl": sl1,
+                             "tp1": tp1, "tp2": tp2, "tp1_hit": bool(t.get("tp1_hit")),
+                             "filled_at": t.get("filled_at", "")}
+                _snap4core = dict(_info or {})
+                _snap4core["today"] = time.strftime("%Y%m%d")
+                _snap4core["bars_since_fill"] = _bars_sf
+                _xr = _core_exit(_pos4core, _snap4core)
+                if _xr.get("exit"):
                     t["status"] = "CLOSED"
-                    t["exit_reason"] = "BE" if is_be else "SL_HIT"
-                    _rem = 0.7 if t.get("tp1_hit") else 1.0
-                    t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + _rem * (_sell_px / ep - 1) * 100 - FEE * _rem, 4)
+                    t["exit_reason"] = _xr["reason"]
+                    t["exit_price"] = _xr.get("price")
+                    if _xr["reason"] in ("TP2_RUNNER",):
+                        t["tp2_hit"] = True
+                        t["realized_pnl"] = (t.get("realized_pnl", 0) or 0) + 0.7 * (tp2 / ep - 1) * 100 - FEE * 0.7
+                        t["pnl_pct"] = round(t.get("realized_pnl", 0), 4)
+                        # FIX(2026-09-08): 原 % 格式串含裸 '%平' 字符 → ValueError；改 f-string
+                        t["note"] = (t.get("note", "") + f" | TP2(FVG/BSL)触发：剩余70%平仓+{(tp2/ep-1)*100:.2f}%（100%已平）").strip()
+                    else:
+                        _rem = 0.7 if t.get("tp1_hit") else 1.0
+                        t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + _rem * (_xr["price"] / ep - 1) * 100 - FEE * _rem, 4)
                     n_close += 1
-                elif not t.get("tp1_hit") and tp1 > 0 and cur_px >= tp1:
+                elif _xr.get("partial") == "TP1" and not t.get("tp1_hit"):
+                    # TP1 部分平仓（与回测合同一致：30%平，SL移保本）
                     t["tp1_hit"] = True
-                    # TP1 30% 部分平仓（与回测合同一致）
+                    if _xr.get("new_state") and _xr["new_state"].get("sl") is not None:
+                        t["sl1"] = _xr["new_state"]["sl"]
                     t["realized_pnl"] = 0.3 * (tp1 / ep - 1) * 100 - FEE * 0.3
                     t["note"] = (t.get("note", "") + " | TP1(swing high)触发：30%平仓+" + str(round((tp1/ep-1)*100,2)) + "%，SL移保本").strip()
-                elif not t.get("tp2_hit") and t.get("tp1_hit") and tp2 > 0 and cur_px >= tp2:
-                    # FIX(2026-09-05, 审计 G06): TP2 触发 = 剩余 70% 全平并 CLOSED ——
-                    # 原实现只记 realized_pnl 不置 CLOSED，后续 SL_HIT/TP4_RUNNER 又按 0.7 双计
-                    t["tp2_hit"] = True
-                    t["realized_pnl"] = (t.get("realized_pnl", 0) or 0) + 0.7 * (tp2 / ep - 1) * 100 - FEE * 0.7
-                    t["status"] = "CLOSED"
-                    t["exit_reason"] = "TP2_RUNNER"
-                    t["pnl_pct"] = round(t.get("realized_pnl", 0), 4)
-                    t["note"] = (t.get("note", "") + " | TP2(FVG/BSL)触发：剩余70%平仓+%.2f%%（100%已平）" % ((tp2/ep-1)*100)).strip()
-                    n_close += 1
-                # FIX(2026-09-08, 审计 P1-2): TP3/TP4 死代码已删除 ——
-                # TP2 触发即 CLOSED(100%已平，见 G06)，TP3/TP4 分支永远不可达，
-                # 且其 `tp3_hit and not tp2_hit` 条件与 TP3 依赖 tp2_hit 的语义自相矛盾。
-                # 统一两段式：TP1(30%部分)+TP2(剩余全平)，无多余 runner。
-                if t["status"] == "FILLED" and not t.get("tp1_hit") and t.get("filled_at"):
-                    # 时间止损（未触 TP1 全仓离场）—— 最后判定，与回测 simulate 的 close-at-end 语义一致
-                    try:
-                        _bs = bars_of(t["code"])
-                        _ds = [b["t"] for b in _bs]
-                        _fd = str(t["filled_at"])[:10].replace("-", "")
-                        if _fd in _ds:
-                            _fi = _ds.index(_fd)
-                            _today = _ds[-1] if _ds else ""
-                            # FIX(2026-09-05, 审计 G08): 持有期统一为 config.MAX_HOLD(12交易日)，
-                            # 原 5 日 TIME_STOP 与回测(12/15根)不一致 → 实盘过早砍单
-                            _hold_max = int(getattr(CFG, "MAX_HOLD", 12))
-                            if _fi + _hold_max < len(_ds) and _ds[_fi + _hold_max] <= _today:
-                                t["status"] = "CLOSED"
-                                t["exit_reason"] = "TIME_STOP"
-                                _rem = 1.0
-                                t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + _rem * (_sell_px / ep - 1) * 100 - FEE * _rem, 4)
-                                n_close += 1
-                    except Exception:
-                        pass
+                # SL 距离 >8% → 降仓标记（风险控制，账本侧）
+                if not t.get("_sl_far_flagged") and (ep - sl1) / ep > 0.08:
+                    t["_sl_far_flagged"] = True
+                    t["position_scale"] = 0.5
             t["mark_price"] = cur_px
             t["mark_pnl_pct"] = round((cur_px / ep - 1) * 100, 4)
             # FIX(2026-08-22): 卖出交易日志（时间/信号/动作/TP/SL/触发类型/盈亏）

@@ -175,3 +175,109 @@ def simulate(daily, entry_idx, ep, sl, tp1=None, tp2=None, max_hold=None,
             "mae_r": (mae * ep / risk) if mae != 999 else 0.0,
             "skipped": False, "realized_partial": gross,
             "net_pnl_pct": round(gross - FEE, 4)}
+
+
+# ---------------- 统一执行三函数（审计 P0-4）----------------
+# 回测（simulate，逐 bar）与纸面（实时快照）共用同一套语义：
+#   plan_order  —— 信号只生成挂单计划（valid_from / 参考价），不写死成交价
+#   try_fill    —— 用实时/下一日市场快照撮合（涨跌停/停牌/valid_from 由本核心统一判定）
+#   try_exit    —— 用实时快照判离场（SL/BE 优先 → TP1/TP2 → 时间止损最后），
+#                  与 simulate 的逐 bar 判定顺序完全一致（FIX P0-4: 消除回测/纸面口径分裂）
+
+def plan_order(signal, asof_date=None):
+    """信号 → 挂单计划。signal 需含: code/name/signal_date/entry_ref(reference_price)/sl/tp。
+    返回 PendingOrder dict: 不含实际成交价，只含 valid_from + 计划参考。"""
+    code = str(signal.get("code") or "")
+    entry_ref = float(signal.get("entry_ref") or signal.get("reference_price") or 0)
+    sl = float(signal.get("sl") or 0)
+    tp = float(signal.get("tp") or 0)
+    sig_date = str(signal.get("signal_date") or "").replace("-", "")
+    if not (code and entry_ref > 0 and sl > 0 and sl < entry_ref and tp > entry_ref):
+        return {"ok": False, "reason": "BAD_SIGNAL", "code": code}
+    return {
+        "ok": True, "code": code, "name": signal.get("name") or code,
+        "signal_date": sig_date,
+        "entry_mode": signal.get("entry_mode") or "next_open",
+        "reference_price": round(entry_ref, 3),
+        "planned_sl": round(sl, 3), "planned_tp": round(tp, 3),
+        "valid_from": signal.get("valid_from") or "",  # 由调用方交易日历填
+        "asof": asof_date or "", "status": "PENDING_ORDER",
+        "actual_filled_price": None, "filled_at": None,
+    }
+
+
+def try_fill(order, market_snapshot):
+    """挂单 + 市场快照 → FillResult。
+    market_snapshot: {px, prev, open, vol}（Sina 实时口径）。
+    统一判定（顺序固定）：停牌 → 涨跌停(按板块) → 未到 valid_from → 撮合。"""
+    snap = market_snapshot or {}
+    code = order.get("code") or ""
+    px, prev, opn, vol = snap.get("px"), snap.get("prev"), snap.get("open"), snap.get("vol")
+    if not px or px <= 0:
+        return {"filled": False, "why": "NO_PRICE"}
+    if is_suspended(snap):
+        return {"filled": False, "why": "SUSPENDED"}
+    if is_limit_up(snap, side="buy", code=code):
+        return {"filled": False, "why": "LIMIT_UP"}
+    vf = str(order.get("valid_from") or "")
+    today = str(snap.get("today") or "")
+    if vf and today and today < vf:
+        return {"filled": False, "why": "NOT_YET_VALID"}
+    mode = order.get("entry_mode") or "next_open"
+    if mode == "retrace":
+        # 回踩限价：回落到参考价成交；否则当日开盘兜底
+        if px <= float(order.get("reference_price") or 0):
+            fill_px = float(order["reference_price"]) * (1 + SLIPPAGE)
+        elif opn and opn > 0:
+            fill_px = opn * (1 + SLIPPAGE)
+        else:
+            return {"filled": False, "why": "WAIT_RETRACE"}
+    else:  # next_open
+        if not (opn and opn > 0):
+            return {"filled": False, "why": "NO_OPEN"}
+        fill_px = opn * (1 + SLIPPAGE)
+    return {"filled": True, "price": round(fill_px, 3),
+            "sl": order.get("planned_sl"), "tp": order.get("planned_tp")}
+
+
+def try_exit(position, market_snapshot):
+    """持仓 + 实时快照 → ExitResult。判定顺序与 simulate 逐 bar 完全一致：
+    ① SL/BE（含 T+1 锁定：当日买入不可卖）→ ② TP1 部分平 → ③ TP2 全平 → ④ 时间止损。
+    position: {code, filled_price(filled), sl, tp, tp1, tp2, tp1_hit, filled_at, asof_bars}
+    market_snapshot: {px, today, bars_since_fill}"""
+    snap = market_snapshot or {}
+    code = position.get("code") or ""
+    px = snap.get("px")
+    if not px or px <= 0:
+        return {"exit": False, "why": "NO_PRICE"}
+    if is_suspended(snap):
+        return {"exit": False, "why": "SUSPENDED"}
+    if is_limit_up(snap, side="sell", code=code):
+        return {"exit": False, "why": "LIMIT_DOWN_SELL"}
+    ep = float(position.get("filled_price") or position.get("filled") or 0)
+    if ep <= 0:
+        return {"exit": False, "why": "BAD_POSITION"}
+    # T+1：买入当日不可卖
+    today = str(snap.get("today") or "")
+    if today and str(position.get("filled_at") or "")[:10].replace("-", "") == today.replace("-", ""):
+        return {"exit": False, "why": "T1_LOCKED"}
+    sl = float(position.get("sl") or 0)
+    tp1 = float(position.get("tp1") or 0)
+    tp2 = float(position.get("tp2") or position.get("tp") or 0)
+    tp1_hit = bool(position.get("tp1_hit"))
+    # ① active SL（TP1 后保本）—— 与 simulate 一致
+    active_sl = sl if not tp1_hit else max(ep, sl)
+    if active_sl and px <= active_sl:
+        return {"exit": True, "reason": "BE" if (tp1_hit and abs(active_sl - ep) < 1e-6) else "SL_HIT",
+                "price": round(px * (1 - SLIPPAGE), 3)}
+    # ② TP1 部分平（未触过）
+    if not tp1_hit and tp1 and px >= tp1:
+        return {"exit": False, "partial": "TP1", "new_state": {"tp1_hit": True, "sl": ep}}
+    # ③ TP2 全平
+    if tp1_hit and tp2 and px >= tp2:
+        return {"exit": True, "reason": "TP2_RUNNER", "price": round(px * (1 - SLIPPAGE), 3)}
+    # ④ 时间止损（未触 TP1 且超 max_hold）—— 最后判定
+    bars = snap.get("bars_since_fill")
+    if (not tp1_hit) and bars is not None and int(bars) >= (getattr(CFG, "MAX_HOLD", 12)):
+        return {"exit": True, "reason": "TIME_STOP", "price": round(px * (1 - SLIPPAGE), 3)}
+    return {"exit": False, "why": "HOLD"}

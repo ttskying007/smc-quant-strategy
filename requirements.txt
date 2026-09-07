@@ -1,0 +1,15 @@
+# SMC 量化策略项目依赖（审计 P1: 依赖锁）
+# 生产解释器: Python 3.12 (PY_PRODUCTION) | 研究解释器: Python 3.13 (PY_RESEARCH)
+# 核心（research/、wdh/）零第三方依赖 —— 标准库 only（urllib/json/sqlite3）。
+# 以下仅为可选增强工具链，缺失不影响策略/回测/流水线运行。
+
+# --- 可选: git 历史清洗（安全审计用，一次性工具）---
+# git-filter-repo>=2.47
+
+# --- 可选: 前端/绘图（kline 图 ECharts 由浏览器端加载，服务端无依赖）---
+
+# --- 说明 ---
+# 1. 策略核心 100% 标准库实现（审计原则: 最小依赖面 = 最小攻击面/供应链风险）
+# 2. kline 数据拉取: urllib + Tencent/Sina 公开 HTTP API
+# 3. 公告库: sqlite3 标准库
+# 4. 若后续引入 LLM 对话(ai_assistant Phase2)，需在此追加并锁定版本

@@ -86,6 +86,16 @@ if n:
         print(f"  {d['code']} {d['sig']}: 账本={d['ledger']} vs 重放={d['replay']}")
     ok = rate >= 95
     print(f"验收: exit_reason 一致率≥95% → {'✅' if ok else '❌'}")
+    # FIX(2026-09-08, 审计 P0-4): 分"统一核心前/后"统计 —— 历史条目由旧手写逻辑产生，
+    # 差异属遗留（不可追溯修复，账本只读）；2026-09-08 后新离场全部走 core.execution.try_exit，
+    # 判定顺序与 simulate 完全一致 → 新条目应为 100% 一致，这才是 P0-4 的验收口径。
+    _CUTOFF = "20260908"
+    _old = [d for d in diff if str(d["sig"]).replace("-", "") < _CUTOFF]
+    _new = [d for d in diff if str(d["sig"]).replace("-", "") >= _CUTOFF]
+    _n_old = sum(1 for t in filled if str(t.get("signal_date", "")).replace("-", "") < _CUTOFF)
+    _n_new = sum(1 for t in filled if str(t.get("signal_date", "")).replace("-", "") >= _CUTOFF)
+    print(f"  [历史<{_CUTOFF} 统一核心前] n={_n_old} 不一致={len(_old)}（遗留，只读不改）")
+    print(f"  [新>=<{_CUTOFF} 统一核心后] n={_n_new} 不一致={len(_new)}{' ✅' if not _new else ' ⚠ 需修'}")
 else:
     print("无可对账样本（数据/字段不足）")
     ok = False

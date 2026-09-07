@@ -1,0 +1,85 @@
+name: CI
+# 审计 P1: lint(语法) + 全量单测 + 密钥扫描 —— 每次推送/PR 自动执行
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: 语法检查（全部 py 文件）
+        run: |
+          python - <<'EOF'
+          import ast, sys, os
+          bad = []
+          for root, dirs, files in os.walk('.'):
+              dirs[:] = [d for d in dirs if d not in ('.git', '__pycache__', 'archive')]
+              for f in files:
+                  if f.endswith('.py'):
+                      p = os.path.join(root, f)
+                      try:
+                          ast.parse(open(p, encoding='utf-8').read())
+                      except SyntaxError as e:
+                          bad.append(f"{p}: {e}")
+          for b in bad: print(b)
+          sys.exit(1 if bad else 0)
+          EOF
+      - name: 运行全部单元测试（不依赖本机数据/网络的套件）
+        run: |
+          cd research
+          python tests_execution.py
+          python tests_exec_unified.py
+          python tests_events.py
+          python tests_manifest.py
+          python tests_portfolio.py
+          python tests_causality.py
+        # 注: tests_audit_core/tests_redteam 等读取本机账本/K线缓存的套件属生产环境验收，
+        # 在本机每日流水线运行；CI 只跑纯逻辑套件（无文件系统依赖）。
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 密钥模式扫描（工作区+全历史）
+        run: |
+          python - <<'EOF'
+          import subprocess, sys, re
+          pats = [
+              (r"ghp_[A-Za-z0-9]{20,}", "GitHub PAT"),
+              (r"gho_[A-Za-z0-9]{20,}", "GitHub OAuth"),
+              (r"AKIA[A-Z0-9]{16}", "AWS AK"),
+              (r"-----BEGIN (RSA|OPENSSH|EC) PRIVATE KEY-----", "Private Key"),
+              (r"password\s*=\s*['\"][^'\"]{6,}['\"]", "Hardcoded Password"),
+              (r"sshpass", "sshpass"),
+          ]
+          bad = []
+          # 工作区
+          r = subprocess.run(['git', 'grep', '-nE', '|'.join(p for p, _ in pats), '--', '.'],
+                             capture_output=True, text=True)
+          if r.stdout.strip():
+              bad.append("工作区:\n" + r.stdout)
+          # 全历史
+          r2 = subprocess.run(['git', 'log', '--all', '-p'], capture_output=True, text=True)
+          for line in r2.stdout.splitlines():
+              for p, name in pats:
+                  if re.search(p, line):
+                      # 排除扫描器自身与公开用户名
+                      if 'REDACTED' in line or 'password\\s' in line or 'maintainer' in line.lower():
+                          continue
+                      bad.append(f"历史: [{name}] {line[:120]}")
+          for b in bad: print(b)
+          sys.exit(1 if bad else 0)
+          EOF
