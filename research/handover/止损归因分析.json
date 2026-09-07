@@ -1,0 +1,19 @@
+{
+  "SMC": {
+    "n_sl": 296,
+    "recovered_ge_1r": 17,
+    "pct_recovered": 5.7,
+    "partial_03_1r": 84,
+    "never_lt_03r": 195,
+    "avg_mfe_r": 0.18,
+    "avg_net": -10.32
+  },
+  "overall": {
+    "n_sl": 296,
+    "recovered_ge_1r": 17,
+    "pct": 5.7,
+    "audit_line": 30,
+    "exceed": false
+  },
+  "generated_at": "2026-09-07 18:11:51"
+}

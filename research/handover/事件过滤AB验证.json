@@ -1,0 +1,74 @@
+{
+  "generated_at": "2026-09-07 18:06:21",
+  "oos_from": "20250701",
+  "A_baseline": {
+    "all": {
+      "n": 3618,
+      "avg": 10.009,
+      "wr": 0.811,
+      "pf": 13.94
+    },
+    "is": {
+      "n": 2881,
+      "avg": 10.856,
+      "wr": 0.824,
+      "pf": 15.34
+    },
+    "oos": {
+      "n": 737,
+      "avg": 6.699,
+      "wr": 0.758,
+      "pf": 8.99
+    }
+  },
+  "B_with_delta": {
+    "all": {
+      "n": 4099,
+      "avg": 9.635,
+      "wr": 0.809,
+      "pf": 12.99
+    },
+    "is": {
+      "n": 3283,
+      "avg": 10.363,
+      "wr": 0.819,
+      "pf": 13.93
+    },
+    "oos": {
+      "n": 816,
+      "avg": 6.704,
+      "wr": 0.766,
+      "pf": 9.25
+    }
+  },
+  "delta_only": {
+    "all": {
+      "n": 481,
+      "avg": 6.818,
+      "wr": 0.792,
+      "pf": 7.61
+    },
+    "is": {
+      "n": 402,
+      "avg": 6.831,
+      "wr": 0.784,
+      "pf": 7.1
+    },
+    "oos": {
+      "n": 79,
+      "avg": 6.749,
+      "wr": 0.835,
+      "pf": 12.77
+    },
+    "n": 481,
+    "layer_dist": {
+      "PROGRESS_WITH_DELTA": 481
+    }
+  },
+  "criteria": {
+    "n_ge_30": true,
+    "oos_avg_gt_1pct": true,
+    "is_oos_consistent": true
+  },
+  "verdict": "PASS → 建议放开 PROGRESS_WITH_DELTA"
+}

@@ -50,12 +50,26 @@ def classify_title_detailed(title):
 def classify_title(title):
     """统一标题分类。返回 (is_event, kind, polarity, amount_wan, pct)。
     kind: 'BUYBACK' | 'HOLDER_INCREASE' | None；polarity: +1(积极) / -1(反向) / 0(中性)。
-    """
+    FIX(2026-09-08, A/B 验证通过): PROGRESS_WITH_DELTA（进展/完成类含金额/比例增量）经
+    481 笔 A/B 回测验证（增量组 IS +6.83% / OOS +6.75% / WR 79-84% / OOS PF 12.77，
+    三条预注册验收线全过，见 handover/事件过滤AB验证.json）→ 纳入候选。
+    硬否（终止/取消/解除/减持/结束）与无金额增量的软否仍拒绝。"""
     s = str(title or "")
     if any(n in s for n in NEG_WORDS):
         # 反向：减持/解除/终止
         if "减持" in s:
             return False, None, -1, None, None
+        # A/B 通过：软否 + 回购/增持 + 明确金额/比例增量 → 候选
+        if any(n in s for n in NEG_SOFT) and ("回购" in s or "增持" in s):
+            if re.search(r"[0-9]+(?:\.[0-9]+)?\s*(亿|万|%|股)", s):
+                _m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*亿(?:元)?", s)
+                _amt = float(_m.group(1)) * 10000 if _m else None
+                _m2 = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*万(?:元)?", s)
+                if _amt is None and _m2:
+                    _amt = float(_m2.group(1))
+                _m3 = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*%", s)
+                _pct = float(_m3.group(1)) if _m3 else None
+                return True, ("BUYBACK" if "回购" in s else "HOLDER_INCREASE"), 1, _amt, _pct
         return False, None, 0, None, None
     is_buyback = "回购" in s
     is_increase = "增持" in s

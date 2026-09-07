@@ -157,6 +157,9 @@ def _run_main_steps():
                     print(f"AI 决策镜像同步警告 {_d}: {_e}", flush=True)
         except Exception as _e:
             print(f"AI 决策同步异常(继续): {_e}", flush=True)
+    # FIX(2026-09-08, 审计方向7): 漏斗监控 —— 记录当日漏斗到历史 + ±2σ 报警（≥8天基线后生效）
+    rc8 = run("funnel_monitor.py", timeout=120)
+    step_status["funnel_monitor"] = rc8
     # FIX(2026-08-22): 运行状态记录（每步成功/失败 + 数据日期 + 兜底标注）
     _data_date = ""
     try:
@@ -169,7 +172,7 @@ def _run_main_steps():
     # 原 `data_complete = rc0 and rc2 and rc3` 未含公告/continuation/dashboard/shadow/reconcile，
     # 公告没拉到或延续腿失败等仍会误标完整（前端显示旧数据）。现按责任域分层：
     _data_complete = rc0 == 0 and rc2 == 0 and rc3 == 0          # 行情/选股数据完整
-    _signal_complete = all(step_status.get(k, 1) == 0 for k in ("announce", "refresh", "holdings", "scanner", "selection"))
+    _signal_complete = all(step_status.get(k, 1) == 0 for k in ("announce", "refresh", "holdings", "scanner", "selection", "funnel_monitor"))
     _execution_complete = all(step_status.get(k, 1) == 0 for k in ("shadow", "reconcile"))
     _frontend_complete = step_status.get("dashboard", 1) == 0
     _production_eligible = _data_complete and _signal_complete and _execution_complete and _frontend_complete

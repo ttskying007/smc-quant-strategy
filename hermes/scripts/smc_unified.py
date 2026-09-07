@@ -3764,8 +3764,8 @@ def build_combo():
 def build_nav():
     if _production_empty_book():
         # FIX(2026-08-17): K线入口不再锁死 V517；EMPTY_BOOK 下由用户自由选择研究版本。
-        return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>冻结研究回测</a><a href='/monitor'>生产状态 / 冻结研究</a><a href='/combo'>研究组合</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收研究</a><a href='/docs'>文档</a></nav>"
-    return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>回测</a><a href='/monitor'>选股</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/uzi'>UZI评审</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/v45?ver=v45_5'>事件实验({FRONTEND_VERSION})</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收</a><a href='/docs'>文档</a></nav>"
+        return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>冻结研究回测</a><a href='/monitor'>生产状态 / 冻结研究</a><a href='/combo'>研究组合</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/funnel'>漏斗</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收研究</a><a href='/docs'>文档</a></nav>"
+    return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>回测</a><a href='/monitor'>选股</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/uzi'>UZI评审</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/funnel'>漏斗</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/v45?ver=v45_5'>事件实验({FRONTEND_VERSION})</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收</a><a href='/docs'>文档</a></nav>"
 
 
 def _empty_book_page(title, detail):
@@ -4212,6 +4212,11 @@ async function doChat(){{
 }}
 </script></body></html>"""
     return html
+
+
+def build_analysis(start='', end=''):
+    # FIX(2026-09-08): 恢复 build_analysis —— build_ai 插入时误吞了本函数头，导致其后代码
+    # 成为 build_ai 的 return 之后死代码（/analysis 404）。现恢复函数边界，主体不变。
     if _production_empty_book():
         return _empty_book_page('生产分析', '无生产交易；分析页不再聚合 V185/V88 历史交易。V517 的冻结研究分析仅在研究页展示。')
     # FIX(2026-08-22): COMBO 生产 — 分析 v20c 回测（逐年/逐月/分腿/弱月）
@@ -4393,6 +4398,61 @@ async function doChat(){{
 <table><thead><tr><th></th><th>领域</th><th>发现</th><th>建议</th></tr></thead><tbody>{rec_rows}</tbody></table></div>
 {contract_block}
 
+</div></body></html>"""
+
+
+def build_funnel():
+    """选股漏斗监控页（审计方向7）：当日漏斗 + 历史 ±2σ 报警 + AB验证结论。"""
+    def _esc(x):
+        return str(x if x is not None else "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+    fun = {}
+    try:
+        with open(r"E:\test\smc_project\research\selection_funnel.json", encoding="utf-8") as fh:
+            fun = json.load(fh)
+    except Exception:
+        pass
+    alarm = {}
+    try:
+        with open(r"E:\test\smc_project\research\selection_funnel_alarm.json", encoding="utf-8") as fh:
+            alarm = json.load(fh)
+    except Exception:
+        pass
+    ab = {}
+    try:
+        with open(r"E:\test\smc_project\research\handover\事件过滤AB验证.json", encoding="utf-8") as fh:
+            ab = json.load(fh)
+    except Exception:
+        pass
+    rej = fun.get("reject_by_reason") or {}
+    alarms = alarm.get("alarms") or []
+    alarm_rows = "".join(
+        f"<tr style='color:#f85149'><td>{_esc(a.get('day'))}</td><td>{_esc(a.get('layer'))}</td>"
+        f"<td>{_esc(a.get('value'))}</td><td>{_esc(a.get('normal_range'))}</td><td>{_esc(a.get('cause_hint'))}</td></tr>"
+        for a in alarms) or "<tr><td colspan=5 style='color:#3fb950'>全部层在 ±2σ 区间内（或基线不足8天）</td></tr>"
+    dl = (ab.get("delta_only") or {})
+    crit = ab.get("criteria") or {}
+    return f"""<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>选股漏斗监控</title>
+<meta http-equiv="refresh" content="300"><style>{CSS}</style></head><body>{build_nav()}
+<div class="container">
+<div class="card"><h2>选股漏斗监控（审计方向7）</h2>
+<p>asof={_esc(fun.get('generated_at'))} | 公告(含增持/回购)={_esc(fun.get('raw_announcements'))} → 正事件={_esc(fun.get('classified_positive'))} → 挂单={_esc(fun.get('orders_created'))}</p>
+<p style="color:#8b949e">漏斗逐层可解释：无新股时可定位"是市场没机会还是系统坏了"。</p></div>
+<div class="card"><h3>当日漏斗分层</h3><table>
+<tr><td>公告总数(关键词命中)</td><td>{_esc(fun.get('raw_announcements'))}</td></tr>
+<tr><td>分类为正事件</td><td>{_esc(fun.get('classified_positive'))}</td></tr>
+<tr><td>硬否(终止/取消/解除/减持/结束)</td><td>{_esc(rej.get('event_filter_hard'))}</td></tr>
+<tr><td>软否(进展/完成等无增量)</td><td>{_esc(rej.get('event_filter_soft'))}</td></tr>
+<tr><td>阶段拒绝(非ACCUM/DOWNTREND)</td><td>{_esc(rej.get('stage'))}</td></tr>
+<tr><td>ADX拒绝(&lt;20)</td><td>{_esc(rej.get('adx'))}</td></tr>
+<tr><td>无K线</td><td>{_esc(rej.get('nodata'))}</td></tr>
+<tr><td>去重</td><td>{_esc(rej.get('dup'))}</td></tr>
+<tr><td><b>挂单</b></td><td><b>{_esc(fun.get('orders_created'))}</b></td></tr>
+</table></div>
+<div class="card"><h3>±2σ 报警（基线≥8天生效）</h3><table><thead><tr><th>日</th><th>层</th><th>当日值</th><th>正常区间</th><th>判因</th></tr></thead><tbody>{alarm_rows}</tbody></table>
+<p style="color:#8b949e">判因规则：正事件骤降但公告量正常 → 疑逻辑/分类 bug；整体骤降 → 市场结构变化或数据源失败。历史 {alarm.get('history_n', 0)} 条。</p></div>
+<div class="card" style="border-left:3px solid #d29922"><h3>事件过滤 A/B 验证（PROGRESS_WITH_DELTA 放开依据）</h3>
+<p>增量组 n={_esc(dl.get('n'))} | IS avg={_esc((dl.get('is') or {}).get('avg'))}% | OOS avg={_esc((dl.get('oos') or {}).get('avg'))}% | OOS PF={_esc((dl.get('oos') or {}).get('pf'))} | OOS WR={_esc((dl.get('oos') or {}).get('wr'))}</p>
+<p>预注册验收: n≥30 {'✅' if crit.get('n_ge_30') else '❌'} | OOS&gt;+1% {'✅' if crit.get('oos_avg_gt_1pct') else '❌'} | IS/OOS一致 {'✅' if crit.get('is_oos_consistent') else '❌'} → <b>{_esc(ab.get('verdict'))}</b></p></div>
 </div></body></html>"""
 
 
@@ -5873,6 +5933,8 @@ class Handler(BaseHTTPRequestHandler):
             self._html(build_shadow())
         elif path == '/ai':
             self._html(build_ai())
+        elif path == '/funnel':
+            self._html(build_funnel())
         elif path == '/stoploss':
             self._html(build_stoploss())
         elif path == '/v45':
