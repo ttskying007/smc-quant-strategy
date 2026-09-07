@@ -17,7 +17,7 @@
 import io, json, os, sqlite3, sys
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from core.events import classify_title, classify_title_detailed
+from core.events import classify_title, classify_title_detailed, NEG_WORDS
 
 KT = r"E:\test\smc_project\hermes\kline_cache_tencent"
 OOS_FROM = "20250701"
@@ -75,18 +75,34 @@ def stage_of(bs, i):
     return "UPTREND" if ret60 > 0 else "DOWNTREND"
 
 
+def classify_no_delta(title):
+    """A 组分类器 = classify_title 减去 PROGRESS_WITH_DELTA 放开（回到第六轮语义）。
+    FIX(2026-09-08 全量回测复检): ① 退出统一 simulate 后重验（原 A/B 用旧循环，
+    含 ep<sl1 机械获利 bug，结果作废）；② A/B 分类器显式区分（classify_title 已放开增量，
+    A 组需用本函数还原"无增量"基线，否则 B−A=0）。"""
+    s = str(title or "")
+    if any(n in s for n in NEG_WORDS):
+        if "减持" in s:
+            return False, None, -1
+        return False, None, 0
+    if "回购" in s:
+        return True, "BUYBACK", 1
+    if "增持" in s:
+        return True, "HOLDER_INCREASE", 1
+    return False, None, 0
+
+
 def run_leg(mode):
-    """mode='A' 全否基线 | 'B' A+PROGRESS_WITH_DELTA。返回交易列表。"""
+    """mode='A' 无增量基线 | 'B' A+PROGRESS_WITH_DELTA。退出统一 core.execution.simulate
+    （BAD_ENTRY 拒绝 ep<sl 的非法区间几何 —— 修复旧循环机械获利bug）。"""
     trades, seen = [], set()
     cur.execute("SELECT date, stock_code, title FROM announce WHERE title LIKE '%增持%' OR title LIKE '%回购%'")
     for date, code, title in cur.fetchall():
-        _is_ev, kind, pol, amt, pct = classify_title(title)
-        layer = classify_title_detailed(title)[5]
+        cls = classify_no_delta if mode == "A" else classify_title
+        _is_ev, kind, pol = cls(title)[:3]
         if not _is_ev or pol < 0:
-            if mode == "A":
-                continue  # 基线：软否/硬否全拒
-            if mode == "B" and layer != "PROGRESS_WITH_DELTA":
-                continue  # B：只额外纳入含增量的进展类
+            continue
+        layer = classify_title_detailed(title)[5]
         d = str(date)[:10].replace("-", "")
         if (code, d) in seen:
             continue
@@ -141,30 +157,16 @@ def run_leg(mode):
         tp1 = _tps[0]
         tp2 = _tps[1] if len(_tps) > 1 else tp1 * 1.05
         tp3 = _tps[2] if len(_tps) > 2 else tp2 * 1.05
-        remaining, net, be = 1.0, 0.0, False
-        for k in range(entry_idx + 1, min(len(bs), entry_idx + 16)):
-            bb = bs[k]
-            stop = ep if be else sl1
-            if bb["l"] <= stop:
-                net += remaining * (stop / ep - 1) * 100
-                remaining = 0
-                break
-            if not be and bb["h"] >= tp1:
-                net += 0.3 * (tp1 / ep - 1) * 100
-                remaining, be = 0.7, True
-            elif be and bb["h"] >= tp2:
-                net += remaining * (tp2 / ep - 1) * 100
-                remaining = 0
-                break
-            elif be and bb["h"] >= tp3:
-                net += remaining * (tp3 / ep - 1) * 100
-                remaining = 0
-                break
-        if remaining > 0:
-            last = bs[min(len(bs), entry_idx + 15) - 1]["c"]
-            net += remaining * (last / ep - 1) * 100
+        # FIX(2026-09-08 复检): 退出统一委托 core.execution.simulate ——
+        # BAD_ENTRY 拒绝 ep<sl1 的非法区间（旧循环对这类首根必获利 = 机械bug，
+        # 旧 A/B 的 +6.75%/PF12.77 即含此水分，全部重测）。
+        from core.execution import simulate as _sim
+        _r = _sim(bs, entry_idx, ep, sl1, tp1=tp1, tp2=tp2, tp3=tp3,
+                  partial_tp1=0.3, stop_to_be=True, max_hold=15, code=code[:6])
+        if _r.get("skipped"):
+            continue  # BAD_ENTRY(区间非法)/SKIP_LIMIT_UP(一字涨停) —— 真实不可执行
         trades.append({"code": code, "entry_date": bs[entry_idx]["t"], "layer": layer,
-                       "net": round(net - 0.20, 4)})
+                       "net": round(_r["net_pnl_pct"], 4)})
     return trades
 
 

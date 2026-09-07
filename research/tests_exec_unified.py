@@ -70,5 +70,30 @@ ok("科创板跌停(-20%)不可卖", (not ex8["exit"]) and ex8["why"] == "LIMIT_
 ex9 = EX.try_exit(pos, {"px": 8.99, "prev": 10.0, "today": "20260907"})
 ok("主板-10.1%跌停不可卖", (not ex9["exit"]) and ex9["why"] == "LIMIT_DOWN_SELL", str(ex9))
 
+# FIX(2026-09-08, P8-1 复检): ep<sl 非法区间几何回归测试 ——
+# 旧 gen_v20f 内联循环对 entry_price < stop 的交易在首根K线必获利(机械bug)。
+# simulate 的 BAD_ENTRY 必须拒绝；正常区间 ep>sl 不受影响。
+def test_ep_lt_sl_bad_entry():
+    # ep=10, sl=10.2(高于入场): 区间几何非法(入场在止损之上)
+    # 旧循环: 首根 l<=10.2 即以10.2获利退出(+2%) —— 机械获利bug
+    daily = [{"t": "20260101", "o": 10.0, "h": 10.1, "l": 9.9, "c": 10.0, "v": 1000000},
+             {"t": "20260102", "o": 10.05, "h": 10.3, "l": 9.8, "c": 10.1, "v": 1000000}]
+    r = EX.simulate(daily, 0, 10.0, 10.2, tp1=10.4, tp2=10.6, tp3=10.8,
+                    partial_tp1=0.3, stop_to_be=True, max_hold=15)
+    ok("P8-1: ep<sl 非法区间→BAD_ENTRY拒绝(防机械获利)", r.get("skipped") and r.get("reason") == "BAD_ENTRY",
+       f"got skipped={r.get('skipped')} reason={r.get('reason')}")
+
+def test_ep_gt_sl_normal():
+    daily = [{"t": "20260101", "o": 10.0, "h": 10.1, "l": 9.9, "c": 10.0, "v": 1000000},
+             {"t": "20260102", "o": 10.05, "h": 10.3, "l": 10.0, "c": 10.2, "v": 1000000},
+             {"t": "20260103", "o": 10.2, "h": 10.5, "l": 10.1, "c": 10.4, "v": 1000000}]
+    r = EX.simulate(daily, 0, 10.0, 9.5, tp1=10.3, tp2=10.6, tp3=10.9,
+                    partial_tp1=0.3, stop_to_be=True, max_hold=15)
+    ok("P8-1: 正常区间 ep>sl 正常执行", not r.get("skipped") and r["net_pnl_pct"] > 0,
+       f"got skipped={r.get('skipped')} net={r.get('net_pnl_pct')}")
+
+test_ep_lt_sl_bad_entry()
+test_ep_gt_sl_normal()
+
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

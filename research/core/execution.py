@@ -66,12 +66,14 @@ def is_limit_up(px_info, side="buy", code=None):
 
 def simulate(daily, entry_idx, ep, sl, tp1=None, tp2=None, max_hold=None,
              partial_tp1=0.0, stop_to_be=False, prev_close=None, track_after_tp1=False,
-             code=None):
+             code=None, tp3=None):
     """统一逐 bar 执行模拟（回测/纸面共用）。
 
     返回 dict: {reason, exit_price, hold_bars, mfe_pct, mae_pct, mfe_r, mae_r,
                 skipped, realized_partial}
-    reason: TP_STRUCTURAL / TP1 / TP2_RUNNER / SL_HIT / SL_GAP / TIME_STOP / SKIP_LIMIT_UP
+    reason: TP_STRUCTURAL / TP1 / TP2_RUNNER / TP3_RUNNER / SL_HIT / SL_GAP / TIME_STOP / SKIP_LIMIT_UP
+    FIX(2026-09-08, 第七轮): 新增 tp3 可选 runner（gen_v20f 事件腿 TP3 语义并入统一内核，
+    消除回测事件腿的平行退出实现）。tp3 触发优先于 TIME_STOP，在 TP2 之后检查。
     """
     ok, skip = entry_ok(daily, entry_idx, ep, sl, prev_close, code)
     if not ok:
@@ -154,6 +156,13 @@ def simulate(daily, entry_idx, ep, sl, tp1=None, tp2=None, max_hold=None,
             realized += remaining * (tp2 / ep - 1) * 100
             remaining = 0
             exit_price, reason = tp2, "TP2_RUNNER"
+            break
+        # FIX(2026-09-08, 第七轮): TP3 runner（gen_v20f 事件腿语义并入；
+        # 与 TP2 互斥 —— TP2 已 break，此处仅当 tp2 未触发而 tp3 直达时（tp2<tp3 且盘中越级））
+        if be_active and tp3 and hi >= tp3 and (not tp2 or tp3 > tp2):
+            realized += remaining * (tp3 / ep - 1) * 100
+            remaining = 0
+            exit_price, reason = tp3, "TP3_RUNNER"
             break
         # 单一结构 TP（调用方显式传 tp2）
         if not tp1 and tp2 and hi >= tp2:

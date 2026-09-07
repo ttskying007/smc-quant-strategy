@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 """生成 v20e 回测 CSV：事件腿（rank_score 6特征 + 回踩买点 ×0.99 + 分层 TP/SL）+ 延续腿（固定10日）
-新 rank_score 特征（阶段跨度/ADX跨度/周线/放量分级/连续放量）的生产回测"""
+新 rank_score 特征（阶段跨度/ADX跨度/周线/放量分级/连续放量）的生产回测
+FIX(2026-09-08, 第七轮审计 消除平行实现): 事件过滤改用 core.events.classify_title
+（生产 paper_sim 与回测同一套分类；PROGRESS_WITH_DELTA 放开后回测同步纳入）。"""
 import csv, io, json, os, sqlite3, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.events import classify_title
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 KT = r"E:\test\smc_project\hermes\kline_cache_tencent"
@@ -27,14 +31,12 @@ def bars_of(code):
 
 
 def is_strong(title):
-    t = str(title or "")
-    if "回购" in t:
-        if "完成" in t or "进度" in t or "进展" in t or "结果" in t or "前十名" in t:
-            return False
-        return True
-    if "增持" in t:
-        return True
-    return False
+    """FIX(2026-09-08, 第七轮): 统一委托 core.events.classify_title ——
+    消除回测/生产两套事件过滤（原 is_strong 与 classify_title 语义不同：
+    is_strong 拒绝回购的完成/进展类但放行全部增持；classify_title 分层硬否/软否）。
+    生产与回测必须同一套分类，否则回测评估的不是生产行为。"""
+    is_ev, kind, pol, _amt, _pct = classify_title(title)
+    return bool(is_ev and pol > 0)
 
 
 def adx14(bs, i):
@@ -183,31 +185,15 @@ for date, code, title in cur.fetchall():
     tp3 = _tps[2] if len(_tps) > 2 else tp2 * 1.05
     remaining = 1.0
     net = 0.0
-    be = False
-    for k in range(entry_idx + 1, min(len(bs), entry_idx + 16)):
-        bb = bs[k]
-        stop = ep if be else sl1
-        if bb["l"] <= stop:
-            net += remaining * (stop / ep - 1) * 100
-            remaining = 0
-            break
-        if not be and bb["h"] >= tp1:
-            net += 0.3 * (tp1 / ep - 1) * 100
-            remaining = 0.7
-            be = True
-        elif be and bb["h"] >= tp2:
-            net += remaining * (tp2 / ep - 1) * 100
-            remaining = 0
-            break
-        elif be and bb["h"] >= tp3:
-            net += remaining * (tp3 / ep - 1) * 100
-            remaining = 0
-            break
-    if remaining > 0:
-        last = bs[min(len(bs), entry_idx + 15) - 1]["c"]
-        net += remaining * (last / ep - 1) * 100
+    # FIX(2026-09-08, 第七轮 消除平行退出实现): 退出改委托 core.execution.simulate
+    # （tp1 30%部分+保本/tp2/tp3 runner/15根持有，与原内联循环语义等价：TP2 先于 TP3 判定，
+    #  SL 按 stop=be?ep:sl1 逐 bar，跳空穿越按开盘价 —— simulate 的 SL_GAP 同保守语义）
+    from core.execution import simulate as _sim
+    _r = _sim(bs, entry_idx, ep, sl1, tp1=tp1, tp2=tp2, tp3=tp3,
+              partial_tp1=0.3, stop_to_be=True, max_hold=15, code=code[:6])
+    net = _r.get("net_pnl_pct", 0.0)
     ev.append({"symbol": code + (".SH" if code.startswith("6") else ".SZ"), "entry_date": bs[entry_idx]["t"],
-               "src": "EVENT", "net_pnl_pct": round(net - 0.20, 4), "rank": rs})
+               "src": "EVENT", "net_pnl_pct": round(net, 4), "rank": rs})
 conn.close()
 print("事件(v20e):", len(ev))
 
