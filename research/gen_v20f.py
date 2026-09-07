@@ -192,8 +192,26 @@ for date, code, title in cur.fetchall():
     _r = _sim(bs, entry_idx, ep, sl1, tp1=tp1, tp2=tp2, tp3=tp3,
               partial_tp1=0.3, stop_to_be=True, max_hold=15, code=code[:6])
     net = _r.get("net_pnl_pct", 0.0)
-    ev.append({"symbol": code + (".SH" if code.startswith("6") else ".SZ"), "entry_date": bs[entry_idx]["t"],
-               "src": "EVENT", "net_pnl_pct": round(net, 4), "rank": rs})
+    if _r.get("skipped"):
+        continue  # BAD_ENTRY(ep<sl 非法区间几何) / SKIP_LIMIT_UP(一字涨停) —— 非真实交易，跳过
+    # FIX(2026-09-08, P8-2): 事件腿逐笔明细 —— 从 simulate 结果补齐 buy/sell/hold/reason/TP-SL/MFE-MAE，
+    # 供 gen_full_backtest_data 逐笔审计（原 CSV 只有 net_pnl_pct，无逐笔字段）
+    _risk = ep - sl1
+    _hb = _r.get("hold_bars", 0)
+    _sell_i = min(len(bs) - 1, entry_idx + max(1, _hb)) if _hb else entry_idx
+    ev.append({
+        "symbol": code + (".SH" if code.startswith("6") else ".SZ"), "entry_date": bs[entry_idx]["t"],
+        "src": "EVENT",
+        "buy_date": bs[entry_idx]["t"], "buy_price": round(ep, 3),
+        "sell_date": bs[_sell_i]["t"] if _hb else "",
+        "sell_price": round(_r.get("exit_price", 0), 3) if _hb else "",
+        "reason": _r.get("reason", ""), "hold_bars": _hb,
+        "tp": round(tp2, 3), "sl": round(sl1, 3), "risk_pct": round(_risk / ep * 100, 3) if _risk > 0 else 0,
+        "net_pnl_pct": round(net, 4),
+        "mfe_pct": _r.get("mfe_pct", 0), "mae_pct": _r.get("mae_pct", 0),
+        "mfe_r": _r.get("mfe_r", 0), "mae_r": _r.get("mae_r", 0),
+        "rr_exit": round((_r.get("exit_price", ep) / ep - 1) / (_risk / ep), 3) if _risk > 0 else 0,
+        "signal_chain": "insider-event", "r20": "", "rank": rs})
 conn.close()
 print("事件(v20e):", len(ev))
 
@@ -230,7 +248,11 @@ combo = combo_capped
 
 out_path = r"E:\test\smc_project\research\combo_v20f_trades.csv"
 with open(out_path, "w", encoding="utf-8-sig", newline="") as fh:
-    w = csv.DictWriter(fh, fieldnames=["symbol", "entry_date", "src", "net_pnl_pct", "rank"])
+    w = csv.DictWriter(fh, fieldnames=["symbol", "entry_date", "src", "net_pnl_pct", "rank",
+                                       "buy_date", "buy_price", "sell_date", "sell_price",
+                                       "reason", "hold_bars", "tp", "sl", "risk_pct",
+                                       "mfe_pct", "mae_pct", "mfe_r", "mae_r", "rr_exit",
+                                       "signal_chain", "r20"])
     w.writeheader()
     for t in combo:
         w.writerow(t)

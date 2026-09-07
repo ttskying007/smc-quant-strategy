@@ -70,6 +70,7 @@ for m in months[-18:]:
 print("\n== ③ 逐笔异常 ==")
 issues = []
 n_t1_violation = n_tp_sl_illegal = n_tail = n_field_missing = 0
+n_ev_t1 = n_ev_tpsl = n_ev_hold0 = 0
 for t in trades:
     # T+1: sell_date 必须 > buy_date（买入当日不可卖）
     bd, sd = str(t.get("buy_date") or ""), str(t.get("sell_date") or "")
@@ -89,18 +90,28 @@ for t in trades:
         n_tail += 1
         if len(issues) < 30:
             issues.append({"type": "TAIL_EXTREME", "pnl": t["net_pnl_pct"], "t": t})
-    # 字段缺失（EVENT 腿 buy/sell 价为空是已知 —— 单独统计）
-    if t.get("leg") == "EVENT" and not t.get("buy_price"):
-        n_field_missing += 1
+    # 事件腿字段完整性（P8-2 逐笔重放后）
+    if t.get("leg") == "EVENT":
+        if not t.get("buy_price") or not t.get("tp") or not t.get("sl"):
+            n_field_missing += 1
+        if not t.get("sell_date") or not t.get("sell_price"):
+            n_ev_t1 += 1  # 未平仓/持有至期末
+        elif t["sell_date"] <= t["buy_date"]:
+            n_ev_t1 += 1
+        if isinstance(t.get("tp"), (int, float)) and isinstance(t.get("sl"), (int, float)) \
+                and isinstance(t.get("buy_price"), (int, float)) and t["tp"] and t["sl"] and t["buy_price"]:
+            if not (t["tp"] > t["buy_price"] > t["sl"]):
+                n_ev_tpsl += 1
 
 print(f"  T+1 违规(sell<=buy): {n_t1_violation}")
 print(f"  TP>buy>SL 非法: {n_tp_sl_illegal}")
 print(f"  尾部极端(<-50%): {n_tail}")
-print(f"  EVENT 腿缺 buy/sell 价字段: {n_field_missing}（已知: gen_full 的 EVENT 腿未逐笔重放K线）")
+print(f"  EVENT 腿缺 buy/tp/sl: {n_field_missing} | EVENT 卖出日期违规/未平仓: {n_ev_t1} | EVENT TP>buy>SL非法: {n_ev_tpsl}")
 
 # 事件腿重放口径缺失检查 —— combo_v20f_trades.csv 只有净收益，无逐笔明细
 rep["anomalies"] = {"t1_violation": n_t1_violation, "tp_sl_illegal": n_tp_sl_illegal,
                    "tail_extreme": n_tail, "event_missing_prices": n_field_missing,
+                   "event_sell_issues": n_ev_t1, "event_tpsl_illegal": n_ev_tpsl,
                    "samples": issues[:30]}
 
 # ④ 集中度（HHI 按月）

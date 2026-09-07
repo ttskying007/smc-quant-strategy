@@ -85,7 +85,7 @@ for tr in trades:
         "r20": sd.get("r20", ""),
     })
 
-# ---- 事件腿（无 K 线逐笔重放，含 buy/sell 估算）----
+# ---- 事件腿（逐笔重放明细，P8-2）----
 ev_detail = []
 ev_rows = list(csv.DictReader(open(os.path.join(RESEARCH, "combo_v20f_trades.csv"), encoding="utf-8-sig")))
 for t in ev_rows:
@@ -95,14 +95,21 @@ for t in ev_rows:
     p = code2file.get(code)
     ed = t.get("entry_date", "")
     pnl = t.get("net_pnl_pct")
+    def _f(x, cast=float):
+        try:
+            return cast(x)
+        except (TypeError, ValueError):
+            return None
     ev_detail.append({
         "leg": "EVENT", "symbol": t.get("symbol", ""), "entry_date": ed,
-        "buy_date": ed, "buy_price": "",
-        "sell_date": "", "sell_price": "",
-        "reason": "", "hold_bars": "",
-        "tp": "", "sl": "", "risk_pct": "",
-        "net_pnl_pct": round(float(pnl), 4) if pnl not in (None, "", "None") else None,
-        "mfe_pct": "", "mae_pct": "", "mfe_r": "", "mae_r": "", "rr_exit": "",
+        "buy_date": t.get("buy_date") or ed, "buy_price": _f(t.get("buy_price")),
+        "sell_date": t.get("sell_date") or "", "sell_price": _f(t.get("sell_price")),
+        "reason": t.get("reason") or "", "hold_bars": _f(t.get("hold_bars"), int) or 0,
+        "tp": _f(t.get("tp")), "sl": _f(t.get("sl")), "risk_pct": _f(t.get("risk_pct")) or 0,
+        "net_pnl_pct": _f(pnl),
+        "mfe_pct": _f(t.get("mfe_pct")) or 0, "mae_pct": _f(t.get("mae_pct")) or 0,
+        "mfe_r": _f(t.get("mfe_r")) or 0, "mae_r": _f(t.get("mae_r")) or 0,
+        "rr_exit": _f(t.get("rr_exit")) or 0,
         "signal_chain": "insider-event", "r20": "", "rank": t.get("rank", ""),
     })
 
