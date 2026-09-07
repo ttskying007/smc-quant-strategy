@@ -74,7 +74,30 @@ def compute_median():
 V_MED = compute_median()
 print(f"vol20 中位: {V_MED:.4f}", flush=True)
 
-# scan for continuation candidates at latest bar (entry next open)
+# FIX(2026-09-08, 审计 P0-3): 交易日历（惰性构建）—— 仅在出现候选需计算 next_td 时才扫描全市场。
+# 避免每次运行都多读一遍 ~4551 个 K 线文件（IO 翻倍）。
+_ALL_TRADE_DATES = None
+
+
+def next_trade_day(d8):
+    """返回 d8 之后第一个已收盘交易日（为 valid_from 提供明日开盘日）。惰性构建日历。"""
+    global _ALL_TRADE_DATES
+    if not d8:
+        return ""
+    if _ALL_TRADE_DATES is None:
+        _s = set()
+        for _p in sorted(os.listdir(KT)):
+            if not _p.endswith("_daily_800.json"):
+                continue
+            for _b in bars(os.path.join(KT, _p)):
+                _s.add(_b["t"])
+        _ALL_TRADE_DATES = _s
+    for d in sorted(_ALL_TRADE_DATES):
+        if d > d8:
+            return d
+    return ""
+
+# scan for continuation candidates at latest bar (entry next trade day)
 cands = []
 n = 0
 latest = ""
@@ -88,7 +111,13 @@ for p in sorted(os.listdir(KT)):
     if daily[-1]["t"] > latest:
         latest = daily[-1]["t"]
     sym = p.replace("_daily_800.json", "").replace("_", ".", 1)
-    i = len(daily) - 2  # signal on second-last bar, entry = last bar open
+    # FIX(2026-09-08, 审计 P0-3): 消除延续腿前视/滞后混用。
+    # 原实现 `i = len-2`(信号倒数第二根), `entry_idx = i+1 = 最后根`，
+    # 且 VWAP/vol/entry_price 用到 entry_idx(最后根)的 open/close/volume ——
+    # 这些在"以最后根收盘后、次日开盘前"做选股时均不可知。
+    # 改为：signal_idx = len-1(最新已收盘日)，所有特征只算到 signal_idx，
+    # entry 为下一个交易日(明日开盘)由 paper_sim.monitor 以实时 open 撮合，不写历史成交价。
+    i = len(daily) - 1
     st = stage_detailed(daily, i)
     if st != "MARKUP":
         continue
@@ -112,33 +141,37 @@ for p in sorted(os.listdir(KT)):
         continue
     if daily[i]["c"] <= sl_tmp:
         continue
-    entry_idx = i + 1
-    if entry_idx >= len(daily) or entry_idx < 20:
+    # FIX(2026-09-08, 审计 P0-3): 引用价 = signal 收盘（决策时点可得），成交由 monitor 以次日 real open 撮合
+    ref_px = daily[i]["c"]
+    if sl_tmp >= ref_px:
         continue
-    ep = daily[entry_idx]["o"]
-    if sl_tmp >= ep:
-        continue
-    pv = sum(daily[k]["c"] * daily[k]["v"] for k in range(entry_idx - 19, entry_idx + 1))
-    vol = sum(daily[k]["v"] for k in range(entry_idx - 19, entry_idx + 1))
+    # VWAP/vol 只算到 signal_idx（不含未来 entry 日）
+    pv = sum(daily[k]["c"] * daily[k]["v"] for k in range(i - 19, i + 1))
+    vol = sum(daily[k]["v"] for k in range(i - 19, i + 1))
     if vol <= 0:
         continue
     vw = pv / vol
     # FIX(2026-08-22): VWAP threshold 5% -> 10% (research: monotonic improvement, 10% = +8.56%)
-    if (daily[entry_idx]["c"] - vw) / vw < 0.09:
+    if (daily[i]["c"] - vw) / vw < 0.09:
         continue
-    w20 = daily[entry_idx - 20:entry_idx]
+    w20 = daily[i - 20:i]
     vol20 = sum((b["h"] - b["l"]) / b["c"] for b in w20) / 20 if len(w20) == 20 else 0
     if vol20 >= V_MED:
         continue
-    cands.append({"symbol": sym, "signal_date": daily[i]["t"], "entry_date": daily[entry_idx]["t"],
-                  "support": round(sl_tmp, 3), "entry_price": round(ep, 3),
+    cands.append({"symbol": sym, "signal_date": daily[i]["t"],
+                  # FIX(2026-09-08, 审计 P0-3): entry 为下一交易日（明日），不提前写死历史 entry 价。
+                  # entry_price 改为 signal 收盘参考价，成交由 paper_sim 实时 open 撮合。
+                  "entry_date": next_trade_day(daily[i]["t"]), "valid_from": next_trade_day(daily[i]["t"]),
+                  "entry_mode": "next_open",
+                  "reference_price": round(ref_px, 3), "entry_price": round(ref_px, 3),
+                  "support": round(sl_tmp, 3),
                   "hold": 10, "signal": "CONTINUATION_MARKUP", "stage": "MARKUP"})
     if n % 1500 == 0:
         print(f"  {n} files, cands {len(cands)}", flush=True)
 
 print(f"扫描完成: {n} files, latest={latest}, 延续候选: {len(cands)}")
 for c in cands[:10]:
-    print(f"  {c['symbol']}: signal={c['signal_date']} entry={c['entry_date']} support={c['support']} entry_price={c['entry_price']}")
+    print(f"  {c['symbol']}: signal={c['signal_date']} ref={c['reference_price']} support={c['support']}")
 
 # merge into scanner result
 try:

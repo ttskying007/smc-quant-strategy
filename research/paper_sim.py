@@ -122,17 +122,12 @@ def _is_suspended(px_info):
     return vol == 0
 
 
-def _is_limit_up(px_info, side="buy"):
-    """粗略涨跌停判定（主板 10%；创业板 30/688 20% 在此简化按 10% 主板规则）。
-    返回 True 表示"无法成交"（买入时涨停、卖出时跌停）。无昨收时返回 False（不拦截）。"""
-    px = (px_info or {}).get("px")
-    prev = (px_info or {}).get("prev") or 0
-    if not px or prev <= 0:
-        return False
-    chg = (px / prev - 1)
-    if side == "buy":
-        return chg >= 0.095  # 触及涨停 ≈ 无法按市价买入
-    return chg <= -0.095  # 触及跌停 ≈ 无法按市价卖出
+def _is_limit_up(px_info, side="buy", code=None):
+    """涨跌停判定 —— FIX(2026-09-08, 审计 P0-5): 统一委托 core.execution.is_limit_up
+    （按板块/代码区分主板10% / 创业板/科创20% / 北交所30%），删除手写 10% 主板简化。
+    兼容旧调用：未传 code 时按主板 10% 处理（保持安全默认）。"""
+    from core.execution import is_limit_up as _core_limit
+    return _core_limit(px_info, side=side, code=code)
 
 
 # ---------- kline helpers (for structure SL/TP) ----------
@@ -433,12 +428,29 @@ def structural_sltp(code, signal_date, src='EVENT', stage='DOWNTREND', adx=0.0):
 
 # ---------- selection (daily 0:00 trigger) ----------
 def _next_td(dates, d8):
-    """FIX(2026-09-05, 审计 G05/G09): signal_date(d8) 之后第一个交易日（T+1 可成交日）。"""
-    if d8 not in dates:
-        # signal_date 不在 K 线中（公告日非交易日）→ 取之后第一个交易日
-        return next((x for x in dates if x > d8), d8)
-    idx = dates.index(d8)
-    return dates[idx + 1] if idx + 1 < len(dates) else d8
+    """FIX(2026-09-05, 审计 G05/G09): signal_date(d8) 之后第一个交易日（T+1 可成交日）。
+    FIX(2026-09-08, 审计 P0-2): 当 d8 是当前最后交易日（今日刚披露、明日K线尚未生成）时，
+    不能再返回 d8 自身，否则 monitor 会把"今日"当成可成交日提前撮合。
+    退化为按周末日历推算下一交易日（A股休市以周六/周日为主，节假日由数据源对齐）；
+    有可用 K 线日期则优先用其映射。"""
+    from datetime import date, timedelta
+    if d8 in dates:
+        idx = dates.index(d8)
+        if idx + 1 < len(dates):
+            return dates[idx + 1]
+        # d8 是当前数据最后交易日（今日刚披露、明日K线尚未生成）→ 按日历推下一交易日
+        if d8 == dates[-1]:
+            try:
+                d = date(int(d8[:4]), int(d8[4:6]), int(d8[6:8]))
+                for _ in range(8):  # 最多推进 8 天必然遇到工作日
+                    d += timedelta(days=1)
+                    if d.weekday() < 5:  # 周一~周五
+                        return d.strftime("%Y%m%d")
+            except Exception:
+                pass
+        return d8
+    # signal_date 不在 K 线中（公告日非交易日）→ 取之后第一个交易日
+    return next((x for x in dates if x > d8), d8)
 
 
 def _parse_insider_magnitude(title):
@@ -542,29 +554,29 @@ def daily_selection():
             if close_px <= 0:
                 continue
             # FIX(2026-08-22): event leg uses T+1 open price (market order, matching backtest)
-            # Previously used limit order at disclosure close — caused PENDING never filling.
+            # FIX(2026-09-08, 审计 P0-2): 不再要求 T+1 K 线已存在。
+            # 原 `entry_idx>=len(bs) -> continue` 会让"今日收盘后刚披露"的公告因明日K线尚未生成而整单跳过
+            # （实盘信号天然滞后/漏选）。现改为：只要 signal 日(披露日收盘)可得即可生成挂单，
+            # 成交价由 monitor 在 valid_from 日以实时 open 撮合，v_ratio 用信号日可得数据计算。
             entry_idx = i + 1
-            if entry_idx >= len(bs):
-                continue
-            entry_px = bs[entry_idx]["o"]
-            if entry_px <= 0:
-                continue
             adx_v = adx14_of(bs, i) or 0
             tp1, tp2, tp3, tp4, sl1, sl2, anchor_note = structural_sltp(code, d8, src='EVENT', stage=st, adx=adx_v)
             # FIX(2026-08-25): tp4/sl2 可能 None（结构不足，ACCUM/DOWNTREND 非强趋势时）—— 回退
-            if tp1 is None or sl1 is None or tp4 is None or tp4 <= entry_px or sl2 is None:
-                tp1 = round(entry_px * 1.03, 3)
-                tp2 = round(entry_px * 1.06, 3)
-                tp3 = round(entry_px * 1.10, 3)
-                tp4 = round(entry_px * 1.15, 3)
-                sl1 = round(entry_px * 0.96, 3)
-                sl2 = round(entry_px * 0.90, 3)
+            if tp1 is None or sl1 is None or tp4 is None or tp4 <= close_px or sl2 is None:
+                tp1 = round(close_px * 1.03, 3)
+                tp2 = round(close_px * 1.06, 3)
+                tp3 = round(close_px * 1.10, 3)
+                tp4 = round(close_px * 1.15, 3)
+                sl1 = round(close_px * 0.96, 3)
+                sl2 = round(close_px * 0.90, 3)
                 anchor_note = "回退:固定比例(结构不足)"
             is_buyback = "回购" in str(title)
             sig = "BUYBACK_STRONG" if is_buyback else "HOLDER_INCREASE"
             subs = sub_signals_event(bs, i, dd)
             avg_v = sum(bs[k]["v"] for k in range(i + 1 - 20, i + 1)) / 20 if i + 1 >= 20 else 0
-            v_ratio = round(bs[entry_idx]["v"] / avg_v, 2) if (avg_v and entry_idx < len(bs)) else 1.0
+            # FIX(2026-09-08, 审计 P0-2): v_ratio 用披露日(决策时点)可得量 bs[i]["v"]，
+            # 原 bs[entry_idx]["v"] 是 T+1 成交量 —— 实盘开盘前不可知，且今日披露时 entry_idx 尚不存在。
+            v_ratio = round(bs[i]["v"] / avg_v, 2) if avg_v else 1.0
             # FIX(2026-08-22): 连续放量（大资金持续入场，研究 iter_vol_cont: 连续放量 +15.55%/PF 9.30）
             # FIX(2026-09-05, 审计 G22): v2_ratio 用 bs[i-1]（signal 日前一日量，决策时点可得），
             # 原 bs[entry_idx+1] 是未来量（T+2）→ 与回测 gen_v20f 口径不一致
@@ -601,7 +613,8 @@ def daily_selection():
             # FIX(2026-08-22): 回踩挂单（披露日收盘×0.99，回落成交；否则 T+1 开盘兜底）—— 研究 +0.47pp
             # limit = disclosure close × 0.99; if T+1 low <= limit → fill at limit; else fill at T+1 open
             limit_px = round(close_px * 0.99, 3)
-            t1_open = round(entry_px, 3)
+            # FIX(2026-09-08, 审计 P0-2): t1_open 已删除 —— monitor 以 valid_from 日实时 open 撮合，
+            # 不再用 T+1 历史开盘价回退（历史价不可当实盘成交参考）。
             # FIX(2026-09-05, 审计 F17): 解析增持金额/占比，作为事件强度字段 + rank 加分
             _amt, _shr, _pct, _mag_hint = _parse_insider_magnitude(title)
             if _pct is not None and _pct >= 1.0:
@@ -645,7 +658,7 @@ def daily_selection():
             if (code, sig_d) in known or (code, sig_d) in seen_orders:
                 continue
             seen_orders.add((code, sig_d))
-            ep = c.get("entry_price", 0)
+            ep = c.get("reference_price") or c.get("entry_price") or 0
             support = c.get("support", 0)
             tp = ep * 1.15 if ep else 0
             sl = support * 0.99 if support else (ep * 0.90 if ep else 0)
@@ -653,21 +666,24 @@ def daily_selection():
             subs2 = []
             dates2 = []
             if bs2 and ep:
-                ed2 = str(c.get("entry_date", ""))
+                # FIX(2026-09-08, 审计 P0-3): 子信号基于 signal 日(决策时点)计算，
+                # 不再依赖已删除的 entry_date（历史 entry 日）。
+                sig_d8 = sig_d.replace("-", "")
                 dates2 = [b["t"] for b in bs2]
-                ei2 = dates2.index(ed2) if ed2 in dates2 else -1
+                ei2 = dates2.index(sig_d8) if sig_d8 in dates2 else -1
                 if ei2 >= 60:
-                    subs2 = sub_signals_cont(bs2, ei2, str(c.get("signal_date", "")))
+                    subs2 = sub_signals_cont(bs2, ei2, sig_d)
             led.append({
                 "code": code, "name": code, "signal_combo": "CONTINUATION_MARKUP",
                 # FIX(2026-09-05, 审计 G04): 延续腿不再当日 FILLED —— 信号 bar 用 ≤signal 数据过滤，
                 # 次日开盘挂单(valid_from)由 monitor 以实时 open 成交，禁止"知今日涨9%按今开买"
+                # FIX(2026-09-08, 审计 P0-3): entry_price 用 signal 收盘参考价，成交价由 monitor 实时 open 撮合
                 "signal_date": sig_d, "trigger": "MARKUP结构支撑+VWAP10%+低波动：次日开盘买入，固定10日",
-                "valid_from": _next_td(dates2, sig_d.replace("-", "")) if (bs2 and ep) else "",
+                "valid_from": c.get("valid_from") or (_next_td(dates2, sig_d8) if (bs2 and ep) else ""),
                 "entry_price": round(ep, 3) if ep else 0, "tp_price": round(tp, 3), "sl_price": round(sl, 3),
                 "status": "PENDING_ORDER", "paper": True, "source": "CONT",
                 "created_at": time.strftime("%Y-%m-%d"), "pick_date": time.strftime("%Y-%m-%d"),
-                "sub_signals": subs2,
+                "sub_signals": subs2, "entry_mode": "next_open",
                 "filled_price": None,
                 "filled_at": None,
                 "exit_reason": None, "pnl_pct": None, "hold": 10,
@@ -811,7 +827,7 @@ def realtime_monitor():
             if _is_suspended(_info):
                 continue
             # FIX(2026-09-04, 审计 P2): 涨停无法买入（挂单不成交，等待回落）
-            if _is_limit_up(_info, side="buy"):
+            if _is_limit_up(_info, side="buy", code=t["code"]):
                 continue
             # FIX(2026-09-05, 审计 G05/G09): 未到 valid_from（signal_date 后首交易日）不可成交；
             # 用实时快照 open 价成交，禁止 t1_open 历史价回退
@@ -861,7 +877,7 @@ def realtime_monitor():
             if _is_suspended(_info):
                 continue
             # FIX(2026-09-04, 审计 P2): 跌停无法卖出（跳过平仓判定，避免按跌停价错误成交）
-            if _is_limit_up(_info, side="sell"):
+            if _is_limit_up(_info, side="sell", code=t["code"]):
                 continue
             ep = t["filled_price"] or t["entry_price"]
             # FIX(2026-09-04, 策略层): 卖出执行价 = 实时价 × (1 - SLIPPAGE)（卖出滑点）
@@ -913,29 +929,15 @@ def realtime_monitor():
                     active_sl = ep  # breakeven after TP1
                 if t.get("tp2_hit") and t.get("sl_price", 0) < (tp1 or ep):
                     active_sl = tp1 or ep  # lock TP1 profit after TP2
-                # FIX(2026-08-22) P1: 5 交易日时间止损（入场后未触 TP1 全仓离场）
-                if not t.get("tp1_hit") and t.get("filled_at"):
-                    try:
-                        _bs = bars_of(t["code"])
-                        _ds = [b["t"] for b in _bs]
-                        _fd = str(t["filled_at"])[:10].replace("-", "")
-                        if _fd in _ds:
-                            _fi = _ds.index(_fd)
-                            _today = _ds[-1] if _ds else ""
-                            # FIX(2026-09-05, 审计 G08): 持有期统一为 config.MAX_HOLD(12交易日)，
-                            # 原 5 日 TIME_STOP 与回测(12/15根)不一致 → 实盘过早砍单
-                            _hold_max = int(getattr(CFG, "MAX_HOLD", 12))
-                            if _fi + _hold_max < len(_ds) and _ds[_fi + _hold_max] <= _today:
-                                t["status"] = "CLOSED"
-                                t["exit_reason"] = "TIME_STOP"
-                                _rem = 1.0
-                                t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + _rem * (_sell_px / ep - 1) * 100 - FEE * _rem, 4)
-                                n_close += 1
-                    except Exception:
-                        pass
+                # FIX(2026-09-08, 审计 P0-4/P1-1): 重排退出判定顺序，对齐 core.execution.simulate。
+                # 原实现先判 TIME_STOP 再判 SL —— 同一根K线价格同时触及止损(含保本)与持有到期时，
+                # 纸面记 TIME_STOP 而回测记 BE/SL，造成 reconcile 不一致。现改为与回测一致：
+                # ① 先判 SL/BE 止损 → ② 再判 TP1/TP2 → ③ 最后判时间止损。
+                # 且保本止损(active_sl==ep, 已触TP1)记录为 BE 与回测标签一致。
+                is_be = bool(t.get("tp1_hit")) and abs(active_sl - ep) < 1e-6
                 if cur_px <= active_sl:
                     t["status"] = "CLOSED"
-                    t["exit_reason"] = "SL_HIT"
+                    t["exit_reason"] = "BE" if is_be else "SL_HIT"
                     _rem = 0.7 if t.get("tp1_hit") else 1.0
                     t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + _rem * (_sell_px / ep - 1) * 100 - FEE * _rem, 4)
                     n_close += 1
@@ -954,14 +956,30 @@ def realtime_monitor():
                     t["pnl_pct"] = round(t.get("realized_pnl", 0), 4)
                     t["note"] = (t.get("note", "") + " | TP2(FVG/BSL)触发：剩余70%平仓+%.2f%%（100%已平）" % ((tp2/ep-1)*100)).strip()
                     n_close += 1
-                elif not t.get("tp3_hit") and t.get("tp2_hit") and tp3 > 0 and cur_px >= tp3:
-                    t["tp3_hit"] = True
-                    t["note"] = (t.get("note", "") + " | TP3(流动性池)触发").strip()
-                elif t.get("tp3_hit") and not t.get("tp2_hit") and tp4 > 0 and cur_px >= tp4:
-                    t["status"] = "CLOSED"
-                    t["exit_reason"] = "TP4_RUNNER"
-                    t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + 0.7 * (_sell_px / ep - 1) * 100 - FEE * 0.7, 4)
-                    n_close += 1
+                # FIX(2026-09-08, 审计 P1-2): TP3/TP4 死代码已删除 ——
+                # TP2 触发即 CLOSED(100%已平，见 G06)，TP3/TP4 分支永远不可达，
+                # 且其 `tp3_hit and not tp2_hit` 条件与 TP3 依赖 tp2_hit 的语义自相矛盾。
+                # 统一两段式：TP1(30%部分)+TP2(剩余全平)，无多余 runner。
+                if t["status"] == "FILLED" and not t.get("tp1_hit") and t.get("filled_at"):
+                    # 时间止损（未触 TP1 全仓离场）—— 最后判定，与回测 simulate 的 close-at-end 语义一致
+                    try:
+                        _bs = bars_of(t["code"])
+                        _ds = [b["t"] for b in _bs]
+                        _fd = str(t["filled_at"])[:10].replace("-", "")
+                        if _fd in _ds:
+                            _fi = _ds.index(_fd)
+                            _today = _ds[-1] if _ds else ""
+                            # FIX(2026-09-05, 审计 G08): 持有期统一为 config.MAX_HOLD(12交易日)，
+                            # 原 5 日 TIME_STOP 与回测(12/15根)不一致 → 实盘过早砍单
+                            _hold_max = int(getattr(CFG, "MAX_HOLD", 12))
+                            if _fi + _hold_max < len(_ds) and _ds[_fi + _hold_max] <= _today:
+                                t["status"] = "CLOSED"
+                                t["exit_reason"] = "TIME_STOP"
+                                _rem = 1.0
+                                t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + _rem * (_sell_px / ep - 1) * 100 - FEE * _rem, 4)
+                                n_close += 1
+                    except Exception:
+                        pass
             t["mark_price"] = cur_px
             t["mark_pnl_pct"] = round((cur_px / ep - 1) * 100, 4)
             # FIX(2026-08-22): 卖出交易日志（时间/信号/动作/TP/SL/触发类型/盈亏）

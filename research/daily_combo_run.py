@@ -152,13 +152,23 @@ def _run_main_steps():
     except Exception:
         pass
     _failed = [k for k, v in step_status.items() if v != 0]
-    # FIX(2026-08-25): data_complete 必须含 selection（selection 失败 → fallback 补跑）
-    _data_complete = rc0 == 0 and rc2 == 0 and rc3 == 0
+    # FIX(2026-09-08, 审计 P1-3): 运行状态四层分层判定。
+    # 原 `data_complete = rc0 and rc2 and rc3` 未含公告/continuation/dashboard/shadow/reconcile，
+    # 公告没拉到或延续腿失败等仍会误标完整（前端显示旧数据）。现按责任域分层：
+    _data_complete = rc0 == 0 and rc2 == 0 and rc3 == 0          # 行情/选股数据完整
+    _signal_complete = all(step_status.get(k, 1) == 0 for k in ("announce", "refresh", "holdings", "scanner", "selection"))
+    _execution_complete = all(step_status.get(k, 1) == 0 for k in ("shadow", "reconcile"))
+    _frontend_complete = step_status.get("dashboard", 1) == 0
+    _production_eligible = _data_complete and _signal_complete and _execution_complete and _frontend_complete
     json.dump({"run_at": time.strftime("%Y-%m-%d %H:%M:%S"), "steps": step_status,
                "data_latest_date": _data_date,
                "data_complete": _data_complete,
-               "fallback_used": bool(_failed) or not _data_complete,
-               "note": ("数据未完整更新或选股失败，需兜底补跑" if not _data_complete else "数据完整更新+选股成功")},
+               "signal_complete": _signal_complete,
+               "execution_complete": _execution_complete,
+               "frontend_complete": _frontend_complete,
+               "production_eligible": _production_eligible,
+               "fallback_used": bool(_failed) or not _production_eligible,
+               "note": ("任一域未完整，需兜底补跑" if not _production_eligible else "数据/信号/执行/前端四层全部完整")},
               open(os.path.join(RESEARCH, "run_status.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
     # FIX(2026-09-05, 蓝图迭代二): daily_combo_run 生成 run_manifest（版本合同+数据血缘）
     try:

@@ -64,5 +64,23 @@ ok("涨停拦截买入", EX.is_limit_up({"px": 11.0, "prev": 10.0}, "buy"))
 ok("跌停拦截卖出", EX.is_limit_up({"px": 9.0, "prev": 10.0}, "sell"))
 ok("停牌(量0)", EX.is_suspended({"px": 10.0, "prev": 10.0, "vol": 0}))
 
+print("== 9. 结构追踪止损生效 (P1-1) ==")
+# 入场10(bar1), SL=9.0, TP1=10.6 在 bar2 触发(partial_tp1=0.4), be_active=True。
+# bar3 回撤形成 swing low(低点10.30, 低于bar2的10.50且低于bar4的10.35 -> 确认)。
+# k=4 时结构追踪将 SL 上移至 ~10.24(>ep=10)；bar5 跳空低开10.15: 高于ep(10)但低于追踪SL。
+# 旧代码 stop=ep=10 -> 10.15 不触发(未保护浮盈); 修复后 stop=max(10,10.24)>10.15 -> SL_GAP。
+daily = mk([(10.0, 10.2, 9.9, 10.1),     # bar0 (前置)
+            (10.0, 10.2, 9.9, 10.1),     # bar1 入场开10
+            (10.30, 10.7, 10.50, 10.65), # bar2 触TP1
+            (10.45, 10.50, 10.30, 10.40),# bar3 回撤, 低10.30
+            (10.40, 10.55, 10.35, 10.50),# bar4 低10.35(>10.30, 确认swing low)
+            (10.15, 10.20, 10.10, 10.15)])# bar5 跳空低开10.15(低于追踪SL 10.24, 高于ep 10)
+r = EX.simulate(daily, 1, 10.0, 9.0, tp1=10.6, tp2=12.0,
+                partial_tp1=0.4, max_hold=8, track_after_tp1=True)
+ok("TP1 后追踪止损触发(SL_GAP/SL_HIT)", r["reason"] in ("SL_GAP", "SL_HIT", "BE"),
+   "reason=" + str(r["reason"]))
+ok("追踪 SL 高于保本(保护浮盈)", (r["exit_price"] or 0) > 10.0,
+   "exit_price=" + str(r["exit_price"]))
+
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

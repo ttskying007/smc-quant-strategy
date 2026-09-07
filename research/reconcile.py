@@ -23,9 +23,12 @@ def norm_reason(r):
     r = str(r).upper()
     if "TP" in r or "RUNNER" in r:
         return "TP"
-    if "SL" in r or "GAP" in r:
+    # FIX(2026-09-08, 审计 P1-1): BE(保本止损) 属于"止损执行"而非"时间离场"。
+    # 原映射 BE→TIME 使账本 SL_HIT vs 重放 BE 被误判为不一致(实际同一保本止损)。
+    # 统一 BE→SL：保本触发的离场是止损类别（只是恰好在成本位）。
+    if "SL" in r or "GAP" in r or "BE" in r:
         return "SL"
-    if "TIME" in r or "HOLD" in r or "BE" in r:
+    if "TIME" in r or "HOLD" in r:
         return "TIME"
     return r
 

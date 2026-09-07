@@ -118,7 +118,11 @@ def simulate(daily, entry_idx, ep, sl, tp1=None, tp2=None, max_hold=None,
                     if _n >= 2:
                         break
             last_sl = max(last_sl, _trail)
-        stop = (ep if be_active else last_sl)
+        # FIX(2026-09-08, 审计 P1-1): 追踪止损上移后必须生效。
+        # 原 `stop = ep if be_active else last_sl` 在 TP1 后无论 last_sl 是否被结构抬高，
+        # 止损恒等于保本(ep)，导致结构追踪(track_after_tp1)白算、浮盈回吐。
+        # 正确：TP1 后止损 = max(保本, 结构追踪上移位) —— 追踪更高时用追踪，否则至少保本。
+        stop = (max(ep, last_sl) if be_active else last_sl)
         # 跳空低开穿越止损 → 按开盘价（保守）
         if op < stop:
             exit_price, reason = op, "SL_GAP"
