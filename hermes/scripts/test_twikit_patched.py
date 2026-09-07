@@ -17,10 +17,16 @@ async def main():
     # Test 1: Login with credentials
     print("\n[1/3] Login with credentials...")
     try:
+        # SECURITY FIX(2026-09-08, 审计 P0-8): 凭据从环境变量读取，禁止明文密码入仓库。
+        _user = os.environ.get("TWIKIT_USERNAME", "")
+        _pwd = os.environ.get("TWIKIT_PASSWORD", "")
+        if not (_user and _pwd):
+            print("  ⚠ 缺少 TWIKIT_USERNAME / TWIKIT_PASSWORD 环境变量，跳过登录测试")
+            return
         await client.login(
-            auth_info_1='ttskying',
-            auth_info_2='REDACTED_CREDENTIAL',
-            password='REDACTED_CREDENTIAL',
+            auth_info_1=_user,
+            auth_info_2=_pwd,
+            password=_pwd,
             cookies_file='/root/.hermes/x_cookies_fresh.json'
         )
         print("  ✅ Login successful!")

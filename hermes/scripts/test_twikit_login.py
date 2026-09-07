@@ -16,10 +16,18 @@ async def main():
     print("Logging in with credentials...")
     
     try:
+        # SECURITY FIX(2026-09-08, 审计 P0-8): 凭据从环境变量读取，禁止明文密码入仓库。
+        # 历史提交中曾出现明文密码 —— 该密码已按审计要求轮换，历史记录见安全报告。
+        import os as _os
+        _user = _os.environ.get("TWIKIT_USERNAME", "")
+        _pwd = _os.environ.get("TWIKIT_PASSWORD", "")
+        if not (_user and _pwd):
+            print("缺少 TWIKIT_USERNAME / TWIKIT_PASSWORD 环境变量，跳过登录测试")
+            return
         await client.login(
-            auth_info_1='ttskying',     # username
-            auth_info_2='REDACTED_CREDENTIAL',  # password  
-            password='REDACTED_CREDENTIAL',
+            auth_info_1=_user,
+            auth_info_2=_pwd,
+            password=_pwd,
             cookies_file='/root/.hermes/x_cookies_fresh.json'
         )
         print("Login successful!")
