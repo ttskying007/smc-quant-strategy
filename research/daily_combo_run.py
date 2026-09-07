@@ -144,6 +144,19 @@ def _run_main_steps():
     # 每日对账（账本 vs simulate 重放）
     rc6 = run("reconcile.py", timeout=600)
     step_status["reconcile"] = rc6
+    # FIX(2026-09-08): AI 助手每日决策画像（--day 生成 ai/ai_decision.json，失败不阻断生产）
+    rc7 = run("ai_assistant.py", "--day", timeout=600)
+    step_status["ai_decision"] = rc7
+    if rc7 == 0:
+        try:
+            import shutil as _sh
+            for _d in MIRROR_DIRS:
+                try:
+                    _sh.copyfile(os.path.join(RESEARCH, "ai", "ai_decision.json"), os.path.join(_d, "ai_decision.json"))
+                except Exception as _e:
+                    print(f"AI 决策镜像同步警告 {_d}: {_e}", flush=True)
+        except Exception as _e:
+            print(f"AI 决策同步异常(继续): {_e}", flush=True)
     # FIX(2026-08-22): 运行状态记录（每步成功/失败 + 数据日期 + 兜底标注）
     _data_date = ""
     try:

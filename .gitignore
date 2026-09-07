@@ -67,3 +67,6 @@ research/daily_audit.json
 research/shadow_ledger.json
 research/reconcile_report.json
 research/shadow_status.json
+
+# ---- AI 助手运行状态（敏感，不入库；ai_assistant.py 代码本身入库）----
+research/ai/

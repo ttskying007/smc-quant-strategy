@@ -3764,8 +3764,8 @@ def build_combo():
 def build_nav():
     if _production_empty_book():
         # FIX(2026-08-17): K线入口不再锁死 V517；EMPTY_BOOK 下由用户自由选择研究版本。
-        return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>冻结研究回测</a><a href='/monitor'>生产状态 / 冻结研究</a><a href='/combo'>研究组合</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收研究</a><a href='/docs'>文档</a></nav>"
-    return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>回测</a><a href='/monitor'>选股</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/uzi'>UZI评审</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/v45?ver=v45_5'>事件实验({FRONTEND_VERSION})</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收</a><a href='/docs'>文档</a></nav>"
+        return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>冻结研究回测</a><a href='/monitor'>生产状态 / 冻结研究</a><a href='/combo'>研究组合</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收研究</a><a href='/docs'>文档</a></nav>"
+    return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>回测</a><a href='/monitor'>选股</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/uzi'>UZI评审</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/v45?ver=v45_5'>事件实验({FRONTEND_VERSION})</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收</a><a href='/docs'>文档</a></nav>"
 
 
 def _empty_book_page(title, detail):
@@ -4141,7 +4141,77 @@ def build_shadow():
     </div>"""
     return f"<!doctype html><html lang='zh'><head><meta charset='utf-8'><title>Shadow 状态</title><style>{CSS}</style></head><body>{build_nav()}<div class='container'>{rows}</div></body></html>"
 
-def build_analysis(start='', end=''):
+
+def build_ai():
+    """AI 实时交易分析助手页（只读）。读取 research/ai/ai_decision.json + ai_equity.json。"""
+    try:
+        with open(r"E:\test\smc_project\research\ai\ai_decision.json", encoding="utf-8") as fh:
+            dec = json.load(fh)
+    except Exception as e:
+        return (f"<!doctype html><html lang='zh'><head><meta charset='utf-8'><title>AI 助手</title><style>{CSS}</style></head>"
+                f"<body>{build_nav()}<div class='container'><div class='card'><h2>AI 实时交易分析助手</h2>"
+                f"<p style='color:#f85149'>尚未生成 AI 决策画像。请先运行 <code>python research/ai_assistant.py --day</code> 生成 ai/ai_decision.json。</p>"
+                f"<p>或通过计划任务每日自动生成。当前: {e}</p></div></div></body></html>")
+    eq = {}
+    try:
+        with open(r"E:\test\smc_project\research\ai\ai_equity.json", encoding="utf-8") as fh:
+            eq = json.load(fh)
+    except Exception:
+        pass
+    cands = dec.get("candidates") or []
+    def esc(x):
+        return str(x if x is not None else "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
+    grade_color = {"A": "#3fb950", "B": "#d29922", "C": "#8b9490"}
+    _rows = []
+    for d in cands:
+        _pp = d.get("position_pct") or 0
+        _pp_txt = f"{float(_pp)*100:.1f}%"
+        _rs = " · ".join(str(x) for x in (d.get("reasons") or [])[:2])
+        _row = (f"<tr style='border-left:3px solid {grade_color.get(d.get('grade','C'),'#888')}'>"
+                f"<td class='mono'>{esc(d.get('code'))}</td><td>{esc(d.get('name'))}</td>"
+                f"<td><b>{esc(d.get('grade'))}</b></td><td>{esc(d.get('score'))}</td>"
+                f"<td>{_pp_txt}</td>"
+                f"<td class='mono'>{esc(d.get('sl'))}</td><td class='mono'>{esc(d.get('tp'))}</td>"
+                f"<td class='mono'>{esc(d.get('live_px'))}</td>"
+                f"<td>{esc(d.get('signal_date'))}</td><td style='font-size:10px'>{esc(d.get('signal_key'))}</td>"
+                f"<td style='font-size:10px;color:#8b949e'>{esc(_rs)}</td></tr>")
+        _rows.append(_row)
+    rows = "".join(_rows) if _rows else "<tr><td colspan=11>当前无候选/持仓</td></tr>"
+    # 预警（盯盘由 --monitor 生成 ai_alert_log.json；此处从 decision 的挑战汇总）
+    alerts = []
+    for d in cands:
+        if d.get("challenges"):
+            alerts.append(f"<li><b>{esc(d['code'])}</b>: {'；'.join(esc(c) for c in d['challenges'][:2])}</li>")
+    alert_html = "".join(alerts) or "<li>无异常提示</li>"
+    html = f"""<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>AI 实时交易分析助手</title>
+<meta http-equiv="refresh" content="120"><style>{CSS}</style></head><body>{build_nav()}
+<div class="container">
+  <div class="card"><h2>AI 实时交易分析助手</h2>
+    <p>asof={esc(dec.get('asof'))} | 市场日={esc(dec.get('market_date'))} | 候选/持仓={len(cands)} | AI净值={esc(eq.get('equity'))} | 组合回撤={esc(eq.get('max_drawdown'))}</p>
+    <p style="color:#8b949e">AI 只读系统选股/回测/实时价，做 A/B/C 分级与仓位建议；不写回策略核心，可整体回滚。</p>
+  </div>
+  <div class="card"><h3>AI 决策面板（A=可买 / B=观察 / C=不碰）</h3>
+    <table><thead><tr><th>代码</th><th>名称</th><th>级别</th><th>Score</th><th>仓位</th><th>SL</th><th>TP</th><th>现价</th><th>信号日</th><th>信号键</th><th>理由</th></tr></thead><tbody>{rows}</tbody></table>
+  </div>
+  <div class="card" style="border-left:3px solid #d29922"><h3>AI 质疑 / 风险提示</h3><ul>{alert_html}</ul></div>
+  <div class="card"><h3>与 AI 对话</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input id="ai-q" placeholder="今天买什么？某只股票怎么样？质疑哪些信号？" value="" style="flex:1;min-width:260px;padding:8px">
+      <button onclick="doChat()">提问</button>
+    </div>
+    <div id="ai-chat-result" style="margin-top:10px"></div>
+  </div>
+</div>
+<script>
+async function doChat(){{
+  let q=document.getElementById('ai-q').value;
+  if(!q) return;
+  let r=await fetch('/api/ai/chat?q='+encodeURIComponent(q));
+  let t=await r.text();
+  document.getElementById('ai-chat-result').innerHTML='<div style="white-space:pre-wrap;background:#161b22;padding:12px;border-radius:6px">'+t.replace(/[&<>]/g,function(c){{return {{'&':'&amp;','<':'&lt;','>':'&gt;'}}[c];}})+'</div>';
+}}
+</script></body></html>"""
+    return html
     if _production_empty_book():
         return _empty_book_page('生产分析', '无生产交易；分析页不再聚合 V185/V88 历史交易。V517 的冻结研究分析仅在研究页展示。')
     # FIX(2026-08-22): COMBO 生产 — 分析 v20c 回测（逐年/逐月/分腿/弱月）
@@ -5801,6 +5871,8 @@ class Handler(BaseHTTPRequestHandler):
             self._html(build_analysis(qs.get('start', [''])[0], qs.get('end', [''])[0]))
         elif path == '/shadow':
             self._html(build_shadow())
+        elif path == '/ai':
+            self._html(build_ai())
         elif path == '/stoploss':
             self._html(build_stoploss())
         elif path == '/v45':
@@ -5840,6 +5912,24 @@ class Handler(BaseHTTPRequestHandler):
             self._json({'ok': True, 'job': job, 'run_date': run_date, 'force': force, 'mode': 'background'})
         elif path in ('/api/live-prices', '/api/live_prices'):
             self._api_live_prices()
+        elif path == '/api/ai/chat':
+            # AI 助手对话接口（只读）：读取已生成的决策画像并回答
+            try:
+                import sys as _ai_sys
+                _ai_sys.path.insert(0, r"E:\test\smc_project\research")
+                import ai_assistant as _AA
+                _dec = _AA.judge_all(_AA.load_config())
+                _q = qs.get('q', [''])[0]
+                _ans = _AA.chat_answer(_q, _dec["candidates"])
+                self._text(_ans)
+            except Exception as _e:
+                self._text(f"AI 对话暂不可用: {_e}")
+        elif path == '/api/ai/overview':
+            try:
+                with open(r"E:\test\smc_project\research\ai\ai_decision.json", encoding="utf-8") as _fh:
+                    self._json(json.load(_fh))
+            except Exception as _e:
+                self._json({"ok": False, "error": str(_e)})
         elif path == '/api/live-combo':
             self._json(self._api_live_combo())
         elif path == '/trade':
@@ -6052,6 +6142,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Expires', '0')
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode())
+
+    def _text(self, content):
+        """纯文本响应（AI 助手对话等）。FIX(2026-09-08): 原实现误并入 _json 的 body 写入行，已分离。"""
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/plain; charset=utf-8')
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        self.end_headers()
+        self.wfile.write(str(content).encode())
 
     def _api_live_combo(self):
         """FIX(2026-08-26): COMBO 模拟持仓实时价 + TP/SL 状态（/live AJAX 每 5 秒调用）"""
