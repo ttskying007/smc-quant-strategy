@@ -3764,8 +3764,8 @@ def build_combo():
 def build_nav():
     if _production_empty_book():
         # FIX(2026-08-17): K线入口不再锁死 V517；EMPTY_BOOK 下由用户自由选择研究版本。
-        return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>冻结研究回测</a><a href='/monitor'>生产状态 / 冻结研究</a><a href='/combo'>研究组合</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/funnel'>漏斗</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收研究</a><a href='/docs'>文档</a></nav>"
-    return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>回测</a><a href='/monitor'>选股</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/uzi'>UZI评审</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/funnel'>漏斗</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/v45?ver=v45_5'>事件实验({FRONTEND_VERSION})</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收</a><a href='/docs'>文档</a></nav>"
+        return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>冻结研究回测</a><a href='/monitor'>生产状态 / 冻结研究</a><a href='/combo'>研究组合</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/funnel'>漏斗</a><a href='/tdx'>数据源</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收研究</a><a href='/docs'>文档</a></nav>"
+    return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>回测</a><a href='/monitor'>选股</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/uzi'>UZI评审</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/funnel'>漏斗</a><a href='/tdx'>数据源</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/v45?ver=v45_5'>事件实验({FRONTEND_VERSION})</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收</a><a href='/docs'>文档</a></nav>"
 
 
 def _empty_book_page(title, detail):
@@ -4455,6 +4455,43 @@ def build_funnel():
 <p>预注册验收: n≥30 {'✅' if crit.get('n_ge_30') else '❌'} | OOS&gt;+1% {'✅' if crit.get('oos_avg_gt_1pct') else '❌'} | IS/OOS一致 {'✅' if crit.get('is_oos_consistent') else '❌'} → <b>{_esc(ab.get('verdict'))}</b></p></div>
 </div></body></html>"""
 
+
+
+
+def build_tdx():
+    """数据源后端状态页（easy_tdx/pytdx/腾讯）—— 集成状态可视化。"""
+    def _esc(x):
+        return str(x if x is not None else "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+    import sys as _sys
+    _sys.path.insert(0, r"E:\\test\\smc_project\\research")
+    try:
+        from core import tdx_feed as TF
+        st = TF.backend_status()
+    except Exception as _e:
+        return "<html><body><h2>tdx_feed 加载失败: %s</h2></body></html>" % _e
+    _ten = st.get('tencent', {}); _pt = st.get('pytdx', {}); _easy = st.get('easy_tdx', {})
+    def _badge(ok):
+        return '<span style="color:' + ('#3fb950">可用' if ok else '#f85149">不可用') + '</span>'
+    _r = []
+    _r.append('<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>数据源后端状态</title>')
+    _r.append('<meta http-equiv="refresh" content="120"><style>' + CSS + '</style></head><body>' + build_nav() + '</body>')
+    _r.append('<div class="container">')
+    _r.append('<div class="card"><h2>数据源后端状态（easy_tdx / pytdx / 腾讯）</h2>')
+    _r.append('<p>激活后端: <b>' + _esc(st.get('active')) + '</b> — 统一适配器 <code>core/tdx_feed.py</code>，单一 bars 结构，后端不可用时自动回退腾讯缓存。</p></div>')
+    _r.append('<div class="card"><h3>腾讯缓存（现行主源）</h3><table>')
+    _r.append('<tr><td>K线文件数</td><td>' + _esc(_ten.get('kline_files')) + ' 只</td></tr>')
+    _r.append('<tr><td>状态</td><td>' + _badge(_ten.get('available')) + '</td></tr>')
+    _r.append('<tr><td>目录</td><td><code>' + _esc(st.get('kline_dir')) + '</code></td></tr></table></div>')
+    _r.append('<div class="card"><h3>pytdx（通达信网络行情）</h3><table>')
+    _r.append('<tr><td>状态</td><td>' + _badge(_pt.get('available')) + '</td></tr>')
+    _r.append('<tr><td>说明</td><td>' + _esc(_pt.get('note')) + '</td></tr></table></div>')
+    _r.append('<div class="card"><h3>easy_tdx（通达信本地数据文件）</h3><table>')
+    _r.append('<tr><td>状态</td><td>' + _badge(_easy.get('available')) + '</td></tr>')
+    _r.append('<tr><td>说明</td><td>' + _esc(_easy.get('note')) + '</td></tr></table></div>')
+    _r.append('<div class="card"><h3>接入方式</h3><pre style="background:#161b22;padding:12px;border-radius:6px">')
+    _r.append('from core import tdx_feed as TF\nbars = TF.get_daily("600519")        # 统一日线（自动回退腾讯）\nrt   = TF.get_realtime(["600519"])   # 实时报价（TDX 可用时）\nff   = TF.get_fundflow("600519")     # 资金/财务（TDX 可用时）\nst   = TF.backend_status()           # 后端状态')
+    _r.append('</pre></div></div></body></html>')
+    return ''.join(_r)
 
 def build_compare():
     if _production_empty_book():
@@ -5935,6 +5972,8 @@ class Handler(BaseHTTPRequestHandler):
             self._html(build_ai())
         elif path == '/funnel':
             self._html(build_funnel())
+        elif path == '/tdx':
+            self._html(build_tdx())
         elif path == '/stoploss':
             self._html(build_stoploss())
         elif path == '/v45':
