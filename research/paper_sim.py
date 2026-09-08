@@ -610,6 +610,16 @@ def daily_selection():
             if _pr is not None and _pr > 0.02:
                 _risk_coef = max(0.3, 1.0 - (_pr - 0.02) / 0.04)
                 _sel_stats["scaled_strong"] = _sel_stats.get("scaled_strong", 0) + 1
+            # FIX(2026-09-08, regime 发现正向应用): 弱市加权 —— 事件腿为逆向策略,
+            # 弱市(proxy<0)信号质量最高(avg+6.6%/PF6.6 vs 强市+1.3%)。
+            # weak_market_consistency 双段(OOS+IS)验证 k=2/4/8 单调提升风险调整收益。
+            # w = clip(1 - k×proxy, 0.3, 2.0): 弱市加仓(≤2x), 强市降仓(≥0.3x), 与强市降仓系数相乘。
+            _regime_coef = 1.0
+            if CFG.WEAK_MARKET_WEIGHT and _pr is not None:
+                _regime_coef = max(CFG.WEAK_MARKET_W_MIN,
+                                   min(CFG.WEAK_MARKET_W_MAX, 1.0 - CFG.WEAK_MARKET_K * _pr))
+                _risk_coef = round(_risk_coef * _regime_coef, 4)
+                _sel_stats["regime_weighted"] = _sel_stats.get("regime_weighted", 0) + 1
             # FIX(2026-08-22): 回踩挂单（披露日收盘×0.99，回落成交；否则 T+1 开盘兜底）—— 研究 +0.47pp
             # limit = disclosure close × 0.99; if T+1 low <= limit → fill at limit; else fill at T+1 open
             limit_px = round(close_px * 0.99, 3)

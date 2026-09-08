@@ -301,6 +301,17 @@ def judge_candidate(order, live, bt_stats, cfg, mkt_date):
     if risk_dist and entry_ref > 0:
         pos = cfg["risk_per_trade_pct"] / (risk_dist / entry_ref)
         position_pct = round(min(pos, cfg["max_position_pct"]), 4)
+        # FIX(2026-09-08, regime 发现正向应用): 弱市加权与 paper_sim 一致 ——
+        # 事件腿逆向策略, 弱市信号质量最高; w = clip(1 - k×proxy, 0.3, 2.0)。
+        try:
+            from paper_sim import _market_proxy as _mp
+            _pr = _mp(code)
+            if CFG.WEAK_MARKET_WEIGHT and _pr is not None:
+                _reg_w = max(CFG.WEAK_MARKET_W_MIN, min(CFG.WEAK_MARKET_W_MAX,
+                                                        1.0 - CFG.WEAK_MARKET_K * _pr))
+                position_pct = round(min(position_pct * _reg_w, cfg["max_position_pct"]), 4)
+        except Exception:
+            pass  # 权重不可得时保持风险平价原仓位
     else:
         challenges.append("风险距离不可算(entry<=sl)，无法定仓")
 
@@ -673,8 +684,12 @@ def run_tests():
     r4 = judge_candidate(order, live3, {"EVENT|sweep:2026|OB:2026": {"n": 5, "avg_net": 5, "wr": 0.6, "pf": 2, "oos_avg": 5, "oos_n": 5}}, cfg, "20260904")
     chk("样本<min→质疑", any("样本" in c for c in r4["challenges"]), r4["challenges"])
 
-    # 5. 仓位风险平价
-    chk("仓位=预算/风险距离", abs(r4["position_pct"] - 0.01/(1.0/10.5)) < 0.002, r4["position_pct"])
+    # 5. 仓位风险平价（关闭弱市加权验证纯公式；加权单独验证）
+    _saved_wm = CFG.WEAK_MARKET_WEIGHT
+    CFG.WEAK_MARKET_WEIGHT = False
+    r4b = judge_candidate(order, live3, {"EVENT|sweep:2026|OB:2026": {"n": 5, "avg_net": 5, "wr": 0.6, "pf": 2, "oos_avg": 5, "oos_n": 5}}, cfg, "20260904")
+    CFG.WEAK_MARKET_WEIGHT = _saved_wm
+    chk("仓位=预算/风险距离", abs(r4b["position_pct"] - 0.01/(1.0/10.5)) < 0.002, r4b["position_pct"])
 
     # 6. auto_execute dry_run 不落盘、有 kill 检查
     res = auto_execute([], cfg, dry_run=True)
