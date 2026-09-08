@@ -1,0 +1,18 @@
+[
+  {
+    "day": "2026-09-07",
+    "generated_at": "2026-09-07 18:10:47",
+    "raw": 153,
+    "positive": 25,
+    "orders": 1,
+    "reject": {
+      "event_filter_hard": 5,
+      "event_filter_soft": 123,
+      "event_filter_soft_with_delta_research": 0,
+      "stage": 10,
+      "adx": 5,
+      "nodata": 3,
+      "dup": 6
+    }
+  }
+]

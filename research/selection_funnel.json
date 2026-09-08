@@ -1,0 +1,32 @@
+{
+  "generated_at": "2026-09-08 11:14:59",
+  "days": [
+    "2026-09-07",
+    "2026-09-06",
+    "2026-09-04",
+    "2026-09-03",
+    "2026-09-02"
+  ],
+  "raw_announcements": 153,
+  "contains_buyback_or_increase": 153,
+  "classified_positive": 25,
+  "reject_by_reason": {
+    "event_filter_hard": 5,
+    "event_filter_soft": 123,
+    "event_filter_soft_with_delta_research": 0,
+    "stage": 10,
+    "adx": 5,
+    "nodata": 3,
+    "dup": 7
+  },
+  "orders_created": 0,
+  "note": "漏斗逐层：公告总数→含增持/回购→分类为正事件→去重→有K线→阶段→ADX→挂单。soft_with_delta 为研究候选（进展类含金额/比例增量），默认流仍拒绝。",
+  "conservation": {
+    "universe_total": 25,
+    "data_missing": 3,
+    "strategy_reject": 22,
+    "passed_to_order": 0,
+    "mutex_check": true,
+    "note": "universe_total = data_missing + strategy_reject + orders（每股每日唯一阶段，互斥）"
+  }
+}

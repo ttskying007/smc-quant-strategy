@@ -1,5 +1,5 @@
 {
-  "ts": "2026-09-04 15:30:14",
+  "ts": "2026-09-08 15:30:15",
   "sources": {
     "sina": {
       "ok": true,
@@ -15,7 +15,7 @@
     },
     "ths_fuyao": {
       "ok": false,
-      "detail": "HTTP Error 429: Too Many Requests"
+      "detail": "<urlopen error [SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] ssl/tls "
     },
     "netease": {
       "ok": false,
@@ -23,6 +23,6 @@
     }
   },
   "coverage": 97.8,
-  "latest": "20260903",
+  "latest": "20260907",
   "alerts": []
 }
