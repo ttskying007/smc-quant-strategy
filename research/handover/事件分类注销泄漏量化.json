@@ -1,0 +1,41 @@
+{
+  "leak_titles": 0,
+  "total_event_titles": 10557,
+  "leak_ratio": 0.0,
+  "trades_total": 2084,
+  "trades_polluted": 0,
+  "polluted_ratio": 0.0,
+  "ab": {
+    "baseline_all": {
+      "n": 1602,
+      "avg": 2.956,
+      "wr": 0.617,
+      "pf": 2.68
+    },
+    "baseline_oos": {
+      "n": 482,
+      "avg": 2.947,
+      "wr": 0.598,
+      "pf": 3.05
+    },
+    "clean_all": {
+      "n": 1602,
+      "avg": 2.956,
+      "wr": 0.617,
+      "pf": 2.68
+    },
+    "clean_oos": {
+      "n": 482,
+      "avg": 2.947,
+      "wr": 0.598,
+      "pf": 3.05
+    },
+    "polluted_all": {
+      "n": 0
+    },
+    "polluted_oos": {
+      "n": 0
+    }
+  },
+  "sample_leak_titles": []
+}

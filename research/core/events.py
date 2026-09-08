@@ -22,9 +22,19 @@ def classify_title_detailed(title):
     """分层分类（研究用）。返回 (is_event, kind, polarity, amount_wan, pct, layer)。
     layer: 'HARD_REJECT' | 'SOFT_REJECT' | 'PROGRESS_WITH_DELTA'(软否但含金额/比例增量) | 'EVENT'。
     PROGRESS_WITH_DELTA 语义：进展/完成类标题里出现明确金额(亿/万)或占比(%)增量 ——
-    供 A/B 验证是否比一刀切拒绝更优；默认流(classify_title)仍拒绝。"""
+    供 A/B 验证是否比一刀切拒绝更优；默认流(classify_title)仍拒绝。
+    FIX(2026-09-08, P2 事件标注集): 增补 INERT_REJECT 层 —— 股本管理类(注销/减资/
+    限制性股票/激励/期权/员工持股/质押)含"回购/增持"字样但非市场回购/增持。"""
+    s0 = str(title or "")
+    if any(n in s0 for n in ("注销", "减资", "限制性股票", "激励", "期权", "员工持股", "质押")):
+        return False, None, 0, None, None, "INERT_REJECT"
     is_ev, kind, pol, amt, pct = classify_title(title)
     if is_ev:
+        # FIX(2026-09-08, P2 标注集): A/B 把 delta 并入默认流后, 本分支曾把 delta 类
+        # 全标成 EVENT(原 PROGRESS_WITH_DELTA 分支变死代码)。恢复分层语义:
+        # 软否+回购/增持+增量 且被默认流纳入 → PROGRESS_WITH_DELTA; 其余 → EVENT。
+        if any(n in s0 for n in NEG_SOFT) and ("回购" in s0 or "增持" in s0):
+            return is_ev, kind, pol, amt, pct, "PROGRESS_WITH_DELTA"
         return is_ev, kind, pol, amt, pct, "EVENT"
     s = str(title or "")
     if any(n in s for n in NEG_HARD):
@@ -55,6 +65,10 @@ def classify_title(title):
     三条预注册验收线全过，见 handover/事件过滤AB验证.json）→ 纳入候选。
     硬否（终止/取消/解除/减持/结束）与无金额增量的软否仍拒绝。"""
     s = str(title or "")
+    # FIX(2026-09-08, P2 事件标注集): 股本管理类(注销/激励/质押等)优先硬否 ——
+    # "回购注销限制性股票"等标题非市场回购; 量化: 33.7% EVENT 标题属此类(0笔交易,上游纠正)
+    if any(n in s for n in ("注销", "减资", "限制性股票", "激励", "期权", "员工持股", "质押")):
+        return False, None, 0, None, None
     if any(n in s for n in NEG_WORDS):
         # 反向：减持/解除/终止
         if "减持" in s:

@@ -1,0 +1,29 @@
+{
+  "trades_total": 2084,
+  "trades_kept": 1434,
+  "trades_rejected": 650,
+  "kept_all": {
+    "n": 1167,
+    "avg": 3.006,
+    "wr": 0.623,
+    "pf": 2.73
+  },
+  "kept_oos": {
+    "n": 267,
+    "avg": 3.628,
+    "wr": 0.633,
+    "pf": 3.99
+  },
+  "rejected_all": {
+    "n": 435,
+    "avg": 2.823,
+    "wr": 0.602,
+    "pf": 2.56
+  },
+  "rejected_oos": {
+    "n": 215,
+    "avg": 2.101,
+    "wr": 0.553,
+    "pf": 2.22
+  }
+}

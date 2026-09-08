@@ -1,0 +1,354 @@
+[
+  {
+    "title": "九州一轨:北京九州一轨环境科技股份有限公司关于提议回购公司股份暨公司“提质增效重回报”行动方案的公告",
+    "layer": "EVENT",
+    "kind": "BUYBACK",
+    "pol": 1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "天通股份:天通股份关于以集中竞价交易方式回购公司股份方案的公告",
+    "layer": "EVENT",
+    "kind": "BUYBACK",
+    "pol": 1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "瑞联新材:关于收到公司持股5%以上股东、实际控制人、董事长提议回购公司股份的提示性公告",
+    "layer": "EVENT",
+    "kind": "BUYBACK",
+    "pol": 1,
+    "amt": null,
+    "pct": 5.0
+  },
+  {
+    "title": "航宇科技:航宇科技关于回购注销第一类限制性股票减资暨通知债权人的公告",
+    "layer": "EVENT",
+    "kind": "BUYBACK",
+    "pol": 1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "立方制药:关于回购注销部分限制性股票减资暨通知债权人的公告",
+    "layer": "EVENT",
+    "kind": "BUYBACK",
+    "pol": 1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "博腾股份:关于回购注销部分限制性股票的公告",
+    "layer": "EVENT",
+    "kind": "BUYBACK",
+    "pol": 1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "隆基绿能:关于股权激励限制性股票回购注销实施公告",
+    "layer": "EVENT",
+    "kind": "BUYBACK",
+    "pol": 1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "启明星辰:关于高级管理人员增持公司股份的公告",
+    "layer": "EVENT",
+    "kind": "HOLDER_INCREASE",
+    "pol": 1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "凯普生物:关于2024年第三次以集中竞价交易方式回购公司股份方案首次回购的公告",
+    "layer": "EVENT",
+    "kind": "BUYBACK",
+    "pol": 1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "莱伯泰科:关于以集中竞价交易方式回购公司股份方案的公告",
+    "layer": "EVENT",
+    "kind": "BUYBACK",
+    "pol": 1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "厦门国贸:上海荣正企业咨询服务(集团)股份有限公司关于厦门国贸集团股份有限公司回购注销部分限制性股票相关事项之独立财务顾问报告",
+    "layer": "EVENT",
+    "kind": "BUYBACK",
+    "pol": 1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "优博讯:关于注销2022年度回购股份并减少注册资本的公告",
+    "layer": "EVENT",
+    "kind": "BUYBACK",
+    "pol": 1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "一心堂:关于回购注销2020年限制性股票激励计划预留授予部分已获授但尚未解除限售的限制性股票的公告",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "密尔克卫:密尔克卫智能供应链服务集团股份有限公司关于2021年股票期权与限制性股票激励计划授予限制性股票第三个解除限售期解除限售条件未成就暨回购注销部分限制性股票的公告",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "仙乐健康:关于2023年限制性股票激励计划部分已授予但尚未解除限售的限制性股票回购注销完成的公告",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "宇环数控:关于回购注销部分已获授但尚未解除限售的限制性股票的公告",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "英特集团:关于回购注销部分激励对象已获授但尚未解除限售的限制性股票的公告",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "海信视像:关于回购注销部分激励对象已获授但尚未解除限售的限制性股票的公告",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "ST金圆:关于控股股东部分股份办理股票质押式回购购回解除质押业务的公告",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "傲农生物:福建傲农生物科技集团股份有限公司关于回购注销部分已授予但尚未解除限售的限制性股票的公告",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "亚钾国际:北京德恒律师事务所关于亚钾国际投资(广州)股份有限公司终止实施2022年股票期权与限制性股票激励计划暨注销股票期权与回购注销限制性股票事项的法律意见",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "龙泉股份:北京市金杜(深圳)律师事务所关于山东龙泉管业股份有限公司2020年限制性股票激励计划回购注销部分已授予但尚未解除限售限制性股票的法律意见书",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "新奥股份:北京国枫律师事务所关于新奥天然气股份有限公司2021年限制性股票激励计划首次授予部分第三个解除限售期解除限售条件成就及回购注销部分限制性股票相关事宜的法律意见书",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "力生制药:天津金诺律师事务所关于天津力生制药股份有限公司回购注销部分激励对象已获授但尚未解除限售的限制性股票事项之法律意见书",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "天山电子:关于首次回购公司股份暨回购股份的进展公告",
+    "layer": "SOFT_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "恒锋信息:关于公司实际控制人、控股股东增持股份计划完成的公告",
+    "layer": "SOFT_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "捷顺科技:关于公司高级管理人员增持股份结果的公告",
+    "layer": "SOFT_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "盛德鑫泰:关于股份回购实施结果暨股份变动的公告",
+    "layer": "SOFT_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "中色股份:关于控股股东增持股份计划实施完毕暨增持结果的公告",
+    "layer": "SOFT_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "天地数码:关于回购公司股份实施进展暨回购完成的公告",
+    "layer": "SOFT_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "申通快递:关于回购股份事项前十名股东及前十名无限售条件股东持股情况的公告",
+    "layer": "SOFT_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "好莱客:广州好莱客创意家居股份有限公司关于2023年员工持股计划非交易过户完成暨回购股份处理完成的公告",
+    "layer": "SOFT_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "康希通信:康希通信关于回购股份事项前十大股东和前十大无限售条件股东持股情况的公告",
+    "layer": "SOFT_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "吉祥航空:上海吉祥航空股份有限公司关于以集中竞价交易方式回购公司股份的回购进展公告",
+    "layer": "SOFT_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "欧普照明:欧普照明股份有限公司关于股份回购实施结果暨股份变动的公告",
+    "layer": "SOFT_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "神马电力:关于以集中竞价交易方式回购公司股份的进展公告",
+    "layer": "SOFT_REJECT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "新筑股份:2023年半年度业绩预告",
+    "layer": "NO_EVENT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "中泰证券:中泰证券股份有限公司2023年半年度业绩快报公告",
+    "layer": "NO_EVENT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "特变电工:特变电工股份有限公司关于召开2023年半年度业绩说明会的公告",
+    "layer": "NO_EVENT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "英派斯:关于特定股东股份减持计划的预披露公告",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": -1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "康龙化成:关于公司主要股东减持计划时间过半的公告",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": -1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "兖矿能源:兖矿能源集团股份有限公司关于兖矿集团财务有限公司2023年半年度未经审计的资产负债表、利润表的公告",
+    "layer": "NO_EVENT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "常宝股份:关于持股5%以上的股东减持至持股5%以下的提示性公告",
+    "layer": "HARD_REJECT",
+    "kind": null,
+    "pol": -1,
+    "amt": null,
+    "pct": null
+  },
+  {
+    "title": "中贝通信:2023年半年度业绩快报公告",
+    "layer": "NO_EVENT",
+    "kind": null,
+    "pol": 0,
+    "amt": null,
+    "pct": null
+  }
+]
