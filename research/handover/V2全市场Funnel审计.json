@@ -1,0 +1,123 @@
+{
+  "asof": "2026-09-09 07:42:35",
+  "sample": {
+    "files": 800,
+    "oos_from": "20250701"
+  },
+  "funnel": {
+    "L0_universe": 800,
+    "bars_scanned": 230181,
+    "L1_pool": 230181,
+    "L2_sweep": 1986,
+    "L3_reclaim": 1759,
+    "L4_disp": 652,
+    "L5_shift": 593,
+    "L6_poi": 593,
+    "L7_retest": 464
+  },
+  "ready_count": 464,
+  "ready_per_month": 35.7,
+  "sample_ready": [
+    [
+      "000007",
+      "20260622",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000020",
+      "20251009",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000020",
+      "20260109",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000020",
+      "20260403",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000035",
+      "20260116",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000056",
+      "20260210",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000078",
+      "20251113",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000301",
+      "20260707",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000421",
+      "20251021",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000428",
+      "20260730",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000517",
+      "20260609",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000517",
+      "20260730",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000530",
+      "20250814",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000530",
+      "20251022",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000530",
+      "20260611",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000530",
+      "20260813",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000560",
+      "20250715",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000560",
+      "20251125",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000590",
+      "20251027",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ],
+    [
+      "000597",
+      "20260720",
+      "pool→sweep→reclaim→disp→shift→poi→retest"
+    ]
+  ],
+  "wdh_oos_seeds": 437
+}
