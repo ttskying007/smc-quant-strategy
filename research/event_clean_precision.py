@@ -33,11 +33,12 @@ def classify_trade(r, window):
     e = _d(int(r["entry_date"][:4]), int(r["entry_date"][4:6]), int(r["entry_date"][6:8]))
     code = r["symbol"].split(".")[0]
     has_real, has_inert_only = False, False
-    for d8, t in ann_by_code.get(code, [])[:24]:
+    # FIX: 遍历全部公告(不截断[:24]——多公告股票2026年新公告会占满前24条, 2023年真公告漏检)
+    for d8, t in ann_by_code.get(code, []):
         dd = _d(int(d8[:4]), int(d8[4:6]), int(d8[6:8]))
         gap = (e - dd).days
         if gap > window:
-            break
+            break  # 降序列表: 更早的公告不再看
         if 0 <= gap <= window:
             if EV.classify_title(t)[0]:
                 has_real = True
