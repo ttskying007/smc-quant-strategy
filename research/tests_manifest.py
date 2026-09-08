@@ -48,5 +48,52 @@ with tempfile.TemporaryDirectory() as td:
     ok("artifact_hash 16位", len(m3["artifact_hash"].get(fp, "")) == 16, m3["artifact_hash"])
     ok("不存在文件 → missing", M.file_hash(os.path.join(td, "none.json")) == "missing")
 
+print("== P0-1 fail-closed: validate_artifacts ==")
+with tempfile.TemporaryDirectory() as td:
+    # 正常 artifact
+    good = os.path.join(td, "good.json")
+    with open(good, "w", encoding="utf-8") as fh:
+        fh.write('{"k": 1}')
+    m_ok = M.build_manifest("run-ok", "s", "v1", params={}, artifact_paths=[good], status="production")
+    ok("正常 artifact 验证通过", M.validate_artifacts(m_ok)[0])
+    # 缺失 artifact
+    miss = os.path.join(td, "missing.json")
+    m_miss = M.build_manifest("run-miss", "s", "v1", params={}, artifact_paths=[miss], status="production")
+    ok_miss, why_miss = M.validate_artifacts(m_miss)
+    ok("缺失 artifact → 验证失败", not ok_miss, why_miss)
+    ok("缺失 artifact → status=INVALID", m_miss.get("status") == "INVALID", m_miss.get("status"))
+    # 空 artifact
+    empty = os.path.join(td, "empty.json")
+    open(empty, "w").close()
+    m_empty = M.build_manifest("run-empty", "s", "v1", params={}, artifact_paths=[empty], status="production")
+    ok_empty, why_empty = M.validate_artifacts(m_empty)
+    ok("空 artifact → 验证失败", not ok_empty, why_empty)
+    # 哈希不符（写后篡改）
+    tamper = os.path.join(td, "tamper.json")
+    with open(tamper, "w", encoding="utf-8") as fh:
+        fh.write("v1")
+    m_t = M.build_manifest("run-tamper", "s", "v1", params={}, artifact_paths=[tamper], status="production")
+    with open(tamper, "w", encoding="utf-8") as fh:
+        fh.write("v2-CHANGED")
+    ok_t, why_t = M.validate_artifacts(m_t)
+    ok("哈希不符 → 验证失败", not ok_t, why_t)
+
+print("== P0-1 finalize_manifest: 原子写+生产阻断 ==")
+with tempfile.TemporaryDirectory() as td:
+    good = os.path.join(td, "a.json")
+    with open(good, "w", encoding="utf-8") as fh:
+        fh.write('{"ok": true}')
+    m_f = M.build_manifest("run-f", "s", "v1", params={}, status="production")
+    p, okf = M.finalize_manifest(m_f, [good], td)
+    ok("finalize 正常 → 返回ok", okf and os.path.exists(p), str(okf))
+    # 缺失 artifact → 抛 RuntimeError（fail-closed 阻断）
+    m_bad = M.build_manifest("run-bad", "s", "v1", params={}, status="production")
+    raised = False
+    try:
+        M.finalize_manifest(m_bad, [os.path.join(td, "none.json")], td)
+    except RuntimeError as e:
+        raised = "blocked" in str(e)
+    ok("缺失 artifact → finalize 抛 RuntimeError(阻断)", raised)
+
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

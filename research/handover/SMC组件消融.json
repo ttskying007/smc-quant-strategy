@@ -1,0 +1,40 @@
+{
+  "asof": "2026-09-08 11:10:25",
+  "oos_from": "20250701",
+  "smc_full": {
+    "is": {
+      "n": 794,
+      "avg": 2.6553,
+      "wr": 0.5315,
+      "pf": 1.694
+    },
+    "oos": {
+      "n": 437,
+      "avg": -0.4562,
+      "wr": 0.4165,
+      "pf": 0.905
+    }
+  },
+  "reverse_oos": {
+    "n": 437,
+    "avg": 0.4562,
+    "wr": 0.5835,
+    "pf": 1.105
+  },
+  "permutation": {
+    "actual_oos_avg": -0.4562,
+    "boot_ci95": [
+      -1.4732,
+      0.6028
+    ],
+    "ci_straddles_zero": true,
+    "significant_negative": false
+  },
+  "component_corr": {
+    "event_span_days_mean": 319.8,
+    "span<=10: n": 219,
+    "avg": 1.958,
+    "span>10: n": 1012
+  },
+  "verdict": "SMC OOS 与随机无异 → 无稳定 edge, 维持禁用(仅 HTF_BIAS 研究特征)"
+}

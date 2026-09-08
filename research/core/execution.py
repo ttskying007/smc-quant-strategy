@@ -237,16 +237,21 @@ def try_fill(order, market_snapshot):
         # 回踩限价：回落到参考价成交；否则当日开盘兜底
         if px <= float(order.get("reference_price") or 0):
             fill_px = float(order["reference_price"]) * (1 + SLIPPAGE)
+            _rule, _src = "LIMIT_RETRACE: px<=ref", "retrace"
         elif opn and opn > 0:
             fill_px = opn * (1 + SLIPPAGE)
+            _rule, _src = "LIMIT_RETRACE: open_fallback", "open"
         else:
             return {"filled": False, "why": "WAIT_RETRACE"}
     else:  # next_open
         if not (opn and opn > 0):
             return {"filled": False, "why": "NO_OPEN"}
         fill_px = opn * (1 + SLIPPAGE)
+        _rule, _src = "MARKET_T1_OPEN", "open"
     return {"filled": True, "price": round(fill_px, 3),
-            "sl": order.get("planned_sl"), "tp": order.get("planned_tp")}
+            "sl": order.get("planned_sl"), "tp": order.get("planned_tp"),
+            # FIX(2026-09-08, 复审 P1-1): 记录撮合规则与价格来源（回踩价/开盘兜底）
+            "fill_rule": _rule, "price_source": _src}
 
 
 def try_exit(position, market_snapshot):

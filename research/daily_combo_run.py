@@ -187,6 +187,9 @@ def _run_main_steps():
                "note": ("任一域未完整，需兜底补跑" if not _production_eligible else "数据/信号/执行/前端四层全部完整")},
               open(os.path.join(RESEARCH, "run_status.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
     # FIX(2026-09-05, 蓝图迭代二): daily_combo_run 生成 run_manifest（版本合同+数据血缘）
+    # FIX(2026-09-08, 复审 P0-1 fail-closed): manifest/artifact 验证失败 → 生产资格降级,
+    # 禁止发布候选（任何 artifact 缺失/空/哈希不符 = INVALID = production blocked）。
+    _manifest_ok = False
     try:
         import core.manifest as _CM
         _m = _CM.build_manifest(
@@ -198,17 +201,22 @@ def _run_main_steps():
                             os.path.join(RESEARCH, "run_status.json")],
             status="production" if _data_complete else "degraded",
             extra={"data_complete": _data_complete, "fallback_used": bool(_failed)})
-        _mp = _CM.save_manifest(_m, os.path.join(RESEARCH, "run_manifests"))
+        # 生产模式 fail-closed: 先验证 artifact 再写（finalize 内含原子写+复核）
+        _mp, _manifest_ok = _CM.finalize_manifest(
+            _m, [os.path.join(RESEARCH, "combo_dashboard.json"),
+                 os.path.join(RESEARCH, "run_status.json")],
+            os.path.join(RESEARCH, "run_manifests"))
         for _d in MIRROR_DIRS:
             try:
                 os.makedirs(_d, exist_ok=True)
                 shutil.copyfile(_mp, os.path.join(_d, "run_manifest.json"))
             except Exception as _e:
                 print(f"manifest 前端同步警告 {_d}: {_e}", flush=True)
-        print(f"manifest: {_mp} (status={_m['status']})", flush=True)
+        print(f"manifest: {_mp} (status={_m['status']} ok={_manifest_ok})", flush=True)
     except Exception as _e:
-        # FIX(2026-09-05, 复审 P0-1): manifest 失败不静默 —— 标 run_status manifest_ok=false（DEGRADED）
-        print(f"manifest 生成失败: {_e}", flush=True)
+        # manifest 失败/artifact 无效 → 生产资格阻断（fail-closed, 不允许 DEGRADED 继续）
+        print(f"manifest 验证失败(FAIL-CLOSED): {_e}", flush=True)
+        _manifest_ok = False
         try:
             _rs_p = os.path.join(RESEARCH, "run_status.json")
             _rs = json.load(open(_rs_p, encoding="utf-8")) if os.path.exists(_rs_p) else {}
@@ -217,7 +225,18 @@ def _run_main_steps():
             json.dump(_rs, open(_rs_p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
         except Exception:
             pass
-    print(f"DONE: batch={rc0} refresh={rc} scan={rc2} sim={rc3} dashboard={rc4}", flush=True)
+    # FIX(2026-09-08, 复审 P0-1 fail-closed): 生产资格必须含 manifest/artifact 验证通过。
+    # manifest 缺失/无效 → 即便四层数据完整也不得 production_eligible=true。
+    _production_eligible = _production_eligible and _manifest_ok
+    try:
+        _rs_p = os.path.join(RESEARCH, "run_status.json")
+        _rs = json.load(open(_rs_p, encoding="utf-8")) if os.path.exists(_rs_p) else {}
+        _rs["manifest_ok"] = _manifest_ok
+        _rs["production_eligible"] = _production_eligible
+        json.dump(_rs, open(_rs_p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    print(f"DONE: batch={rc0} refresh={rc} scan={rc2} sim={rc3} dashboard={rc4} manifest_ok={_manifest_ok}", flush=True)
 
 if __name__ == "__main__":
     main()

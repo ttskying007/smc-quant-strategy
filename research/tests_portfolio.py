@@ -41,5 +41,43 @@ ok("单月集中→HHI高", PF.hhi([90, 1, 1, 1]) > 0.6, str(PF.hhi([90,1,1,1]))
 vals, h = PF.monthly_contribution([1,2,3,4,5], ["01","01","02","02","03"])
 ok("月度聚合", vals == [3.0, 7.0, 5.0], str(vals))
 
+print("== P1-5 组合级风险 ==")
+# 总暴露
+ok_e, why_e, tot = PF.portfolio_exposure_check([{"code": "a", "position_pct": 0.22}, {"code": "b", "position_pct": 0.22}], max_total_exposure=0.4)
+ok("总暴露0.44>0.4→拒绝", not ok_e and "总暴露" in why_e, why_e)
+ok_e2, _, tot2 = PF.portfolio_exposure_check([{"code": "a", "position_pct": 0.2}], max_total_exposure=0.8)
+ok("总暴露0.2<0.8→OK", ok_e2, str(tot2))
+ok_b, why_b, _ = PF.portfolio_exposure_check([{"code": "a", "position_pct": 0.3}], max_single=0.25)
+ok("单票0.3>0.25→拒绝", not ok_b and "单票" in why_b, why_b)
+# 行业集中
+ok_i, why_i, byind = PF.industry_concentration_check(
+    [{"code": "a", "position_pct": 0.3}, {"code": "b", "position_pct": 0.2}],
+    {"a": "BANK", "b": "BANK"}, max_industry=0.4)
+ok("行业BANK 0.5>0.4→拒绝", not ok_i and "BANK" in why_i, why_i)
+ok_i2, _, _ = PF.industry_concentration_check(
+    [{"code": "a", "position_pct": 0.2}, {"code": "b", "position_pct": 0.2}],
+    {"a": "BANK", "b": "TECH"}, max_industry=0.4)
+ok("两行业各0.2→OK", ok_i2)
+# kill switch
+k1, why1, _ = PF.kill_switch([-0.01]*5, window="consecutive", consecutive_loss=5)
+ok("连续5亏→kill", k1, why1)
+k2, _, _ = PF.kill_switch([-0.01, +0.02, -0.01, +0.03, -0.01], window="consecutive", consecutive_loss=5)
+ok("非连续5亏→不kill", not k2)
+k3, why3, _ = PF.kill_switch([-0.02]*20, window="daily", daily_loss=-0.03)
+ok("近20笔-40%→daily kill", k3, why3)
+# 订单幂等
+d, r = PF.idempotent_order_check(
+    [{"code": "600000", "signal_date": "20260907", "order_type": "MARKET_T1_OPEN"}],
+    {"code": "600000", "signal_date": "20260907", "order_type": "MARKET_T1_OPEN"})
+ok("同code+日期+类型→重复", d, r)
+d2, _ = PF.idempotent_order_check(
+    [{"code": "600000", "signal_date": "20260907", "order_type": "MARKET_T1_OPEN"}],
+    {"code": "600000", "signal_date": "20260908", "order_type": "MARKET_T1_OPEN"})
+ok("不同日期→非重复", not d2)
+# 跳空风险
+gl, br = PF.gap_risk_check({"position_pct": 0.2, "sl": 9.0}, gap_pct=-0.08)
+ok("8%跳空×20%仓=1.6%账户损失", abs(gl - 0.016) < 1e-9, str(gl))
+ok("缺口<仓位50%→非breach", not br)
+
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

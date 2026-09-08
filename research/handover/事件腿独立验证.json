@@ -1,0 +1,70 @@
+{
+  "total_trades": 2084,
+  "wins": 1277,
+  "losses": 807,
+  "avg_net": 2.954,
+  "avg_gross": 3.154,
+  "fee_per_trade": 0.2,
+  "pf": 2.753,
+  "top1": {
+    "pnl": 66.77,
+    "symbol": "002655.SZ",
+    "date": "20260803",
+    "share": 1.1
+  },
+  "top5_share": 4.6,
+  "by_year": {
+    "2023": {
+      "n": 101,
+      "avg": -1.13,
+      "pf": 0.47
+    },
+    "2024": {
+      "n": 1226,
+      "avg": 3.283,
+      "pf": 2.71
+    },
+    "2025": {
+      "n": 400,
+      "avg": 2.353,
+      "pf": 3.33
+    },
+    "2026": {
+      "n": 357,
+      "avg": 3.656,
+      "pf": 3.39
+    }
+  },
+  "family_count": 1918,
+  "repeat_count": 166,
+  "bootstrap_ci95": [
+    2.548,
+    3.381
+  ],
+  "post_event_return": {
+    "1": 1.65,
+    "3": 2.17,
+    "5": 2.25,
+    "10": 3.32,
+    "20": 5.42
+  },
+  "announce_to_entry_delay_days": {
+    "1": 396,
+    "3": 82,
+    "4": 6,
+    "11": 16
+  },
+  "multiple_testing": {
+    "reported_experiments": 7,
+    "bonferroni_alpha": 0.0071,
+    "note": "bootstrap CI 已含抽样误差; 试验总数按 handover 报告计数"
+  },
+  "verdict": {
+    "sample_ok": true,
+    "concentration_ok": true,
+    "ci_positive": true,
+    "not_small_sample": "✅",
+    "not_top5_dominated": "✅",
+    "ci_strictly_positive": "✅"
+  }
+}

@@ -116,3 +116,50 @@ def validate_manifest(m):
         if not m.get(f):
             return False, f"missing: {f}"
     return True, "ok"
+
+
+def validate_artifacts(m, require_nonempty=True):
+    """FIX(2026-09-08, 复审 P0-1): artifact 存在性/空/哈希验证。
+    审计要求: artifact 不存在、为空、hash 不匹配时状态必须为 INVALID，禁止发布候选。
+    返回 (ok, reason_list)。m['artifact_hash'] = {path: hash_or_'missing'}。"""
+    ah = m.get("artifact_hash") or {}
+    bad = []
+    for p, h in ah.items():
+        if h == "missing":
+            bad.append(f"{os.path.basename(p)}: 文件不存在")
+            continue
+        if require_nonempty:
+            try:
+                if os.path.getsize(p) == 0:
+                    bad.append(f"{os.path.basename(p)}: 文件为空")
+                    continue
+            except OSError:
+                bad.append(f"{os.path.basename(p)}: 无法访问")
+                continue
+        # 重算哈希核对（防半更新/旧数据）
+        cur = file_hash(p)
+        if cur != h:
+            bad.append(f"{os.path.basename(p)}: 哈希不匹配({h} vs {cur})")
+    if bad:
+        m["status"] = "INVALID"
+        m["invalid_reason"] = "; ".join(bad[:5])
+        return False, bad
+    return True, []
+
+
+def finalize_manifest(m, artifact_paths, out_dir):
+    """FIX(2026-09-08, 复审 P0-1): 生产合同收口 —— 验证 → 原子写 → artifact 复核。
+    任何 artifact 缺失/空/哈希不符 → status=INVALID 且抛 RuntimeError(生产阻断)。
+    返回 (manifest_path, valid_bool)。"""
+    # 1. artifact 哈希记录
+    m["artifact_hash"] = {p: file_hash(p) for p in (artifact_paths or [])}
+    # 2. 原子写
+    p = save_manifest(m, out_dir)
+    # 3. artifact 复核（写后重新验证，捕获半更新/损坏）
+    ok, bad = validate_artifacts(m)
+    if not ok:
+        m["status"] = "INVALID"
+        m["invalid_reason"] = "; ".join(bad[:5])
+        save_manifest(m, out_dir)  # 重写带 INVALID 状态
+        raise RuntimeError(f"production run blocked: invalid manifest/artifact: {bad[:3]}")
+    return p, True

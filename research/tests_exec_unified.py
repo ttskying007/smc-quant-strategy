@@ -95,5 +95,61 @@ def test_ep_gt_sl_normal():
 test_ep_lt_sl_bad_entry()
 test_ep_gt_sl_normal()
 
+print("== 复审 P0-2: 时间因果硬断言 ==")
+# ① 成交时间 >= 可交易时间(valid_from)
+o1 = {"code": "000001", "entry_mode": "next_open", "reference_price": 10.0,
+      "planned_sl": 9.5, "planned_tp": 11.5, "valid_from": "20260907"}
+s1 = {"px": 10.2, "prev": 10.0, "open": 10.1, "vol": 1000, "today": "20260906"}
+r1 = EX.try_fill(o1, s1)
+ok("P0-2: today<valid_from 不成交(NOT_YET_VALID)", (not r1["filled"]) and r1["why"] == "NOT_YET_VALID", str(r1))
+s1b = {"px": 10.2, "prev": 10.0, "open": 10.1, "vol": 1000, "today": "20260907"}
+r1b = EX.try_fill(o1, s1b)
+ok("P0-2: today>=valid_from 可成交", r1b["filled"], str(r1b))
+# ② 成交价不高于涨停（买入）
+s1c = {"px": 11.05, "prev": 10.0, "open": 10.1, "vol": 1000, "today": "20260907"}
+r1c = EX.try_fill(o1, s1c)
+ok("P0-2: 涨停不可买(LIMIT_UP)", (not r1c["filled"]) and r1c["why"] == "LIMIT_UP", str(r1c))
+# ③ 退出时间 > 成交时间（T+1 锁）
+pos2 = {"code": "000001", "entry_date": "20260907", "filled_price": 10.0, "sl": 9.5, "tp": 11.5, "tp1": 10.5, "tp1_hit": False, "bars_since_fill": 0, "filled_at": "2026-09-07 10:00:00"}
+ex2 = EX.try_exit(pos2, {"px": 10.6, "prev": 10.0, "today": "20260907"})
+ok("P0-2: T+1锁定当日不可卖", (not ex2["exit"]) and ex2["why"] == "T1_LOCKED", str(ex2))
+pos2b = {"code": "000001", "entry_date": "20260904", "filled_price": 10.0, "sl": 9.5, "tp": 11.5, "tp1": 10.5, "tp1_hit": False, "bars_since_fill": 1, "filled_at": "2026-09-04 10:00:00"}
+ex2b = EX.try_exit(pos2b, {"px": 10.6, "prev": 10.0, "today": "20260907"})
+# T+1 解除后: px 10.6 > tp1 10.5 → TP1 部分平仓(partial)即卖出被允许; 若 exit=False 仅允许 HOLD
+ok("P0-2: T+1后可卖(T1锁解除→TP1部分平)", ex2b["exit"] or ex2b.get("partial") == "TP1", str(ex2b))
+# ④ 同一根K线 high/low 顺序未知 → 保守规则: SL 优先于 TP（simulate 已实现）
+daily3 = [{"t": "20260101", "o": 10.0, "h": 10.0, "l": 10.0, "c": 10.0, "v": 1000000},
+          {"t": "20260102", "o": 10.0, "h": 11.0, "l": 9.0, "c": 10.0, "v": 1000000}]
+r3 = EX.simulate(daily3, 0, 10.0, 9.8, tp1=10.4, tp2=10.8, partial_tp1=0.3, stop_to_be=True, max_hold=15)
+ok("P0-2: 同K线SL优先于TP(保守)", r3["reason"] == "SL_HIT", r3["reason"])
+# ⑤ try_fill 记录 fill_rule/price_source（P1-1）
+r4 = EX.try_fill({"code": "000001", "entry_mode": "retrace", "reference_price": 10.0,
+                  "planned_sl": 9.5, "planned_tp": 11.5, "valid_from": "20260901"},
+                 {"px": 9.9, "prev": 10.0, "open": 10.1, "vol": 1000, "today": "20260907"})
+ok("P1-1: retrace 回踩成交记录 fill_rule", r4["filled"] and "LIMIT_RETRACE" in r4.get("fill_rule", "") and r4.get("price_source") == "retrace", str(r4))
+r5 = EX.try_fill({"code": "000001", "entry_mode": "next_open", "reference_price": 10.0,
+                  "planned_sl": 9.5, "planned_tp": 11.5, "valid_from": "20260901"},
+                 {"px": 10.2, "prev": 10.0, "open": 10.1, "vol": 1000, "today": "20260907"})
+ok("P1-1: next_open 开盘成交记录 fill_rule", r5["filled"] and r5.get("fill_rule") == "MARKET_T1_OPEN" and r5.get("price_source") == "open", str(r5))
+
+print("== 复审 P1-6: MAE/MFE 从 fill bar 起算（非 signal bar）==")
+# 构造: entry_idx=0 (fill bar), 后续 bar 大幅波动 —— MAE/MFE 应反映 entry 后的真实不利/有利偏移
+d6 = [{"t": "20260101", "o": 10.0, "h": 10.0, "l": 10.0, "c": 10.0, "v": 1000000},  # fill bar (entry_idx=0, 以open=10买入)
+      {"t": "20260102", "o": 10.1, "h": 10.5, "l": 9.9, "c": 10.2, "v": 1000000},  # 第一根持有bar: MFE=(10.5/10-1)=5%, MAE=(9.9/10-1)=-1%
+      {"t": "20260103", "o": 10.2, "h": 11.0, "l": 10.1, "c": 10.8, "v": 1000000}]  # 第二根: MFE=10%
+r6 = EX.simulate(d6, 0, 10.0, 9.0, tp1=10.6, tp2=10.9, partial_tp1=0.3, stop_to_be=True, max_hold=15)
+ok("P1-6: MFE 从 fill 后第一根bar起算(≥5%)", r6["mfe_pct"] >= 5.0, f"mfe={r6['mfe_pct']}%")
+ok("P1-6: MAE 从 fill 后第一根bar起算(≤-1%)", r6["mae_pct"] <= -1.0, f"mae={r6['mae_pct']}%")
+# 信号bar的极端高低不应计入（signal bar high=10.5 若误计会让 MFE 失真, 但 simulate 从 entry_idx+1 起算）
+ok("P1-6: mfe_r/mae_r 为正负符号正确", r6["mfe_r"] > 0 and r6["mae_r"] < 0, f"mfe_r={r6['mfe_r']} mae_r={r6['mae_r']}")
+# 未成交订单不进入 MAE/MFE 样本：BAD_ENTRY 返回 skipped，无 mfe/mae
+r7 = EX.simulate(d6, 0, 10.0, 10.2, tp1=10.6, tp2=10.9, partial_tp1=0.3, stop_to_be=True, max_hold=15)
+ok("P1-6: BAD_ENTRY(ep<sl) 不入 MAE/MFE 样本", r7.get("skipped"), str(r7.get("reason")))
+# 同K线 SL/TP 冲突 → SL 优先（保守, 无未来函数）
+d8 = [{"t": "20260101", "o": 10.0, "h": 10.0, "l": 10.0, "c": 10.0, "v": 1000000},
+      {"t": "20260102", "o": 10.0, "h": 11.5, "l": 8.5, "c": 10.0, "v": 1000000}]  # 同根: high 11.5(TP), low 8.5(SL)
+r8 = EX.simulate(d8, 0, 10.0, 9.8, tp1=10.4, tp2=10.8, partial_tp1=0.3, stop_to_be=True, max_hold=15)
+ok("P1-6: 同K线 SL 优先于 TP（保守规则）", r8["reason"] in ("SL_HIT", "SL_GAP"), r8["reason"])
+
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

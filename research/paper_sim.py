@@ -508,6 +508,10 @@ def daily_selection():
     _sel_stats = {"scanned": 0, "selected": 0, "skipped_stage": 0, "skipped_adx": 0,
                   "skipped_strong": 0, "skipped_nodata": 0, "skipped_dup": 0}
     _skipped_detail = []  # FIX(2026-08-26): 跳过明细（代码/名称/原因）
+    # FIX(2026-09-08, 复审 P1-4): 每股每日只记一个最终拒绝阶段（互斥/守恒证明）。
+    # 分类: DATA_MISSING(无K线/无此日期) 与 STRATEGY_REJECT(阶段/ADX/去重) 分开计数。
+    _reject_stage = {}  # {(code, dd): stage_name}
+    _data_missing = 0   # 数据缺失单独计数（不计入策略拒绝）
     for dd in recent_days:
         # FIX(2026-09-05, 审计 G25): 改为全量拉取增持/回购候选，Python 端用 core.events.classify_title
         # 统一过滤（否定词全集：终止/完毕/解除/…/减持/完成/进度/前十名，scanner 与 selection 同一套）
@@ -525,16 +529,21 @@ def daily_selection():
             d8 = str(dd).replace("-", "")
             if (code, dd) in known or (code, dd) in seen_orders:
                 _sel_stats["skipped_dup"] += 1
+                _reject_stage[(code, dd)] = "DUP_EXISTING"
                 continue
             seen_orders.add((code, dd))
             bs = bars_of(code)
             if not bs:
                 _sel_stats["skipped_nodata"] += 1
+                _data_missing += 1
+                _reject_stage[(code, dd)] = "DATA_MISSING"
                 _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": "无K线数据"})
                 continue
             dates = [b["t"] for b in bs]
             if d8 not in dates:
                 _sel_stats["skipped_nodata"] += 1
+                _data_missing += 1
+                _reject_stage[(code, dd)] = "DATA_MISSING"
                 _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": "K线无此日期"})
                 continue
             i = dates.index(d8)
@@ -543,11 +552,13 @@ def daily_selection():
             st, deep = stage_and_deep(bs, i)
             if st not in ("ACCUM", "DOWNTREND"):
                 _sel_stats["skipped_stage"] += 1
+                _reject_stage[(code, dd)] = f"STAGE_{st}"
                 _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": f"阶段={st}(非ACCUM/DOWNTREND)"})
                 continue
             adx = adx14_of(bs, i)
             if adx is None or adx < 20:
                 _sel_stats["skipped_adx"] += 1
+                _reject_stage[(code, dd)] = "ADX_LT20"
                 _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": f"ADX={adx}<20"})
                 continue
             close_px = bs[i]["c"]
@@ -655,6 +666,13 @@ def daily_selection():
                 "position_pct": _position_pct, "risk_dist_pct": round(_risk_dist / limit_px * 100, 2) if _risk_dist else None,
                 "filled_price": None, "filled_at": None,
                 "exit_reason": None, "pnl_pct": None, "entry_mode": "retrace",
+                # FIX(2026-09-08, 复审 P1-1): 订单类型显式化 —— 每笔记录类型与时间边界。
+                # retrace = LIMIT_RETRACE(披露收盘×0.99限价, 次日低点触发), next_open = MARKET_T1_OPEN。
+                # submitted_at=信号生成日, eligible_at=valid_from(可成交首日), fill_rule=撮合规则。
+                "order_type": "LIMIT_RETRACE", "submitted_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "eligible_at": _next_td(dates, d8),
+                "fill_rule": "回踩挂单: low<=limit×0.99 成交, 否则 T+1 开盘兜底(实时open)",
+                "not_filled_reason": None,
             })
             new_orders.append((code, name, dd, limit_px))
     conn.close()
@@ -697,6 +715,10 @@ def daily_selection():
                 "filled_price": None,
                 "filled_at": None,
                 "exit_reason": None, "pnl_pct": None, "hold": 10,
+                # FIX(2026-09-08, 复审 P1-1): 订单类型显式化
+                "order_type": "MARKET_T1_OPEN", "submitted_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "eligible_at": c.get("valid_from") or (_next_td(dates2, sig_d8) if (bs2 and ep) else ""),
+                "fill_rule": "T+1开盘市价(实时open, 带滑点)", "not_filled_reason": None,
             })
             new_orders.append((code, code, sig_d, ep))
     except Exception:
@@ -745,6 +767,10 @@ def daily_selection():
                     "position_pct": round(_pos, 4),
                     "r20": r20, "filled_price": None, "filled_at": None,
                     "exit_reason": None, "pnl_pct": None, "entry_mode": "next_open",
+                    # FIX(2026-09-08, 复审 P1-1): 订单类型显式化
+                    "order_type": "MARKET_T1_OPEN", "submitted_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "eligible_at": _next_td(dates3, (sig_d or ev_d).replace("-", "")),
+                    "fill_rule": "T+1开盘市价(实时open, 带滑点)", "not_filled_reason": None,
                 })
                 new_orders.append((code, code, sig_d, ep))
                 _sel_stats["smc_selected"] = _sel_stats.get("smc_selected", 0) + 1
@@ -803,6 +829,16 @@ def daily_selection():
             "orders_created": len(new_orders),
             "note": "漏斗逐层：公告总数→含增持/回购→分类为正事件→去重→有K线→阶段→ADX→挂单。"
                     "soft_with_delta 为研究候选（进展类含金额/比例增量），默认流仍拒绝。",
+            # FIX(2026-09-08, 复审 P1-4): 守恒证明 —— 每股每日恰一个最终阶段；
+            # 阶段计数总和 = universe_total（每股每日去重后）；DATA_MISSING 单列不计入策略拒绝。
+            "conservation": {
+                "universe_total": _ev_cnt,
+                "data_missing": _data_missing,
+                "strategy_reject": len(_reject_stage) - _data_missing,
+                "passed_to_order": len(new_orders),
+                "mutex_check": len(_reject_stage) + len(new_orders) == _ev_cnt,
+                "note": "universe_total = data_missing + strategy_reject + orders（每股每日唯一阶段，互斥）",
+            },
         }
         json.dump(funnel, open(os.path.join(ROOT, "selection_funnel.json"), "w", encoding="utf-8"),
                   ensure_ascii=False, indent=2)
@@ -899,8 +935,13 @@ def realtime_monitor():
                 t["status"] = "FILLED"
                 t["filled_price"] = _fr["price"]
                 t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                # FIX(2026-09-08, 复审 P1-1): 成交记录撮合规则与价格来源
+                t["fill_rule"] = _fr.get("fill_rule") or t.get("fill_rule") or "core.execution:try_fill"
+                t["fill_price_source"] = _fr.get("price_source", "core")
                 n_fill += 1
             else:
+                # FIX(2026-09-08, 复审 P1-1): 未成交原因显式记录（停牌/涨停/未到日/待回落）
+                t["not_filled_reason"] = _fr.get("why") or "unknown"
                 # FIX(2026-09-08, 审计12): PENDING 过期机制 —— valid_from 后 PENDING_EXPIRE_DAYS
                 # 个交易日内未成交（停牌/涨停/未回落）→ EXPIRED，避免长期 pending 阻塞同代码后续信号
                 # （known/seen_orders 按.signal_date 去重，EXPIRED 后同代码新信号可正常进入）
