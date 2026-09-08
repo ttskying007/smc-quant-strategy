@@ -14,5 +14,21 @@
       "nodata": 3,
       "dup": 6
     }
+  },
+  {
+    "day": "2026-09-08",
+    "generated_at": "2026-09-08 17:20:15",
+    "raw": 162,
+    "positive": 33,
+    "orders": 2,
+    "reject": {
+      "event_filter_hard": 6,
+      "event_filter_soft": 123,
+      "event_filter_soft_with_delta_research": 0,
+      "stage": 13,
+      "adx": 6,
+      "nodata": 5,
+      "dup": 7
+    }
   }
 ]
