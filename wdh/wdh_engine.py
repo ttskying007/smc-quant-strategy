@@ -228,7 +228,12 @@ def weekly_permission(weekly, day_date):
     return False, "NO_W1_PERMISSION"
 
 
-def build_seeds(symbol, daily):
+def build_seeds(symbol, daily, gates=None):
+    """gates: 消融开关 {"w1": 周许可, "sweep_vol": 扫损量能,
+    "disp_sig": 位移签名, "strong_bos": 位移延续}。
+    默认全开 = 生产行为不变；消融脚本逐项关闭做 cascade 验证。"""
+    _g = {"w1": True, "sweep_vol": True, "disp_sig": True, "strong_bos": True}
+    _g.update(gates or {})
     weekly = aggregate_weekly(daily)
     seeds = []
     # FIX(2026-09-05, 审计 G02): 去重 —— 同一 entry_idx 只产一个 seed；同一被扫低点只用一次；
@@ -239,9 +244,11 @@ def build_seeds(symbol, daily):
     for i in range(20, len(daily) - 3):
         b = daily[i]
         # W1 permission (weekly structure strictly before this week)
-        wok, wwhy = weekly_permission(weekly, b["t"])
-        if not wok:
-            continue
+        wok, wwhy = True, "GATED_OFF"
+        if _g["w1"]:
+            wok, wwhy = weekly_permission(weekly, b["t"])
+            if not wok:
+                continue
         # D1: daily SSL sweep of a confirmed swing low
         # FIX(2026-09-05, 审计 F09): 扫损根要求量能签名（volZ>=0.5，机构吸筹扫损），
         # 避免把普通波动跌破当作吸筹。
@@ -255,7 +262,7 @@ def build_seeds(symbol, daily):
             if b["l"] <= ssl * (1 - _tol) and b["c"] > ssl:
                 # FIX(2026-09-05, 审计 G17): 真 z-score（60日均值±标准差）替代"量比−1"
                 _vz, _ = vol_z(daily, i, 60)
-                if _vz < 0.5:
+                if _g["sweep_vol"] and _vz < 0.5:
                     continue  # 无放量扫损 → 非机构吸筹
                 swept = j
                 break
@@ -285,9 +292,9 @@ def build_seeds(symbol, daily):
         # 收盘在上35%：close 位于当日 (low..high) 区间上 35%
         _rng = (daily[rsp]["h"] - daily[rsp]["l"]) if daily[rsp]["h"] > daily[rsp]["l"] else 0
         _pos_35 = _rng > 0 and (daily[rsp]["c"] - daily[rsp]["l"]) / _rng >= 0.65
-        if not (_vzr >= 1.0 and _atr_r > 0 and _rng >= _atr_r and _pos_35):
+        if _g["disp_sig"] and not (_vzr >= 1.0 and _atr_r > 0 and _rng >= _atr_r and _pos_35):
             continue  # 非大资金推动的位移（需放量+实体≥ATR+收盘上35%）
-        if STRONG_BOS:
+        if _g["strong_bos"] and STRONG_BOS:
             rsp2 = rsp + 1
             if rsp2 < len(daily) and daily[rsp2]["c"] < swing_high_vis:
                 continue  # retraced — weak BOS

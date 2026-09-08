@@ -1,0 +1,32 @@
+{
+  "strict_n": 1231,
+  "nonstrict_n": 0,
+  "strict_all": {
+    "n": 1231,
+    "avg": 1.613,
+    "wr": 0.471,
+    "pf": 1.38
+  },
+  "nonstrict_all": {
+    "n": 0,
+    "avg": 0.0,
+    "wr": 0.0,
+    "pf": 0.0
+  },
+  "strict_oos": {
+    "n": 435,
+    "avg": -0.499,
+    "wr": 0.395,
+    "pf": 0.9
+  },
+  "nonstrict_oos": {
+    "n": 0,
+    "avg": 0.0,
+    "wr": 0.0,
+    "pf": 0.0
+  },
+  "order_dist": {
+    "sotr": 1231
+  },
+  "verdict": "顺序无显著信息/样本不足"
+}
