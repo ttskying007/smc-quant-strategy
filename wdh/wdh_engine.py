@@ -31,6 +31,7 @@ try:
     from core.structure import is_swing_high as _core_swing_high
     from core.structure import atr_of as _core_atr_of
     from core.structure import sweep_tol_of as _core_sweep_tol_of
+    from core.displacement import displacement_score as _core_disp_score
     _USE_CORE = True
 except Exception:
     _USE_CORE = False
@@ -56,6 +57,9 @@ FEE = 0.20
 SL_BUFFER = 0.99
 # strong-BOS disabled (audit: close-only BOS + more samples outperformed confirmed-BOS)
 STRONG_BOS = False
+
+# V1 迭代2: SMC 研究腿阶段漏斗计数器（build_seeds 累积，扫描脚本读取）。
+STAGE_STATS = {}
 # FIX(2026-09-05, 审计 F10): BOS 窗口 —— 扫损后 N 根内允许出现位移+收盘突破（日线 8 根）
 BOS_WINDOW = 8
 
@@ -234,6 +238,9 @@ def build_seeds(symbol, daily, gates=None):
     默认全开 = 生产行为不变；消融脚本逐项关闭做 cascade 验证。"""
     _g = {"w1": True, "sweep_vol": True, "disp_sig": True, "strong_bos": True}
     _g.update(gates or {})
+    global STAGE_STATS
+    STAGE_STATS = {"bars_scanned": 0, "w1_pass": 0, "sweep_found": 0,
+                   "bos_found": 0, "disp_pass": 0, "entry_found": 0, "seeds": 0}
     weekly = aggregate_weekly(daily)
     seeds = []
     # FIX(2026-09-05, 审计 G02): 去重 —— 同一 entry_idx 只产一个 seed；同一被扫低点只用一次；
@@ -243,12 +250,14 @@ def build_seeds(symbol, daily, gates=None):
     swing_lows = [j for j in range(PIVOT_L, len(daily) - PIVOT_R) if is_swing_low(daily, j)]
     for i in range(20, len(daily) - 3):
         b = daily[i]
+        STAGE_STATS["bars_scanned"] += 1
         # W1 permission (weekly structure strictly before this week)
         wok, wwhy = True, "GATED_OFF"
         if _g["w1"]:
             wok, wwhy = weekly_permission(weekly, b["t"])
             if not wok:
                 continue
+        STAGE_STATS["w1_pass"] += 1
         # D1: daily SSL sweep of a confirmed swing low
         # FIX(2026-09-05, 审计 F09): 扫损根要求量能签名（volZ>=0.5，机构吸筹扫损），
         # 避免把普通波动跌破当作吸筹。
@@ -268,6 +277,7 @@ def build_seeds(symbol, daily, gates=None):
                 break
         if swept is None:
             continue
+        STAGE_STATS["sweep_found"] += 1
         # D2: bullish break - BOS within window (FIX 2026-09-05, 审计 F10):
         # 旧实现只允许扫损后"下一根"收盘突破；真实 sweep→BOS 常需 2-8 根。
         # 改为 bos_window（默认 8 根）内出现 位移K+收盘突破；中途收盘跌破扫损低点则失效。
@@ -282,6 +292,7 @@ def build_seeds(symbol, daily, gates=None):
                 break  # 中途跌破扫损低 → 失效
         if rsp is None:
             continue
+        STAGE_STATS["bos_found"] += 1
         # 位移根量能/实体/收盘位置签名（FIX 2026-09-05, 规范 DISPLACEMENT）
         # FIX(2026-09-05, 审计 G17): 真 z-score 量能
         _vzr, _ = vol_z(daily, rsp, 60)
@@ -294,10 +305,15 @@ def build_seeds(symbol, daily, gates=None):
         _pos_35 = _rng > 0 and (daily[rsp]["c"] - daily[rsp]["l"]) / _rng >= 0.65
         if _g["disp_sig"] and not (_vzr >= 1.0 and _atr_r > 0 and _rng >= _atr_r and _pos_35):
             continue  # 非大资金推动的位移（需放量+实体≥ATR+收盘上35%）
-        if _g["strong_bos"] and STRONG_BOS:
-            rsp2 = rsp + 1
-            if rsp2 < len(daily) and daily[rsp2]["c"] < swing_high_vis:
-                continue  # retraced — weak BOS
+        STAGE_STATS["disp_pass"] += 1
+        # V1 迭代2: 语义化位移分（0-100）存入 seed —— 供分桶 A/B 检验打分是否有排序信息
+        _ds = {"score": 0, "bucket": "N/A", "parts": {}}
+        if _USE_CORE:
+            try:
+                _ds = _core_disp_score(daily, rsp)
+            except Exception:
+                _ds = {"score": 0, "bucket": "N/A", "parts": {}}
+        disp_score, disp_bucket = _ds["score"], _ds["bucket"]
         # D3: 看涨 OB —— FIX(2026-09-05, 审计 F02):
         # 旧实现取 BOS 后第一根阴线（其实是回踩K，非真 OB）。
         # SMC 看涨 OB = 位移腿之前最后一根反向（阴）K，即位移腿起点前一根。
@@ -390,6 +406,7 @@ def build_seeds(symbol, daily, gates=None):
         # FIX(2026-09-05, 审计 G01): 前视断言 —— 所有锚点必须严格早于入场
         if not (max(i, rsp, ob_idx, touch_idx, reclaim_idx) < entry_idx):
             continue  # 结构锚点未全部在入场前确认 → 丢弃（防前视）
+        STAGE_STATS["entry_found"] += 1
         # TP: pre-entry confirmed swing high ABOVE both zone and entry price
         entry_price = f(daily[entry_idx]["o"])
         tgt = None
@@ -447,7 +464,10 @@ def build_seeds(symbol, daily, gates=None):
             "target_swing_idx": tgt[0], "target": round(tgt[1], 6),
             "weekly_target": round(wk_target, 6) if wk_target else "",
             "r20": r20 if r20 is not None else "",
+            # V1 迭代2: 语义化位移分（0-100）及分桶 —— 供分桶 A/B 检验
+            "disp_score": disp_score, "disp_bucket": disp_bucket,
         })
+        STAGE_STATS["seeds"] += 1
     return seeds
 
 
