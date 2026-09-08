@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-08 17:20:15",
+  "generated_at": "2026-09-09 00:00:09",
   "days": [
     "2026-09-07",
     "2026-09-06",
@@ -9,24 +9,24 @@
   ],
   "raw_announcements": 162,
   "contains_buyback_or_increase": 162,
-  "classified_positive": 33,
+  "classified_positive": 20,
   "reject_by_reason": {
-    "event_filter_hard": 6,
-    "event_filter_soft": 123,
-    "event_filter_soft_with_delta_research": 0,
-    "stage": 13,
-    "adx": 6,
-    "nodata": 5,
+    "event_filter_hard": 4,
+    "event_filter_soft": 115,
+    "event_filter_soft_with_delta_research": 3,
+    "stage": 8,
+    "adx": 5,
+    "nodata": 3,
     "dup": 7
   },
-  "orders_created": 2,
+  "orders_created": 0,
   "note": "漏斗逐层：公告总数→含增持/回购→分类为正事件→去重→有K线→阶段→ADX→挂单。soft_with_delta 为研究候选（进展类含金额/比例增量），默认流仍拒绝。",
   "conservation": {
-    "universe_total": 33,
-    "data_missing": 5,
-    "strategy_reject": 26,
-    "passed_to_order": 2,
-    "mutex_check": true,
+    "universe_total": 20,
+    "data_missing": 3,
+    "strategy_reject": 20,
+    "passed_to_order": 0,
+    "mutex_check": false,
     "note": "universe_total = data_missing + strategy_reject + orders（每股每日唯一阶段，互斥）"
   }
 }

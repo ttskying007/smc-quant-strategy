@@ -1,0 +1,213 @@
+{
+  "frozen_at": "2026-09-09 07:14:04",
+  "git_commit": "d10f106131901f984e6dc35e7d487c1c7786f1de",
+  "universe": {
+    "kline_files": 4662,
+    "snapshot_hash": "0a372aa499d9"
+  },
+  "data": {
+    "trades_csv": "combo_v20f_trades.csv",
+    "event_trades": 1640
+  },
+  "cost_model": {
+    "fee_pct_roundtrip": 0.2,
+    "slippage": 0.001,
+    "note": "FEE_PCT=0.20%双边, SLIPPAGE=0.001 (core/execution.py)"
+  },
+  "execution_version": "core/execution.py simulate/try_fill/try_exit 统一内核 (TP1 partial + TP2 + TP3 runner + SL_GAP + 追踪止损 P1-1 + BAD_ENTRY)",
+  "events_version": "classify_title 纯净语义 (NEG_HARD/NEG_SOFT/NEG_INERT/PROGRESS_WITH_DELTA), 2026-09-08 修复注销/激励类污染(剔除444笔)",
+  "period": {
+    "start": "20230913",
+    "end": "20260814",
+    "oos_from": "20250701"
+  },
+  "smc_leg": {
+    "status": "DISABLED (ENABLE_SMC_LEG=False)",
+    "reason": "逐门消融 OOS全负(CI含0); 位移分OOS倒挂; V1迭代1-2证据"
+  },
+  "metrics": {
+    "by_year": {
+      "2023": {
+        "all": {
+          "n": 76,
+          "avg": -1.201,
+          "wr": 0.276,
+          "pf": 0.46
+        },
+        "oos": {
+          "n": 0
+        }
+      },
+      "2024": {
+        "all": {
+          "n": 1003,
+          "avg": 4.047,
+          "wr": 0.66,
+          "pf": 3.33
+        },
+        "oos": {
+          "n": 0
+        }
+      },
+      "2025": {
+        "all": {
+          "n": 272,
+          "avg": 2.766,
+          "wr": 0.695,
+          "pf": 4.42
+        },
+        "oos": {
+          "n": 73,
+          "avg": 1.128,
+          "wr": 0.644,
+          "pf": 2.11
+        }
+      },
+      "2026": {
+        "all": {
+          "n": 289,
+          "avg": 4.76,
+          "wr": 0.626,
+          "pf": 4.8
+        },
+        "oos": {
+          "n": 289,
+          "avg": 4.76,
+          "wr": 0.626,
+          "pf": 4.8
+        }
+      }
+    },
+    "overall": {
+      "all": {
+        "n": 1640,
+        "avg": 3.717,
+        "wr": 0.642,
+        "pf": 3.45
+      },
+      "is": {
+        "n": 1278,
+        "avg": 3.629,
+        "wr": 0.646,
+        "pf": 3.26
+      },
+      "oos": {
+        "n": 362,
+        "avg": 4.027,
+        "wr": 0.63,
+        "pf": 4.34
+      }
+    },
+    "hold_buckets": {
+      "1-3d": {
+        "all": {
+          "n": 491,
+          "avg": -0.571,
+          "wr": 0.403,
+          "pf": 0.7
+        },
+        "oos": {
+          "n": 103,
+          "avg": -0.688,
+          "wr": 0.437,
+          "pf": 0.51
+        }
+      },
+      "4-6d": {
+        "all": {
+          "n": 201,
+          "avg": 1.976,
+          "wr": 0.637,
+          "pf": 2.09
+        },
+        "oos": {
+          "n": 43,
+          "avg": 2.033,
+          "wr": 0.674,
+          "pf": 3.14
+        }
+      },
+      "7-9d": {
+        "all": {
+          "n": 142,
+          "avg": 2.524,
+          "wr": 0.683,
+          "pf": 2.36
+        },
+        "oos": {
+          "n": 36,
+          "avg": 2.504,
+          "wr": 0.667,
+          "pf": 2.67
+        }
+      },
+      "10-15d": {
+        "all": {
+          "n": 806,
+          "avg": 6.973,
+          "wr": 0.782,
+          "pf": 7.07
+        },
+        "oos": {
+          "n": 180,
+          "avg": 7.506,
+          "wr": 0.722,
+          "pf": 7.9
+        }
+      }
+    },
+    "exit_reasons": {
+      "TP2_RUNNER": {
+        "n": 357,
+        "avg": 8.61,
+        "wr": 0.994,
+        "pf": 28072.65
+      },
+      "TIME_STOP": {
+        "n": 638,
+        "avg": 7.544,
+        "wr": 0.799,
+        "pf": 10.6
+      },
+      "SL_HIT": {
+        "n": 314,
+        "avg": -5.198,
+        "wr": 0.0,
+        "pf": 0.0
+      },
+      "BE": {
+        "n": 184,
+        "avg": 0.908,
+        "wr": 0.908,
+        "pf": 98.34
+      },
+      "SL_GAP": {
+        "n": 147,
+        "avg": -2.219,
+        "wr": 0.143,
+        "pf": 0.08
+      }
+    },
+    "mfe_mae": {
+      "avg_mfe_pct": 10.05,
+      "avg_mae_pct": -3.18,
+      "avg_rr_exit": 0.31,
+      "n": 1640
+    },
+    "cont_leg_reference": {
+      "note": "CONT延续腿(生产并行腿, 非SMC); SMC腿已禁用(逐门消融OOS全负)",
+      "all": {
+        "n": 113,
+        "avg": 6.668,
+        "wr": 0.735,
+        "pf": 5.25
+      },
+      "oos": {
+        "n": 65,
+        "avg": 7.157,
+        "wr": 0.8,
+        "pf": 5.74
+      }
+    }
+  }
+}

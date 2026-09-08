@@ -1,0 +1,102 @@
+{
+  "asof": "2026-09-09 07:17:59",
+  "window_30d": {
+    "A_EVENT_only": {
+      "all": {
+        "n": 1278,
+        "avg": 3.629,
+        "wr": 0.646,
+        "pf": 3.26
+      },
+      "OOS": {
+        "n": 362,
+        "avg": 4.027,
+        "wr": 0.63,
+        "pf": 4.34
+      }
+    },
+    "B_EVENT_with_SMC": {
+      "n": 4,
+      "all": {
+        "n": 3,
+        "avg": -2.191,
+        "wr": 0.333,
+        "pf": 0.03
+      },
+      "OOS": {
+        "n": 1,
+        "avg": 0.317,
+        "wr": 1.0,
+        "pf": 99
+      }
+    }
+  },
+  "window_45d": {
+    "A_EVENT_only": {
+      "all": {
+        "n": 1278,
+        "avg": 3.629,
+        "wr": 0.646,
+        "pf": 3.26
+      },
+      "OOS": {
+        "n": 362,
+        "avg": 4.027,
+        "wr": 0.63,
+        "pf": 4.34
+      }
+    },
+    "B_EVENT_with_SMC": {
+      "n": 5,
+      "all": {
+        "n": 4,
+        "avg": -2.294,
+        "wr": 0.25,
+        "pf": 0.02
+      },
+      "OOS": {
+        "n": 1,
+        "avg": 0.317,
+        "wr": 1.0,
+        "pf": 99
+      }
+    }
+  },
+  "window_90d": {
+    "A_EVENT_only": {
+      "all": {
+        "n": 1278,
+        "avg": 3.629,
+        "wr": 0.646,
+        "pf": 3.26
+      },
+      "OOS": {
+        "n": 362,
+        "avg": 4.027,
+        "wr": 0.63,
+        "pf": 4.34
+      }
+    },
+    "B_EVENT_with_SMC": {
+      "n": 16,
+      "all": {
+        "n": 13,
+        "avg": 1.069,
+        "wr": 0.538,
+        "pf": 1.61
+      },
+      "OOS": {
+        "n": 3,
+        "avg": 7.388,
+        "wr": 0.667,
+        "pf": 10.42
+      }
+    }
+  },
+  "verdict_45d": {
+    "B_sample_ok": false,
+    "B_beats_A_OOS_avg": false,
+    "B_beats_A_OOS_pf": true,
+    "SMC_has_marginal_contribution": false
+  }
+}
