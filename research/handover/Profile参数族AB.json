@@ -1,0 +1,54 @@
+{
+  "nA": 650,
+  "nB": 657,
+  "profile_dist": {
+    "profile_low_persist": 4,
+    "profile_high_persist": 127,
+    "profile_low_mr": 52,
+    "profile_mid_mr": 365,
+    "profile_high_mr": 267,
+    "profile_mid_persist": 82
+  },
+  "A_fixed": {
+    "IS": {
+      "n": 321,
+      "avg": 2.068,
+      "wr": 0.523,
+      "pf": 1.59
+    },
+    "OOS": {
+      "n": 329,
+      "avg": 0.57,
+      "wr": 0.462,
+      "pf": 1.13
+    },
+    "OOS_ci": [
+      -0.828,
+      2.275
+    ]
+  },
+  "B_profile": {
+    "IS": {
+      "n": 321,
+      "avg": 1.102,
+      "wr": 0.517,
+      "pf": 1.34
+    },
+    "OOS": {
+      "n": 336,
+      "avg": 0.973,
+      "wr": 0.482,
+      "pf": 1.25
+    },
+    "OOS_ci": [
+      -0.464,
+      2.511
+    ]
+  },
+  "verdict": {
+    "B_sample_ok": true,
+    "B_beats_A_avg": true,
+    "B_beats_A_pf": true,
+    "profile_adaptive_helps": true
+  }
+}
