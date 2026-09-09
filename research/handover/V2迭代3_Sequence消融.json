@@ -1,0 +1,62 @@
+{
+  "A_TRUE": {
+    "IS": {
+      "n": 430,
+      "avg": 1.572,
+      "wr": 0.507,
+      "pf": 1.45
+    },
+    "OOS": {
+      "n": 446,
+      "avg": 0.331,
+      "wr": 0.453,
+      "pf": 1.08
+    },
+    "OOS_ci": [
+      -0.928,
+      1.697
+    ]
+  },
+  "B_RANDOM": {
+    "IS": {
+      "n": 426,
+      "avg": 1.276,
+      "wr": 0.479,
+      "pf": 1.37
+    },
+    "OOS": {
+      "n": 444,
+      "avg": -0.223,
+      "wr": 0.471,
+      "pf": 0.94
+    },
+    "OOS_ci": [
+      -1.167,
+      0.797
+    ]
+  },
+  "C_REVERSE": {
+    "IS": {
+      "n": 11,
+      "avg": 4.337,
+      "wr": 0.636,
+      "pf": 4.06
+    },
+    "OOS": {
+      "n": 14,
+      "avg": -2.558,
+      "wr": 0.214,
+      "pf": 0.34
+    },
+    "OOS_ci": [
+      -5.498,
+      0.446
+    ]
+  },
+  "verdict": {
+    "A_sample_ok": true,
+    "A_beats_random_OOS": true,
+    "A_beats_reverse_OOS": true,
+    "sequence_carries_information": true
+  }
+}
