@@ -778,10 +778,25 @@ def daily_selection():
             print(f'SMC 腿接入失败(不阻断): {_e}', flush=True)
     save_ledger(led)
     # FIX(2026-08-22): 选股结果日志（前端显示最新选股执行结果）
+    # FIX(2026-09-08, R14 日历三态): day_status 区分 周末/无数据(节假日)/正常无信号/有信号
+    _day_status = "OK"
+    try:
+        from datetime import date as _date_cls
+        _today = _date_cls.today()
+        if _today.weekday() >= 5:
+            _day_status = "WEEKEND"
+        elif not recent_days:
+            _day_status = "HOLIDAY_OR_NO_DATA"  # 无可评估的交易日(节假日/数据未更新)
+        elif not new_orders:
+            _day_status = "NO_SIGNAL"  # 交易日且数据OK但无符合条件信号
+        # else OK: 有新订单
+    except Exception:
+        pass
     _sel_stats["selected"] = len(new_orders)
     try:
         json.dump({"selected_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                    "days": recent_days, "stats": _sel_stats,
+                   "day_status": _day_status,
                    "new_orders": [{"code": o[0], "name": o[1], "date": o[2], "price": o[3]} for o in new_orders],
                    "skipped_detail": _skipped_detail[-50:]},
                   open(os.path.join(ROOT, "selection_result.json"), "w", encoding="utf-8"),
