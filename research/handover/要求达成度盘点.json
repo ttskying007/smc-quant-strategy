@@ -1,0 +1,105 @@
+{
+  "asof": "2026-09-09 08:26:41",
+  "total": 16,
+  "done": 7,
+  "partial": 5,
+  "open": 4,
+  "items": [
+    {
+      "id": "R1",
+      "req": "边修改边测试边回测边验证(audit-driven)",
+      "status": "DONE",
+      "evidence": "全部18个commit均含测试+回测+验证; 327+8全绿; 每次修改先测试后提交"
+    },
+    {
+      "id": "R2",
+      "req": "V1蓝图12迭代全面审计",
+      "status": "DONE(核心8项)",
+      "evidence": "V1迭代1消融/2位移/3时序/4WF/5标注集+污染修复/6纯净三分类/7基线重生成 + 审计P0-4收口(49d9661)"
+    },
+    {
+      "id": "R3",
+      "req": "SMC结构+时序状态机(优先级①②)",
+      "status": "DONE(V2语义层)",
+      "evidence": "core/liquidity+mss+fgv_ob+displacement+structure 语义引擎完整(60+测试) + core/sequence 状态机(13测试)"
+    },
+    {
+      "id": "R4",
+      "req": "Entry+TP/SL引擎(优先级②)",
+      "status": "PARTIAL",
+      "evidence": "统一execution内核已有(TP1/2/3+SL+追踪); Entry Zone与结构化TP/SL(内/外/HTF流动性)未落地→本轮迭代7/8"
+    },
+    {
+      "id": "R5",
+      "req": "自适应多周期引擎(优先级③)",
+      "status": "NOT-STARTED",
+      "evidence": "core/adaptive.py 仍ATR三桶(V2蓝图§28判定不足); Stock Profile/TF Selector待V2迭代5"
+    },
+    {
+      "id": "R6",
+      "req": "'一个月无新股'根因",
+      "status": "DONE",
+      "evidence": "Funnel审计: 新引擎208/月 vs 生产硬门槛33.6/月=门槛链削减84%候选(0833122)"
+    },
+    {
+      "id": "R7",
+      "req": "Funnel ±2σ 基线累积",
+      "status": "PARTIAL",
+      "evidence": "funnel_monitor.py 每日运行中; 8天累积样本待满(尚不足基线统计)"
+    },
+    {
+      "id": "R8",
+      "req": "P0-9 SMC vs EVENT 边际贡献",
+      "status": "DONE(欠功效)",
+      "evidence": "种子交集仅4-16笔→实验欠功效; 已记录待新引擎事件流重跑(3b1bc99)"
+    },
+    {
+      "id": "R9",
+      "req": "时序携带信息验证(§74)",
+      "status": "DONE",
+      "evidence": "True+0.33%>Random-0.22%>Reverse-2.56% 方向成立(7ca1f12); 诚实面: 骨架CI含0"
+    },
+    {
+      "id": "R10",
+      "req": "弱市加权k=2生产决策",
+      "status": "OPEN(证据矛盾)",
+      "evidence": "V1迭代4 WF显示k滚动不稳健(诚实降级研究保留); 但生产CFG仍启用(b4d8e35早于WF证据); 需决策"
+    },
+    {
+      "id": "R11",
+      "req": "AI助手基线同步纯净口径",
+      "status": "PARTIAL",
+      "evidence": "动态JSON已自动继承(d10f106); 注释行212仍引用n=3552旧数→本轮修"
+    },
+    {
+      "id": "R12",
+      "req": "执行一致性/Replay",
+      "status": "DONE(工程层)",
+      "evidence": "统一execution内核+回测=paper同一语义; Replay逐笔重放已在b04701a完成"
+    },
+    {
+      "id": "R13",
+      "req": "亏损归因Loss Attribution",
+      "status": "PARTIAL",
+      "evidence": "SL_GAP最贵亏损(V1迭代3)/RR_exit0.31确认TP偏近(基线冻结); 20类主因标签未建→V2迭代9"
+    },
+    {
+      "id": "R14",
+      "req": "报告自动绑定+日历三态+入口歧义清理",
+      "status": "NOT-STARTED",
+      "evidence": "P2工程小项, 排后"
+    },
+    {
+      "id": "R15",
+      "req": "Stock Profile/Cluster",
+      "status": "NOT-STARTED",
+      "evidence": "V2迭代5"
+    },
+    {
+      "id": "R16",
+      "req": "Market Regime 正式化",
+      "status": "PARTIAL",
+      "evidence": "proxy 200股20日均(幸存者偏差已标注V2§31); 指数/Breadth/涨跌停真值未建→V2迭代6"
+    }
+  ]
+}

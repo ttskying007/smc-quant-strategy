@@ -209,7 +209,9 @@ def build_signal_stats(bt_trades):
 
 def signal_key_of(order, leg):
     """为候选构造与回测一致的信号键。
-    回测 EVENT 腿统一用链 'insider-event'（n=3552, avg 7.07%, PF 7.9, OOS 6.28%）。
+    回测 EVENT 腿统一用链 'insider-event'——纯净口径基线: n=1640, avg +3.72%, PF 3.45,
+    OOS(n=362) +4.03% / PF 4.34（2026-09-08 注销/激励语义修复后, 见 handover/baseline_metrics.json;
+    此前 n=3552/avg7.07% 为修复前虚高口径, 已废弃）。
     因此 EVENT 候选映射到 'EVENT|insider-event' 以命中腿级历史统计；
     SMC/CONT 无稳定回测键，按 leg 兜底（SMC 生产禁用，实际走不到）。"""
     if leg == "EVENT":
