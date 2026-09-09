@@ -1,0 +1,62 @@
+{
+  "n_all": 650,
+  "n_with_event": 39,
+  "n_without": 611,
+  "A_ALL": {
+    "IS": {
+      "n": 321,
+      "avg": 2.068,
+      "wr": 0.523,
+      "pf": 1.59
+    },
+    "OOS": {
+      "n": 329,
+      "avg": 0.57,
+      "wr": 0.462,
+      "pf": 1.13
+    },
+    "OOS_ci": [
+      -0.828,
+      2.275
+    ]
+  },
+  "B_WITH_EVENT": {
+    "IS": {
+      "n": 28,
+      "avg": -0.335,
+      "wr": 0.536,
+      "pf": 0.92
+    },
+    "OOS": {
+      "n": 11,
+      "avg": -6.25,
+      "wr": 0.455,
+      "pf": 0.13
+    },
+    "OOS_ci": null
+  },
+  "C_NO_EVENT": {
+    "IS": {
+      "n": 293,
+      "avg": 2.297,
+      "wr": 0.522,
+      "pf": 1.67
+    },
+    "OOS": {
+      "n": 318,
+      "avg": 0.806,
+      "wr": 0.462,
+      "pf": 1.19
+    },
+    "OOS_ci": [
+      -0.677,
+      2.491
+    ]
+  },
+  "verdict": {
+    "B_sample_ok": false,
+    "B_beats_C_avg": false,
+    "B_beats_C_pf": false,
+    "event_prior_has_marginal": false
+  }
+}

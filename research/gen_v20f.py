@@ -176,6 +176,9 @@ for date, code, title in cur.fetchall():
             _trs.append(_tr)
         _atr = sum(_trs) / 14 if _trs else 0
     sl1 = (lows[0] - 0.5 * _atr) if _atr > 0 else lows[0] * 0.99
+    # V2第7批受控A/B实验(受控SL语义AB.json): 结构位收紧 OOS avg +3.96→+3.99(微升)但
+    # PF 4.08→3.82(降) / IS avg 3.64→3.58(降) —— 不满足预注册双升线, 不晋级生产。
+    # 收紧SL砍小亏损(WR+2.8pp)但也打掉可回摆单。维持原SL语义, 证据见 handover。
     # P2: TP 单调去重（确保 tp1<tp2<tp3 且都 > ep）
     _tps = sorted([x for x in (tp1, tp2, tp3) if x and x > ep])
     if not _tps:
