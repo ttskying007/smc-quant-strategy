@@ -1,0 +1,39 @@
+{
+  "windows": [
+    {
+      "oos": "202507~202509",
+      "n_oos": 24,
+      "q1": 3.12,
+      "q3": 0.31,
+      "q5": null,
+      "monotonic_q1_lt_q3_or_q3_lt_q5": false
+    },
+    {
+      "oos": "202510~202512",
+      "n_oos": 49,
+      "q1": -0.02,
+      "q3": 2.03,
+      "q5": null,
+      "monotonic_q1_lt_q3_or_q3_lt_q5": true
+    },
+    {
+      "oos": "202601~202603",
+      "n_oos": 52,
+      "q1": 1.26,
+      "q3": 1.39,
+      "q5": 1.27,
+      "monotonic_q1_lt_q3_or_q3_lt_q5": true
+    },
+    {
+      "oos": "202605~202607",
+      "n_oos": 168,
+      "q1": 3.25,
+      "q3": 2.52,
+      "q5": 8.57,
+      "monotonic_q1_lt_q3_or_q3_lt_q5": true
+    }
+  ],
+  "n_windows": 4,
+  "n_hold": 3,
+  "preregistered_verdict": "E-score稳健(WFO通过)"
+}

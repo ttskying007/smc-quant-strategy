@@ -1,0 +1,37 @@
+{
+  "picks": {
+    "fwd5": {
+      "n": 0
+    },
+    "fwd10": {
+      "n": 0
+    }
+  },
+  "rejected_all": {
+    "fwd5": {
+      "n": 0
+    },
+    "fwd10": {
+      "n": 0
+    }
+  },
+  "rejected_by_reason": {
+    "阶段=UPTREND(非ACCUM/DOWNTREND)": {
+      "fwd5": {
+        "n": 0
+      },
+      "fwd10": {
+        "n": 0
+      }
+    },
+    "无K线数据": {
+      "fwd5": {
+        "n": 0
+      },
+      "fwd10": {
+        "n": 0
+      }
+    }
+  },
+  "verdict": "样本不足(数据窗口内无可配对事件)"
+}

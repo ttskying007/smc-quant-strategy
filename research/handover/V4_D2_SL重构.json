@@ -1,0 +1,43 @@
+{
+  "method": "规则带重放(max(3%,min(8%,d))); 救活单保守记0; 结构低点版留PAPER",
+  "overall": {
+    "old": {
+      "n": 739,
+      "avg": 1.491,
+      "wr": 48.6,
+      "pf": 1.9
+    },
+    "new": {
+      "n": 739,
+      "avg": 1.693,
+      "wr": 48.4,
+      "pf": 2.17
+    },
+    "delta_avg": 0.202
+  },
+  "narrow_sl_group": {
+    "old": {
+      "n": 279,
+      "avg": 0.667,
+      "wr": 34.1,
+      "pf": 1.47
+    },
+    "new": {
+      "n": 279,
+      "avg": 1.201,
+      "wr": 33.7,
+      "pf": 2.36
+    }
+  },
+  "rejected_far_gt8pct": 901,
+  "rejected_share": 54.9,
+  "rescued_narrow_stops": 100,
+  "preregistered": {
+    "sl_rate": {
+      "old": 47.2,
+      "new_est": 31.0
+    },
+    "verdict": "D2需权衡(拒单54.9%>30%红线, 不自动采纳)"
+  },
+  "caveat": "rescued zero-lower-bound; TIME unaffected; only SL with mae<new-SL rescued"
+}

@@ -171,6 +171,9 @@ def _run_main_steps():
     step_status["funnel_accum"] = rc10
     rc11 = run("setup_engine_paper.py", timeout=1800)
     step_status["setup_paper"] = rc11
+    # V4 第十轮审计: L2 被拒事件前向收益追踪(每日跑, 事件走完后自动积累对照)
+    rc12 = run("v4_l2_reject_tracker.py", timeout=600)
+    step_status["l2_reject_tracker"] = rc12
     # FIX(2026-08-22): 运行状态记录（每步成功/失败 + 数据日期 + 兜底标注）
     _data_date = ""
     try:

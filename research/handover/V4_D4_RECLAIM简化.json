@@ -1,0 +1,41 @@
+{
+  "full_chain": {
+    "all": {
+      "n": 6003,
+      "avg": 2.92,
+      "wr": 53.4,
+      "pf": 1.85
+    },
+    "oos": {
+      "n": 2562,
+      "avg": 1.824,
+      "wr": 51.5,
+      "pf": 1.5
+    }
+  },
+  "simplified_chain": {
+    "all": {
+      "n": 8160,
+      "avg": 2.564,
+      "wr": 52.5,
+      "pf": 1.73
+    },
+    "oos": {
+      "n": 3453,
+      "avg": 1.137,
+      "wr": 48.6,
+      "pf": 1.29
+    }
+  },
+  "delta_avg_pp": {
+    "all": -0.356,
+    "oos": -0.687
+  },
+  "baseline_consistency": {
+    "v3_replay_n": 6003,
+    "this_run_n": 6003,
+    "ok": true
+  },
+  "preregistered_verdict": "简化作废(Δ超0.5pp)",
+  "exit_version": "setup_exit_v1"
+}

@@ -223,30 +223,38 @@ class SequenceMachineV2:
         self.events.append(ev)
         return ev["id"]
 
+    # D4①: 简化链合法序列(无 RECLAIM) —— Family DB 双样本证明其统计等价
+    EVENT_SEQ_V2_SIMPLIFIED = ("LIQUIDITY", "SWEEP", "DISPLACEMENT", "SHIFT", "POI", "RETEST")
+
     def setup(self):
-        """完整链则返回 setup dict, 否则 None(断链可从 events/rejected 诊断)。"""
-        if len(self.events) < len(EVENT_SEQ_V2):
-            return None
-        kinds = [e["event_type"] for e in self.events]
-        if tuple(kinds[-len(EVENT_SEQ_V2):]) != EVENT_SEQ_V2:
-            return None
-        sweep_ev = [e for e in self.events if e["event_type"] == "SWEEP"][-1]
-        poi_ev = [e for e in self.events if e["event_type"] == "POI"][-1]
-        retest_ev = [e for e in self.events if e["event_type"] == "RETEST"][-1]
-        return {"state": "ENTRY_READY", "sequence": "→".join(kinds),
-                "swept_pool": sweep_ev.get("target_pool"),
-                "poi": poi_ev.get("poi"),
-                "retest_price": retest_ev["price"],
-                "events": [e["id"] for e in self.events]}
+        """完整链或简化链(D4①)则返回 setup dict, 否则 None(断链可从 events/rejected 诊断)。"""
+        for seq in (EVENT_SEQ_V2, self.EVENT_SEQ_V2_SIMPLIFIED):
+            if len(self.events) >= len(seq) and \
+               tuple(e["event_type"] for e in self.events[-len(seq):]) == seq:
+                kinds = [e["event_type"] for e in self.events]
+                sweep_ev = [e for e in self.events if e["event_type"] == "SWEEP"][-1]
+                poi_ev = [e for e in self.events if e["event_type"] == "POI"][-1]
+                retest_ev = [e for e in self.events if e["event_type"] == "RETEST"][-1]
+                return {"state": "ENTRY_READY", "sequence": "→".join(kinds),
+                        "swept_pool": sweep_ev.get("target_pool"),
+                        "poi": poi_ev.get("poi"),
+                        "retest_price": retest_ev["price"],
+                        "chain": "full" if len(seq) == 7 else "simplified",
+                        "events": [e["id"] for e in self.events]}
+        return None
 
 
 def run_sequence_v2(daily, i, symbol="", timeframe="D1", lookback=40,
-                    pool_min_score=40, disp_min=50, retest_bars=8):
+                    pool_min_score=40, disp_min=50, retest_bars=8,
+                    require_reclaim=True):
     """完整事件链重建(决策时点 i, 无前视)。
     链: 池(score>=阈值) → 扫该池(破后收回, 绑定池) → 收复 sweep 前可见前高(因果绑定)
         → 位移(>=阈值) → MSS/BOS 上破(core.mss) → POI(FVG 优先/OB 兜底)
         → 重测 POI(<=retest_bars, 未破失效位 poi.low×0.97)。
-    任一环失败返回部分链(诊断友好)。"""
+    任一环失败返回部分链(诊断友好)。
+    V4 D4①(第十轮审计): require_reclaim=False 时跳过 RECLAIM 环 —— Family DB 双样本
+    (800股 Δ+0.02pp / 全市场 Δ-0.35pp)证明 RECLAIM 不携带独立信息; 简化链
+    SWEEP→DISP→SHIFT→POI→RETEST。默认 True 不改变任何现有调用方行为。"""
     import core.liquidity as LQ
     import core.displacement as DS
     import core.mss as MSS
@@ -287,22 +295,25 @@ def run_sequence_v2(daily, i, symbol="", timeframe="D1", lookback=40,
         return m
     # A3: reclaim 的因果 level = sweep 前可见前高(sweep 引用)
     reclaim_level = max(x["h"] for x in daily[max(0, sweep_i - 5):sweep_i])
-    # 3) 收复(绑定 reclaim_level)
+    # 3) 收复(绑定 reclaim_level) —— D4①: 可选层(简化链直接从 SWEEP 找 DISP)
     recl_i = None
-    for k in range(sweep_i + 1, min(len(daily), sweep_i + 6)):
-        if daily[k]["c"] > reclaim_level:
-            _id_rc = m._emit("RECLAIM", daily[k]["t"], reclaim_level, 55, _id_sw,
-                             {"reclaim_level": reclaim_level})
-            recl_i = k
-            break
-        if daily[k]["c"] < pool["price"] * (1 - 2 * tol):
-            m.rejected.append({"why": "BREAK_AFTER_SWEEP", "at": daily[k]["t"]})
+    _id_rc = _id_sw      # 简化链中 DISP 的父事件 = SWEEP
+    if require_reclaim:
+        for k in range(sweep_i + 1, min(len(daily), sweep_i + 6)):
+            if daily[k]["c"] > reclaim_level:
+                _id_rc = m._emit("RECLAIM", daily[k]["t"], reclaim_level, 55, _id_sw,
+                                 {"reclaim_level": reclaim_level})
+                recl_i = k
+                break
+            if daily[k]["c"] < pool["price"] * (1 - 2 * tol):
+                m.rejected.append({"why": "BREAK_AFTER_SWEEP", "at": daily[k]["t"]})
+                return m
+        if recl_i is None:
             return m
-    if recl_i is None:
-        return m
-    # 4) 位移
+    # 4) 位移(完整链从 reclaim 起; 简化链从 sweep 起)
+    disp_from = recl_i if require_reclaim else sweep_i
     disp_i = None
-    for k in range(recl_i, min(len(daily), recl_i + 6)):
+    for k in range(disp_from, min(len(daily), disp_from + 6)):
         sc = DS.displacement_score(daily, k)
         if sc["score"] >= disp_min and daily[k]["c"] > daily[k]["o"]:
             _id_dp = m._emit("DISPLACEMENT", daily[k]["t"], daily[k]["c"], sc["score"], _id_rc,
