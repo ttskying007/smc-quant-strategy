@@ -1,0 +1,31 @@
+{
+  "A_80_100": {
+    "n": 55,
+    "avg": 1.016,
+    "wr": 0.473,
+    "pf": 1.19
+  },
+  "B_60_80": {
+    "n": 328,
+    "avg": 0.708,
+    "wr": 0.451,
+    "pf": 1.18
+  },
+  "C_40_60": {
+    "n": 40,
+    "avg": 0.401,
+    "wr": 0.475,
+    "pf": 1.1
+  },
+  "D_0_40": {
+    "n": 0,
+    "avg": null,
+    "wr": null,
+    "pf": 99
+  },
+  "_verdict": {
+    "A_B_C_monotone": true,
+    "D_bucket_structurally_empty": true,
+    "A_minus_D": null
+  }
+}
