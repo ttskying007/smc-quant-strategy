@@ -15,6 +15,27 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 from core.entry import fill_in_zone
 from core.setup_exit import settle_from_record, EXIT_VERSION
 from core.setup_engine import build_setup, validate_setup, ENGINE_VERSION
+from core.escore import escore_for_date, exposure_coef
+
+# E-score 快照单源读取: escore_daily.py 维护的 escore_history(避免每次全市场扫)
+ESCORE_HIST = r"E:\test\smc_project\research\handover\escore_history.json"
+_ehist, ESCORE_META = {}, {}
+try:
+    _h = json.load(open(ESCORE_HIST, encoding="utf-8"))
+    _ehist = {d["d8"]: d for d in _h.get("days", [])}
+    ESCORE_META = {"mid_proxy": _h.get("days", [{}])[-1].get("mid_proxy") if _h.get("days") else None}
+except Exception:
+    pass
+
+def escore_at(d8, want_coef=False):
+    """决策时点 E: 优先历史快照; 无快照→现算 F1 缺→None(满仓不杀单)。"""
+    d8 = str(d8)[:8]
+    rec = _ehist.get(d8)
+    if rec is not None:
+        e = rec.get("e")
+        return (exposure_coef(e) if want_coef else e)
+    e = escore_for_date(d8)          # 无快照日: F1 需全市场(慢), 仅必要时
+    return (exposure_coef(e) if want_coef else e)
 
 KL = r"E:\test\smc_project\hermes\kline_cache_tencent"
 LEDGER = r"E:\test\smc_project\research\handover\setup_engine_paper_ledger.json"
@@ -109,12 +130,28 @@ for fp in files:
                "invalid_price": setup["invalid_price"], "poi_type": setup["poi"]["type"],
                "sequence": setup["sequence"], "family": setup["family"],
                "order_type": setup["order_type"],
+               # V4 D1 SHADOW 双臂: 决策时点 E-score 标注(单源 core.escore, F1 由
+               # escore_history 预算快照提供, 缺失 None→满仓不杀单)
+               "escore": escore_at(dd[i]["t"]),
+               "exposure_coef": escore_at(dd[i]["t"], want_coef=True),
+               "escore_proxy": ESCORE_META.get("mid_proxy"),
                "status": "OPEN", "ret_pct": None, "exit_reason": None}
         led.setdefault("signals", []).append(sig)
         seen.add((code, dd[i]["t"]))
         n_new += 1
 
-# ---------- 3) 汇总(SAMPLED 口径显式) ----------
+# ---------- 3) E-score 回填: 历史信号缺 E 标注 → 从快照补(SHADOW 双臂一致性) ----------
+n_e_back = 0
+for s in led.get("signals", []):
+    if s.get("escore") is None:
+        rec = _ehist.get(str(s.get("date"))[:8])
+        if rec is not None:
+            s["escore"] = rec.get("e")
+            s["exposure_coef"] = rec.get("exposure_coef", exposure_coef(rec.get("e")))
+            s["escore_proxy"] = rec.get("mid_proxy")
+            n_e_back += 1
+
+# ---------- 4) 汇总(SAMPLED 口径显式) ----------
 sigs = led.get("signals", [])
 closed = [s for s in sigs if s.get("ret_pct") is not None]
 avg = round(sum(s["ret_pct"] for s in closed) / len(closed), 3) if closed else None

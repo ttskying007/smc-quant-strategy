@@ -17,7 +17,10 @@
       "exit_version": "setup_exit_v1",
       "sl": 20.091,
       "tp": 27.807,
-      "exit_reason": "TIME_STOP"
+      "exit_reason": "TIME_STOP",
+      "escore": 0.6756,
+      "exposure_coef": 1.0,
+      "escore_proxy": "512100"
     },
     {
       "code": "000951",
@@ -36,7 +39,10 @@
       "exit_version": "setup_exit_v1",
       "sl": 20.1006,
       "tp": 27.6981,
-      "exit_reason": "TIME_STOP"
+      "exit_reason": "TIME_STOP",
+      "escore": 0.8066,
+      "exposure_coef": 1.0,
+      "escore_proxy": "512100"
     },
     {
       "code": "000951",
@@ -54,7 +60,10 @@
       "fill_date": "20260910",
       "exit_version": "setup_exit_v1",
       "sl": 20.1521,
-      "tp": 29.2638
+      "tp": 29.2638,
+      "escore": 0.7366,
+      "exposure_coef": 1.0,
+      "escore_proxy": "512100"
     },
     {
       "code": "300569",
@@ -73,7 +82,10 @@
       "exit_version": "setup_exit_v1",
       "sl": 4.2948,
       "tp": 6.0356,
-      "exit_reason": "TIME_STOP"
+      "exit_reason": "TIME_STOP",
+      "escore": 0.8066,
+      "exposure_coef": 1.0,
+      "escore_proxy": "512100"
     },
     {
       "code": "600195",
@@ -86,7 +98,10 @@
       "poi_type": "FVG",
       "sequence": "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST",
       "status": "OPEN",
-      "ret_pct": null
+      "ret_pct": null,
+      "escore": 0.6215,
+      "exposure_coef": 1.0,
+      "escore_proxy": "512100"
     },
     {
       "code": "600195",
@@ -99,7 +114,10 @@
       "poi_type": "FVG",
       "sequence": "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST",
       "status": "OPEN",
-      "ret_pct": null
+      "ret_pct": null,
+      "escore": 0.6756,
+      "exposure_coef": 1.0,
+      "escore_proxy": "512100"
     },
     {
       "code": "600486",
@@ -112,7 +130,10 @@
       "poi_type": "OB",
       "sequence": "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST",
       "status": "OPEN",
-      "ret_pct": null
+      "ret_pct": null,
+      "escore": 0.8066,
+      "exposure_coef": 1.0,
+      "escore_proxy": "512100"
     },
     {
       "code": "600642",
@@ -125,7 +146,10 @@
       "poi_type": "OB",
       "sequence": "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST",
       "status": "OPEN",
-      "ret_pct": null
+      "ret_pct": null,
+      "escore": 0.6215,
+      "exposure_coef": 1.0,
+      "escore_proxy": "512100"
     },
     {
       "code": "601577",
@@ -138,7 +162,10 @@
       "poi_type": "OB",
       "sequence": "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST",
       "status": "OPEN",
-      "ret_pct": null
+      "ret_pct": null,
+      "escore": 0.6756,
+      "exposure_coef": 1.0,
+      "escore_proxy": "512100"
     },
     {
       "code": "601908",
@@ -151,7 +178,10 @@
       "poi_type": "OB",
       "sequence": "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST",
       "status": "OPEN",
-      "ret_pct": null
+      "ret_pct": null,
+      "escore": 0.8066,
+      "exposure_coef": 1.0,
+      "escore_proxy": "512100"
     },
     {
       "setup_id": "000951_20260910_OB_v1",
@@ -170,7 +200,10 @@
       "order_type": "LIMIT_RETRACE",
       "status": "OPEN",
       "ret_pct": null,
-      "exit_reason": null
+      "exit_reason": null,
+      "escore": 0.5584,
+      "exposure_coef": 1.0,
+      "escore_proxy": "512100"
     },
     {
       "setup_id": "300569_20260909_OB_v1",
@@ -193,7 +226,10 @@
       "filled_price": 4.72,
       "fill_date": "20260910",
       "sl": 4.2948,
-      "tp": 5.9956
+      "tp": 5.9956,
+      "escore": 0.7366,
+      "exposure_coef": 1.0,
+      "escore_proxy": "512100"
     }
   ],
   "days": 0,
@@ -217,7 +253,7 @@
       "G7_persistence": false
     },
     "gate_notes": "G5 执行偏差需 paper/backtest 逐笔配对 fill_dev_pct 字段(PHASE E 采集); 其余六门已可计算。全部通过才可评估 MICRO REAL。",
-    "days_accum": 4,
+    "days_accum": 6,
     "last_run": "20260910"
   }
 }
