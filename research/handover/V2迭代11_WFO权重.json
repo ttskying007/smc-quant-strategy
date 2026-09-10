@@ -1,0 +1,101 @@
+{
+  "n_pool": 816,
+  "windows": [
+    {
+      "test": "202407~202410",
+      "n": 119,
+      "sel": "disp_heavy",
+      "wf_top_avg": 8.741,
+      "eq_top_avg": 7.881,
+      "wf_beats_eq": true
+    },
+    {
+      "test": "202410~202501",
+      "n": 65,
+      "sel": "disp_heavy",
+      "wf_top_avg": 5.451,
+      "eq_top_avg": 4.924,
+      "wf_beats_eq": true
+    },
+    {
+      "test": "202501~202504",
+      "n": 84,
+      "sel": "struct_heavy",
+      "wf_top_avg": -1.173,
+      "eq_top_avg": -1.658,
+      "wf_beats_eq": true
+    },
+    {
+      "test": "202504~202507",
+      "n": 48,
+      "sel": "struct_heavy",
+      "wf_top_avg": 2.36,
+      "eq_top_avg": 0.342,
+      "wf_beats_eq": true
+    },
+    {
+      "test": "202507~202510",
+      "n": 38,
+      "sel": "equal",
+      "wf_top_avg": 10.845,
+      "eq_top_avg": 10.845,
+      "wf_beats_eq": false
+    },
+    {
+      "test": "202510~202601",
+      "n": 129,
+      "sel": "struct_heavy",
+      "wf_top_avg": 2.222,
+      "eq_top_avg": 1.974,
+      "wf_beats_eq": true
+    },
+    {
+      "test": "202601~202604",
+      "n": 92,
+      "sel": "equal",
+      "wf_top_avg": -2.591,
+      "eq_top_avg": -2.591,
+      "wf_beats_eq": false
+    },
+    {
+      "test": "202604~202607",
+      "n": 100,
+      "sel": "disp_heavy",
+      "wf_top_avg": -4.978,
+      "eq_top_avg": -4.369,
+      "wf_beats_eq": false
+    },
+    {
+      "test": "202607~202610",
+      "n": 64,
+      "sel": "disp_heavy",
+      "wf_top_avg": 1.661,
+      "eq_top_avg": 3.962,
+      "wf_beats_eq": false
+    }
+  ],
+  "global_oos": {
+    "equal": {
+      "top_avg": 0.485,
+      "gap": -0.119
+    },
+    "struct_heavy": {
+      "top_avg": 0.589,
+      "gap": -0.221
+    },
+    "disp_heavy": {
+      "top_avg": 0.549,
+      "gap": -0.031
+    }
+  },
+  "verdict": {
+    "wf_wins_windows": "5/9",
+    "global_best_cand": "struct_heavy",
+    "equal_top_avg": 0.485,
+    "struct_heavy_top_avg": 0.589,
+    "disp_heavy_top_avg": 0.549,
+    "wf_pooled_top_avg": 2.504,
+    "eq_pooled_top_avg": 2.368,
+    "wf_adaptive_beats_equal": true
+  }
+}
