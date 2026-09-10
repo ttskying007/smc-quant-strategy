@@ -1,0 +1,68 @@
+{
+  "cells_total": 18,
+  "cells_effective": 7,
+  "oos_baseline": {
+    "n": 498,
+    "avg": 0.253,
+    "wr": 44.6,
+    "pf": 1.06,
+    "ci": [
+      -1.038,
+      1.646
+    ]
+  },
+  "oos_adaptive": {
+    "n": 322,
+    "avg": 0.3,
+    "wr": 43.8,
+    "pf": 1.06,
+    "ci": [
+      -1.302,
+      1.947
+    ]
+  },
+  "param_grid": [
+    {
+      "wide": 1.2,
+      "hold": 15
+    },
+    {
+      "wide": 1.2,
+      "hold": 25
+    },
+    {
+      "wide": 1.5,
+      "hold": 15
+    },
+    {
+      "wide": 1.5,
+      "hold": 25
+    },
+    {
+      "wide": 2.25,
+      "hold": 15
+    },
+    {
+      "wide": 2.25,
+      "hold": 25
+    }
+  ],
+  "base": {
+    "wide": 1.5,
+    "hold": 15
+  },
+  "e_cut": {
+    "q33": 0.4559,
+    "q67": 0.5562
+  },
+  "preregistered": {
+    "D1_层级充足(cells_with_pick)": 7,
+    "D2_增量≥0.5pp且PF不降": false,
+    "D3_翻转率≤50%": false,
+    "delta_oos_pp": 0.047,
+    "flip_rate": 0.57,
+    "adaptive_valid": false
+  },
+  "dimension_note": "Profile(6)×Regime(3)×Sequence(1: full) —— 本版 sequence 维仅 full(Family DB 两大族结论已另有实验)",
+  "runtime_s": 828
+}
