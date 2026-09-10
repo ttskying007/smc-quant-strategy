@@ -150,6 +150,15 @@ for s in led.get("signals", []):
             s["exposure_coef"] = rec.get("exposure_coef", exposure_coef(rec.get("e")))
             s["escore_proxy"] = rec.get("mid_proxy")
             n_e_back += 1
+# family 回填: 旧版 build_setup(无默认 family)入账的信号 → 从 sequence 签名推导
+FAM_OF_SEQ = {
+    "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST": "SMC_REVERSAL",
+}
+n_f_back = 0
+for s in led.get("signals", []):
+    if not s.get("family"):
+        s["family"] = FAM_OF_SEQ.get(s.get("sequence"), "SMC_REVERSAL")
+        n_f_back += 1
 
 # ---------- 4) 汇总(SAMPLED 口径显式) ----------
 sigs = led.get("signals", [])

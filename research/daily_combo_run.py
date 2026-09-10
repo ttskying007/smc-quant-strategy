@@ -180,6 +180,9 @@ def _run_main_steps():
     # V4 D1: E-score 每日快照(SHADOW 双臂前置, 供 PAPER/组合层单源读取)
     rc14 = run("escore_daily.py", timeout=900)
     step_status["escore_daily"] = rc14
+    # PAPER 周期报告(观察期监控: 里程碑/E分布/家族分布/异常预警)
+    rc15 = run("paper_weekly_report.py", timeout=300)
+    step_status["paper_weekly_report"] = rc15
     # FIX(2026-08-22): 运行状态记录（每步成功/失败 + 数据日期 + 兜底标注）
     _data_date = ""
     try:

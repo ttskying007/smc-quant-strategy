@@ -37,7 +37,7 @@ FILES = sorted(glob.glob(KL + os.sep + "*_daily_800.json"))[::2][:2000]   # 全�
 
 def variants_at(daily, i):
     """决策点 i 的五变体判定。返回 {variant: setup_dict or None}(setup 含 poi/invalid)。"""
-    out = {"A_full": None, "B_no_reclaim": None, "C_trunc": None, "D_poi_only": None, "E_reverse": None}
+    out = {"A_full": None, "B_no_reclaim": None, "C_trunc": None, "D_poi_only": None, "E_rev2": None}
     if i < 60:
         return out
     atr = atr_of(daily, i - 1) or 0
@@ -136,16 +136,29 @@ def variants_at(daily, i):
                                     rt2 = retest_after(poi2, pk2)
                                     if rt2 is not None:
                                         out["B_no_reclaim"] = {"poi": poi2}
-                            # E_reverse: 先有 shift/POI 再出现 sweep(顺序反转对照)
-                            rev_sw = None
-                            for k in range(max(60, i - 40), i + 1):
-                                if daily[k]["l"] <= min(x["l"] for x in daily[max(0, k-20):k]) * (1 - tol) and daily[k]["c"] > min(x["l"] for x in daily[max(0, k-20):k]):
-                                    rev_sw = k
-                                    break
-                            if rev_sw is not None and sh2 is not None and rev_sw > sh2:
-                                pk3, poi3 = poi_after(sh2, sh2 + 4)
-                                if pk3 is not None:
-                                    out["E_reverse"] = {"poi": poi3}
+    # ---- E_rev2 (inducement, V4 修正定义): shift → POI → 晚扫入POI(触及下沿+收回) ----
+    # 旧 E_reverse(212笔+2.62%) 已被 V4_E_reverse机理 推翻(小样本选择效应):
+    #   真实定义 n=67540 avg+0.68 < A_full+1.41 → 晚扫劣。此处用与 V4 实验完全同语义。
+    sh_r = None
+    for k in range(max(60, i - 40), i + 1):
+        s5 = MSS.structure_shift(daily, k)
+        if s5 and s5["direction"] == "LONG":
+            sh_r = k
+            break
+    if sh_r is not None:
+        pk_r, poi_r = poi_after(sh_r, sh_r + 13)
+        if pk_r is not None and pk_r < i:
+            swept = False
+            for k in range(pk_r + 1, i + 1):
+                b = daily[k]
+                if b["l"] <= poi_r["low"] and b["c"] > poi_r["low"]:
+                    swept = True
+                    break
+                if b["c"] < poi_r["low"] * 0.97:
+                    swept = False
+                    break
+            if swept:
+                out["E_rev2"] = {"poi": poi_r}
     # ---- D_poi_only: 无 liquidity/sweep 先导, 仅形态 POI+RETEST ----
     pk4, poi4 = poi_after(max(60, i - 15), i + 1)
     if pk4 is not None:
@@ -154,7 +167,7 @@ def variants_at(daily, i):
             out["D_poi_only"] = {"poi": poi4}
     return out
 
-fam = {v: [] for v in ("A_full", "B_no_reclaim", "C_trunc", "D_poi_only", "E_reverse")}
+fam = {v: [] for v in ("A_full", "B_no_reclaim", "C_trunc", "D_poi_only", "E_rev2")}
 t0 = time.time()
 for fp in FILES:
     try:
@@ -204,7 +217,7 @@ def stats(pnl):
             "pf": round(w / l_, 2) if l_ > 0 else None}
 
 S = {v: stats(fam[v]) for v in fam}
-a, b, c, d_, e = (S["A_full"], S["B_no_reclaim"], S["C_trunc"], S["D_poi_only"], S["E_reverse"])
+a, b, c, d_, e = (S["A_full"], S["B_no_reclaim"], S["C_trunc"], S["D_poi_only"], S["E_rev2"])
 
 def delta(x, y):
     if x.get("avg") is None or y.get("avg") is None:
@@ -224,11 +237,13 @@ tests = {
         "verdict": ("流动性链必要" if delta(a, d_) is not None and delta(a, d_) >= 1.0 and d_["n"] >= 30
                     else ("纯形态POI无独立alpha" if delta(a, d_) is not None and abs(delta(a, d_)) < 0.5 and d_["n"] >= 30
                           else "UNKNOWN(样本不足)"))},
-    "A_vs_E(顺序信息量检验§74)": {"delta": delta(a, e), "n_e": e["n"],
+    "A_vs_E(顺序信息量检验§74, E_rev2 inducement定义)": {"delta": delta(a, e), "n_e": e["n"],
         "verdict": ("顺序携带信息" if delta(a, e) is not None and delta(a, e) >= 1.0 and e["n"] >= 30
-                    else ("顺序不携带信息" if delta(a, e) is not None and abs(delta(a, e)) < 0.5 and e["n"] >= 30
+                    else ("顺序不携带信息(反转配置无超额)" if delta(a, e) is not None and abs(delta(a, e)) < 0.5 and e["n"] >= 30
                           else "UNKNOWN(样本不足)"))},
 }
+# V4 修正注记: 旧 E_reverse(212笔+2.62% "顺序携带信息") 已被 V4_E_reverse机理 推翻 ——
+# 真实 inducement 定义展开后晚扫劣(Δ-0.73pp), 旧判定为小样本选择效应。
 out = {"window": f"OOS {OOS}+ 全市场[::2][:{len(FILES)}](实际{len(FILES)}股) 与V4同universe",
        "families": S, "tests": tests,
        "runtime_s": round(time.time() - t0)}

@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-09-11 02:22:52",
+  "milestone": {
+    "days_accum": 7,
+    "closed": 3,
+    "next_gate": "G7 30closed+20d",
+    "pct_to_30": 10.0
+  },
+  "escore_dist": {
+    "n_with_e": 12,
+    "bands": {
+      "high": 12
+    },
+    "avg_e": 0.711
+  },
+  "family_dist": {
+    "SMC_REVERSAL": 12
+  },
+  "exit_dist": {
+    "TIME_STOP": 3,
+    "OPEN": 9
+  },
+  "alerts": [
+    "负收益集中: 2/3 closed 为负"
+  ],
+  "raw": {
+    "total": 12,
+    "closed": 3,
+    "open": 9
+  }
+}

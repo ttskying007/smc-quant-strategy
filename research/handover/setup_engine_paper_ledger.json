@@ -20,7 +20,8 @@
       "exit_reason": "TIME_STOP",
       "escore": 0.6756,
       "exposure_coef": 1.0,
-      "escore_proxy": "512100"
+      "escore_proxy": "512100",
+      "family": "SMC_REVERSAL"
     },
     {
       "code": "000951",
@@ -42,7 +43,8 @@
       "exit_reason": "TIME_STOP",
       "escore": 0.8066,
       "exposure_coef": 1.0,
-      "escore_proxy": "512100"
+      "escore_proxy": "512100",
+      "family": "SMC_REVERSAL"
     },
     {
       "code": "000951",
@@ -63,7 +65,8 @@
       "tp": 29.2638,
       "escore": 0.7366,
       "exposure_coef": 1.0,
-      "escore_proxy": "512100"
+      "escore_proxy": "512100",
+      "family": "SMC_REVERSAL"
     },
     {
       "code": "300569",
@@ -85,7 +88,8 @@
       "exit_reason": "TIME_STOP",
       "escore": 0.8066,
       "exposure_coef": 1.0,
-      "escore_proxy": "512100"
+      "escore_proxy": "512100",
+      "family": "SMC_REVERSAL"
     },
     {
       "code": "600195",
@@ -101,7 +105,8 @@
       "ret_pct": null,
       "escore": 0.6215,
       "exposure_coef": 1.0,
-      "escore_proxy": "512100"
+      "escore_proxy": "512100",
+      "family": "SMC_REVERSAL"
     },
     {
       "code": "600195",
@@ -117,7 +122,8 @@
       "ret_pct": null,
       "escore": 0.6756,
       "exposure_coef": 1.0,
-      "escore_proxy": "512100"
+      "escore_proxy": "512100",
+      "family": "SMC_REVERSAL"
     },
     {
       "code": "600486",
@@ -133,7 +139,8 @@
       "ret_pct": null,
       "escore": 0.8066,
       "exposure_coef": 1.0,
-      "escore_proxy": "512100"
+      "escore_proxy": "512100",
+      "family": "SMC_REVERSAL"
     },
     {
       "code": "600642",
@@ -149,7 +156,8 @@
       "ret_pct": null,
       "escore": 0.6215,
       "exposure_coef": 1.0,
-      "escore_proxy": "512100"
+      "escore_proxy": "512100",
+      "family": "SMC_REVERSAL"
     },
     {
       "code": "601577",
@@ -165,7 +173,8 @@
       "ret_pct": null,
       "escore": 0.6756,
       "exposure_coef": 1.0,
-      "escore_proxy": "512100"
+      "escore_proxy": "512100",
+      "family": "SMC_REVERSAL"
     },
     {
       "code": "601908",
@@ -181,7 +190,8 @@
       "ret_pct": null,
       "escore": 0.8066,
       "exposure_coef": 1.0,
-      "escore_proxy": "512100"
+      "escore_proxy": "512100",
+      "family": "SMC_REVERSAL"
     },
     {
       "setup_id": "000951_20260910_OB_v1",
@@ -253,7 +263,7 @@
       "G7_persistence": false
     },
     "gate_notes": "G5 执行偏差需 paper/backtest 逐笔配对 fill_dev_pct 字段(PHASE E 采集); 其余六门已可计算。全部通过才可评估 MICRO REAL。",
-    "days_accum": 6,
-    "last_run": "20260910"
+    "days_accum": 7,
+    "last_run": "20260911"
   }
 }

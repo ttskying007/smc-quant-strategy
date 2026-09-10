@@ -1,0 +1,41 @@
+{
+  "arms": {
+    "BASE": {
+      "init_cash": 1000000.0,
+      "final_equity": 1159041.78,
+      "total_return_pct": 15.9,
+      "mdd_pct": 18.04,
+      "n_trades": 483,
+      "win_rate": 42.2,
+      "pf": 1.15,
+      "n_open_positions": 0,
+      "avg_hold_days": 9.4,
+      "wr": 42.2
+    },
+    "E_coef": {
+      "init_cash": 1000000.0,
+      "final_equity": 1343631.78,
+      "total_return_pct": 34.36,
+      "mdd_pct": 18.82,
+      "n_trades": 629,
+      "win_rate": 42.6,
+      "pf": 1.17,
+      "n_open_positions": 0,
+      "avg_hold_days": 9.6,
+      "wr": 42.6
+    }
+  },
+  "delta_total_return_pp": 18.46,
+  "mdd_improvement_pp": -0.78,
+  "config": {
+    "base_pos": 0.08,
+    "sl_fixed": 0.07,
+    "coef_map": "Q1→0.3 / Q2→0.5 / Q3→0.75 / Q4+→1.0 / E缺→1.0"
+  },
+  "preregistered": {
+    "P1_权益更高且MDD更小": false,
+    "P2_PF不降超0.2且WR不降超5pp": true,
+    "P3_n差<10%": false
+  },
+  "note": "离线预演(事件腿信号流回放); SHADOW 60日实盘对照另行"
+}
