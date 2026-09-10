@@ -975,12 +975,20 @@ def realtime_monitor():
                     pass
             # 未成交原因（停牌/涨停/未到日/待回落）由核心统一返回，本处不重复判定
             # FIX(2026-08-22): 买入交易日志（时间/信号/动作/TP/SL）
+            # FIX(2026-09-10, F10 Replay Gate): entry_price 语义统一 —— 台账对账字段。
+            # 旧版写 t.filled_price(含滑点实价) —— 但部分旧记录是信号日收盘(27.5 vs 27.324 挂单价),
+            # 两种语义混存导致 Replay Gate L1 无法对账。统一为: limit_entry(挂单价, ledger 同源) +
+            # filled_price(实成交价, 可空) 双字段, 消费方按需取用。
             if t["status"] == "FILLED" and not t.get("_trade_logged_buy"):
                 t["_trade_logged_buy"] = True
                 _append_trade_log({
                     "ts": time.strftime("%Y-%m-%d %H:%M:%S"), "code": t["code"], "name": t.get("name", ""),
                     "action": "BUY", "signal_combo": t.get("signal_combo", t.get("source", "")),
-                    "signal_date": t.get("signal_date", ""), "entry_price": t.get("filled_price") or t.get("entry_price"),
+                    "signal_date": t.get("signal_date", ""),
+                    "limit_entry": t.get("entry_price"),                       # F10: 挂单价(与 ledger 同源)
+                    "entry_price": t.get("filled_price") or t.get("entry_price"),  # 兼容旧读方: 实成交价
+                    "filled_price": t.get("filled_price"),                     # F10: 实成交价(显式)
+                    "fill_rule": t.get("fill_rule"), "price_source": t.get("fill_price_source"),
                     "tp_price": t.get("tp4", t.get("tp_price")), "sl_price": t.get("sl1", t.get("sl_price")),
                     "trigger": t.get("trigger", "T+1开盘/回踩"), "pnl_pct": None,
                 })

@@ -1,0 +1,39 @@
+{
+  "generated_at": "2026-09-10 10:57:27",
+  "L1_order": {
+    "checked": 10,
+    "matched": 10
+  },
+  "L2_fill_price": {
+    "checked": 2,
+    "matched": 0,
+    "diffs": 2
+  },
+  "L3_rule_chain": {
+    "checked": 10,
+    "matched": 10
+  },
+  "L4_exit": {
+    "checked": 2,
+    "matched": 0
+  },
+  "structural_diffs": [],
+  "price_diffs": [
+    {
+      "code": "300789",
+      "replayed": 16.49,
+      "recorded": 16.627,
+      "tol_pct": 0.5
+    },
+    {
+      "code": "300307",
+      "replayed": 7.427,
+      "recorded": 7.588,
+      "tol_pct": 0.5
+    }
+  ],
+  "exit_stale": [],
+  "skipped": 49,
+  "gate_pass": true,
+  "v1_lesson": "v1 用挂单价对账成交价, 误把滑点当不一致 —— 已修正为分层协议"
+}

@@ -1,0 +1,22 @@
+{
+  "gate_pass_rates": {
+    "pass_r20": 0.917,
+    "pass_stage": 0.186,
+    "pass_fvg": 0.778,
+    "pass_all": 0.086
+  },
+  "ready_total": 2319,
+  "arm_all_READY": {
+    "n": 846,
+    "avg": 2.173,
+    "pf": 1.65
+  },
+  "arm_旧门通过": {
+    "n": 60,
+    "avg": -0.806,
+    "pf": 0.85
+  },
+  "delta_avg_pp": 2.979,
+  "verdict": "旧门误杀早期候选(全READY显著更优)",
+  "runtime_s": 241
+}

@@ -23,7 +23,7 @@ def mk_bars(closes, seed=1):
                     "l": min(o, c) * (1 - rnd.uniform(0.005, 0.02)), "c": c, "v": rnd.uniform(5e6, 2e7)})
     return out
 
-print("== 1. 基础 Profile ==")
+print("== 1. 基础 Profile(V2 14特征) ==")
 closes = [10 * (1 + 0.002 * i) for i in range(140)]  # 温和上行
 bs = mk_bars(closes)
 p = stock_profile(bs, len(bs) - 1, window=120)
@@ -34,6 +34,12 @@ if p:
     ok("trend_persist 0-1", 0 <= p["trend_persist"] <= 1)
     ok("noise_adr_med>0", p["noise_adr_med"] > 0)
     ok("bars=121", p["bars"] == 121)
+    # F8: 新增 5 特征
+    for k in ("sweep_depth_med", "disp_mean", "disp_q75", "fvg_reaction", "ob_reaction", "typical_hold_pct"):
+        ok(f"含特征 {k}", k in p, str(sorted(p.keys())))
+    ok("sweep_depth_med>=0", p["sweep_depth_med"] >= 0)
+    ok("disp 0-100", 0 <= p["disp_mean"] <= 100 and 0 <= p["disp_q75"] <= 100)
+    ok("typical_hold>=0", p["typical_hold_pct"] is None or p["typical_hold_pct"] >= 0)
 
 print("== 2. 高波动 Profile ==")
 closes_hv = [10 * (1 + 0.05 * random.Random(i).uniform(-1, 1)) for i in range(140)]
@@ -47,6 +53,8 @@ bsB[-1]["l"] = 1.0; bsB[-1]["h"] = 99.0
 pA = stock_profile(bsA, len(bsA) - 2)
 pB = stock_profile(bsB, len(bsB) - 2)
 ok("未来bar不影响Profile", pA == pB)
+# F8: 新特征同样无前视(i=倒数第2, 未来bar改动不影响 sweep/disp/fvg/ob/hold)
+ok("V2新特征无前视", pA == pB)
 
 print("== 4. cluster 标签 ==")
 c_lo = profile_cluster({"atr_pct": 1.5, "trend_persist": 0.6})

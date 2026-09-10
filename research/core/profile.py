@@ -6,6 +6,9 @@ Profile V1(第三轮深审 A7 诚实标注): 当前 9 特征 —— ATR%/跳空�
 趋势持续性/均值回归/噪声ADR/20日平均摆幅/量能稳定性/窗口元数据。
 待补(蓝图全量): 扫损深度/位移分布/FVG反应/OB反应/典型持有。
 
+F8(2026-09-09 第四轮后续): 已补齐 5 特征 → Profile V2 = 14 特征(sweep_depth_med/disp_mean/
+disp_q75/fvg_reaction/ob_reaction/typical_hold_pct)。
+
 语义(决策时点 i, 无前视): 全部特征只用 [i-window, i] 数据。
 输出: profile dict + cluster 标签(分位数桶, 免 sklearn)。
 """
@@ -16,9 +19,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 def stock_profile(daily, i, window=120, code=""):
     """计算 daily[i] 决策时点的滚动 Profile。i>=window 才有效。
     code: 6位股票代码(用于 A8 板块涨跌停规则; 空则按 10% 主板近似)。
-    Profile V1(第三轮深审A7 诚实标注): 实际9特征——ATR%/跳空频率/涨跌停频率/趋势持续性/
-    均值回归/噪声ADR/20日平均摆幅/量能稳定性/(+窗口元数据)。蓝图§29的扫损深度/位移分布/
-    FVG反应/OB反应/典型持有 5 特征待 V2 补齐后升级。"""
+    Profile V2(14 特征, F8 补齐): 基础9 + sweep_depth_med/disp_mean/disp_q75/
+    fvg_reaction/ob_reaction/typical_hold_pct。全部只用 [i-window, i] 数据(无前视)。"""
     if i < window:
         return None
     w = daily[i - window:i + 1]
@@ -71,10 +73,59 @@ def stock_profile(daily, i, window=120, code=""):
     # 换手代理: 平均量 / 中位量(量能稳定性)
     sv = sorted(vols)
     vol_stability = (sum(vols) / n) / sv[n // 2] if sv[n // 2] else 1.0
+    # ---- F8(第三轮深审遗留): 补齐 14+ 特征的 5 项 ----
+    # 扫损深度: 窗口内 bar 下破 20bar 前低后收回的深度中位数(ATR%)
+    import core.liquidity as LQ
+    sweep_depths = []
+    for k in range(25, n):
+        p20 = min(x["l"] for x in w[max(0, k - 20):k])
+        b = w[k]
+        if b["l"] < p20 and b["c"] > p20:
+            sweep_depths.append((p20 - b["l"]) / (closes[k] or 1) * 100)
+    sweep_depth_med = round(sorted(sweep_depths)[len(sweep_depths) // 2], 3) if sweep_depths else 0.0
+    # 位移分布: 窗口 displacement_score 的均值与上四分位
+    import core.displacement as DS
+    dsc = [DS.displacement_score(w, k)["score"] for k in range(25, n)]
+    dsc.sort()
+    disp_mean = round(sum(dsc) / len(dsc), 1) if dsc else 0.0
+    disp_q75 = round(dsc[int(len(dsc) * 0.75)], 1) if dsc else 0.0
+    # FVG 反应: FVG 出现后 5bar 内回补(触碰 mid)比例
+    import core.fvg_ob as FO
+    fvg_n = fvg_fill = 0
+    for k in range(25, n - 5):
+        f_ = FO.fvg_at(w, k)
+        if f_:
+            fvg_n += 1
+            for j in range(k + 1, min(n, k + 6)):
+                if w[j]["l"] <= f_["mid"]:
+                    fvg_fill += 1
+                    break
+    fvg_reaction = round(fvg_fill / fvg_n, 3) if fvg_n else None
+    # OB 反应: OB 出现后 5bar 内回踩 mid 比例
+    ob_n = ob_touch = 0
+    for k in range(25, n - 5):
+        o_ = FO.order_block(w, k, "BULL")
+        if o_:
+            ob_n += 1
+            for j in range(k + 1, min(n, k + 6)):
+                if w[j]["l"] <= o_["mid"]:
+                    ob_touch += 1
+                    break
+    ob_reaction = round(ob_touch / ob_n, 3) if ob_n else None
+    # 典型持有: 20bar 区间收益绝对值中位数(持有尺度的代理)
+    holds = []
+    for s in range(0, n - 20, 5):
+        r = closes[s + 20] / closes[s] - 1
+        holds.append(abs(r) * 100)
+    typical_hold = round(sorted(holds)[len(holds) // 2], 2) if holds else None
     return {"atr_pct": round(atr_pct, 3), "gap_freq": round(gap_freq, 4),
             "limit_freq": round(limit_freq, 5), "trend_persist": round(trend_persist, 3),
             "mean_reversion": round(mean_reversion, 3), "noise_adr_med": round(noise, 2),
             "avg_swing_20d": round(avg_swing, 2), "vol_stability": round(vol_stability, 3),
+            # F8 新增 5 特征(→14)
+            "sweep_depth_med": sweep_depth_med, "disp_mean": disp_mean, "disp_q75": disp_q75,
+            "fvg_reaction": fvg_reaction, "ob_reaction": ob_reaction,
+            "typical_hold_pct": typical_hold,
             "window": window, "bars": n}
 
 
