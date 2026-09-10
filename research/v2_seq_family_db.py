@@ -240,7 +240,8 @@ tests = {
     "A_vs_E(顺序信息量检验§74, E_rev2 inducement定义)": {"delta": delta(a, e), "n_e": e["n"],
         "verdict": ("顺序携带信息" if delta(a, e) is not None and delta(a, e) >= 1.0 and e["n"] >= 30
                     else ("顺序不携带信息(反转配置无超额)" if delta(a, e) is not None and abs(delta(a, e)) < 0.5 and e["n"] >= 30
-                          else "UNKNOWN(样本不足)"))},
+                    else ("晚扫劣(V4预注册R3线同步: Δ<-0.5)" if delta(a, e) is not None and delta(a, e) < -0.5 and e["n"] >= 30
+                          else "UNKNOWN(样本不足)")))},
 }
 # V4 修正注记: 旧 E_reverse(212笔+2.62% "顺序携带信息") 已被 V4_E_reverse机理 推翻 ——
 # 真实 inducement 定义展开后晚扫劣(Δ-0.73pp), 旧判定为小样本选择效应。
