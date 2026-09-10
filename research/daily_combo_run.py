@@ -174,6 +174,9 @@ def _run_main_steps():
     # V4 第十轮审计: L2 被拒事件前向收益追踪(每日跑, 事件走完后自动积累对照)
     rc12 = run("v4_l2_reject_tracker.py", timeout=600)
     step_status["l2_reject_tracker"] = rc12
+    # V3-C 升级: 全漏斗被拒候选身份+前向收益(每类拒绝放走多少收益)
+    rc16 = run("funnel_reject_detail.py", timeout=600)
+    step_status["funnel_reject_detail"] = rc16
     # V4 D1: E-score 前置——指数日线刷新(wdh/pull_index_daily, 权益 F2/F3 数据源)
     rc13 = run(r"..\wdh\pull_index_daily.py", timeout=300)
     step_status["index_refresh"] = rc13

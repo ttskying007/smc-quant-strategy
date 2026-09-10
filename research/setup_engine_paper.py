@@ -205,6 +205,9 @@ gates.pop("G6_drawdown", None)
 # G7 持续性: 30 closed 只是最低门槛; days>=20 交易日且目标 60~100 closed
 _days = led.get("summary", {}).get("days_accum", 0)
 gates["G7_persistence"] = len(closed) >= 30 and _days >= 20
+# 幂等 days_accum: 同日重跑不双计(第五轮审计纪律: 计数器必须幂等)
+_prev_run = str(led.get("summary", {}).get("last_run") or "")
+_inc = 0 if _prev_run == today else 1
 led["summary"] = {
     "ledger_type": "SAMPLED_PAPER",                       # 禁止混淆: 非全市场
     "sampling": f"[::{SAMPLE}] 抽样监测, 每日{RECENT_DECISIONS}个决策窗",
@@ -215,7 +218,7 @@ led["summary"] = {
     "promotion_gates": gates,                                # 七道门全量(G5 未采集=None 如实)
     "gate_notes": "G5 执行偏差需 paper/backtest 逐笔配对 fill_dev_pct 字段(PHASE E 采集); "
                   "其余六门已可计算。全部通过才可评估 MICRO REAL。",
-    "days_accum": led.get("summary", {}).get("days_accum", 0) + 1, "last_run": today}
+    "days_accum": _days + _inc, "last_run": today}
 json.dump(led, open(LEDGER, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 print(f"新 READY: {n_new}  结算: {n_settled}  仍OPEN: {n_still_open}")
 print(f"台账[SAMPLED_PAPER ::{SAMPLE}]: total={len(sigs)} closed={len(closed)} avg={avg} "
