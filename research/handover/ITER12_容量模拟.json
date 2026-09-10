@@ -1,0 +1,86 @@
+{
+  "method": "固定名义仓位成交可行性(非组合复利); v2复利口径天文数字教训已记录",
+  "stats": {
+    "1M@5%": {
+      "n": 1640,
+      "binding_n": 2,
+      "binding_pct": 0.12,
+      "deployable_pct": 99.97
+    },
+    "1M@10%": {
+      "n": 1640,
+      "binding_n": 0,
+      "binding_pct": 0.0,
+      "deployable_pct": 100.0
+    },
+    "1M@20%": {
+      "n": 1640,
+      "binding_n": 0,
+      "binding_pct": 0.0,
+      "deployable_pct": 100.0
+    },
+    "5M@5%": {
+      "n": 1640,
+      "binding_n": 66,
+      "binding_pct": 4.02,
+      "deployable_pct": 97.61
+    },
+    "5M@10%": {
+      "n": 1640,
+      "binding_n": 16,
+      "binding_pct": 0.98,
+      "deployable_pct": 99.49
+    },
+    "5M@20%": {
+      "n": 1640,
+      "binding_n": 3,
+      "binding_pct": 0.18,
+      "deployable_pct": 99.92
+    },
+    "10M@5%": {
+      "n": 1640,
+      "binding_n": 169,
+      "binding_pct": 10.3,
+      "deployable_pct": 93.13
+    },
+    "10M@10%": {
+      "n": 1640,
+      "binding_n": 66,
+      "binding_pct": 4.02,
+      "deployable_pct": 97.61
+    },
+    "10M@20%": {
+      "n": 1640,
+      "binding_n": 16,
+      "binding_pct": 0.98,
+      "deployable_pct": 99.49
+    }
+  },
+  "verdict": {
+    "1M": {
+      "conclusion": "完整部署",
+      "binding_5/10/20": [
+        0.12,
+        0.0,
+        0.0
+      ]
+    },
+    "5M": {
+      "conclusion": "完整部署",
+      "binding_5/10/20": [
+        4.02,
+        0.98,
+        0.18
+      ]
+    },
+    "10M": {
+      "conclusion": "部分截断(可行)",
+      "binding_5/10/20": [
+        10.3,
+        4.02,
+        0.98
+      ]
+    }
+  },
+  "conclusion": "部分截断(可行)"
+}
