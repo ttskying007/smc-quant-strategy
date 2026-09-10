@@ -44,16 +44,16 @@ def structured_tp_sl(daily, i, zone, direction="LONG", atr_pct=0.02, fee_pct=0.2
         else:
             tps.append(entry + lvl_mult * risk)
     tp1, tp2, tp3 = tps
-    # EV 估算: WR 假设按 bucket(保守 0.45/0.35/0.25 到各 TP), 分批 TP1 50% TP2 30% TP3 20%
-    # net = 费后
+    # EV 估算(第三轮深审 A6 降级声明): p_win=0.5 与固定 TP 权重是【研究示例值】,
+    # 非条件期望值。生产准入只允许用 rr1/rr2/rr3(结构RR); ev_est 严禁用于买卖决策,
+    # 直至 Walk-Forward 历史条件概率 P(TP1/TP2/TP3/SL) 建成为止。
     f = fee_pct / 100
-    ev = (0.45 * ((tp1 / entry - 1) - f) + 0.35 * ((tp2 / entry - 1) - f)
-          + 0.25 * ((tp3 / entry - 1) - f) - 0.45 * 0 + (-0.0) )
-    # 简化 EV: 期望收益 = Σ p_i×(tp_i收益) − (1−WR_total)×SL损失; WR_total 保守 0.5
-    p_win = 0.5
+    p_win = 0.5  # RESEARCH-ONLY placeholder
     ev = (0.5 * (0.5 * (tp1 / entry - 1) + 0.3 * (tp2 / entry - 1) + 0.2 * (tp3 / entry - 1))
           - 0.5 * (risk / entry)) - f
     return {"sl": round(sl, 4), "tp1": round(tp1, 4), "tp2": round(tp2, 4), "tp3": round(tp3, 4),
             "rr1": round((tp1 - entry) / risk, 2), "rr2": round((tp2 - entry) / risk, 2),
             "rr3": round((tp3 - entry) / risk, 2),
-            "ev_est": round(ev * 100, 3), "structure_based": len(bsls) >= 2}
+            "ev_est": round(ev * 100, 3),
+            "ev_est_research_only": True,  # A6: 显式标记, 消费方必须检查
+            "structure_based": len(bsls) >= 2}

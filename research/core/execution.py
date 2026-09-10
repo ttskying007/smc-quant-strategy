@@ -233,8 +233,26 @@ def try_fill(order, market_snapshot):
     if vf and today and today < vf:
         return {"filled": False, "why": "NOT_YET_VALID"}
     mode = order.get("entry_mode") or "next_open"
-    if mode == "retrace":
-        # 回踩限价：回落到参考价成交；否则当日开盘兜底
+    if mode == "limit_retrace":
+        # 第三轮深审 A5: 严格限价回踩单 —— 未触价保持 PENDING, 无任何 open fallback。
+        # 生产默认。若需要开盘兜底, 显式使用 limit_or_open 或 next_open。
+        if px <= float(order.get("reference_price") or 0):
+            fill_px = float(order["reference_price"]) * (1 + SLIPPAGE)
+            _rule, _src = "LIMIT_RETRACE: px<=ref", "retrace"
+        else:
+            return {"filled": False, "why": "WAIT_RETRACE", "order_type": "LIMIT"}
+    elif mode == "limit_or_open":
+        # A5: 显式兜底单(研究/特殊用途): 触价优先, 否则开盘市价。
+        if px <= float(order.get("reference_price") or 0):
+            fill_px = float(order["reference_price"]) * (1 + SLIPPAGE)
+            _rule, _src = "LIMIT_OR_OPEN: px<=ref", "retrace"
+        elif opn and opn > 0:
+            fill_px = opn * (1 + SLIPPAGE)
+            _rule, _src = "LIMIT_OR_OPEN: open_fallback", "open"
+        else:
+            return {"filled": False, "why": "WAIT_RETRACE", "order_type": "LIMIT_OR_OPEN"}
+    elif mode == "retrace":
+        # 兼容旧名(= limit_or_open 语义), 已废弃: 新代码用 limit_retrace / limit_or_open
         if px <= float(order.get("reference_price") or 0):
             fill_px = float(order["reference_price"]) * (1 + SLIPPAGE)
             _rule, _src = "LIMIT_RETRACE: px<=ref", "retrace"
@@ -242,7 +260,7 @@ def try_fill(order, market_snapshot):
             fill_px = opn * (1 + SLIPPAGE)
             _rule, _src = "LIMIT_RETRACE: open_fallback", "open"
         else:
-            return {"filled": False, "why": "WAIT_RETRACE"}
+            return {"filled": False, "why": "WAIT_RETRACE", "order_type": "LEGACY_RETRACE"}
     else:  # next_open
         if not (opn and opn > 0):
             return {"filled": False, "why": "NO_OPEN"}

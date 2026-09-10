@@ -1,18 +1,24 @@
 # -*- coding: utf-8 -*-
 """core/profile.py —— V2 ITERATION 5: Stock Profile
-蓝图 §29: 每股滚动 Profile: ATR%/换手/跳空频率/涨跌停频率/趋势持续性/均值回归/噪声/
-平均摆幅/扫损深度/位移分布/FVG反应/OB反应/典型持有。
-蓝图 §30: Stock Profile Cluster —— 行为聚类共享参数族, 不是一股一参数。
+蓝图 §29: 每股滚动 Profile(目标 14+ 特征); 蓝图 §30: 行为聚类共享参数族, 不是一股一参数。
+
+Profile V1(第三轮深审 A7 诚实标注): 当前 9 特征 —— ATR%/跳空频率/涨跌停频率(板块统一 A8)/
+趋势持续性/均值回归/噪声ADR/20日平均摆幅/量能稳定性/窗口元数据。
+待补(蓝图全量): 扫损深度/位移分布/FVG反应/OB反应/典型持有。
 
 语义(决策时点 i, 无前视): 全部特征只用 [i-window, i] 数据。
-输出: profile dict(14特征) + cluster 标签(KMeans-free 的分位数桶, 避免引入sklearn依赖)。
+输出: profile dict + cluster 标签(分位数桶, 免 sklearn)。
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def stock_profile(daily, i, window=120):
-    """计算 daily[i] 决策时点的滚动 Profile。i>=window 才有效。"""
+def stock_profile(daily, i, window=120, code=""):
+    """计算 daily[i] 决策时点的滚动 Profile。i>=window 才有效。
+    code: 6位股票代码(用于 A8 板块涨跌停规则; 空则按 10% 主板近似)。
+    Profile V1(第三轮深审A7 诚实标注): 实际9特征——ATR%/跳空频率/涨跌停频率/趋势持续性/
+    均值回归/噪声ADR/20日平均摆幅/量能稳定性/(+窗口元数据)。蓝图§29的扫损深度/位移分布/
+    FVG反应/OB反应/典型持有 5 特征待 V2 补齐后升级。"""
     if i < window:
         return None
     w = daily[i - window:i + 1]
@@ -31,8 +37,15 @@ def stock_profile(daily, i, window=120):
     # 跳空频率: |open/prev_close-1|>1%
     gaps = sum(1 for k in range(1, n) if w[k]["o"] and abs(w[k]["o"] / closes[k - 1] - 1) > 0.01)
     gap_freq = gaps / n
-    # 涨跌停频率(A股±10%/±20%近似): 单bar |ret|>9.5%
-    limits = sum(1 for k in range(1, n) if closes[k - 1] and abs(closes[k] / closes[k - 1] - 1) > 0.095)
+    # 涨跌停频率(第三轮深审A8: 统一 core/limits 板块规则, 替代原 9.5% 近似)
+    from core.limits import daily_limit_pct
+    limits = 0
+    for k in range(1, n):
+        if closes[k - 1] > 0:
+            _d8k = w[k].get("t") if isinstance(w[k].get("t"), str) and len(str(w[k].get("t"))) >= 8 else None
+            lim = daily_limit_pct(code, _d8k) / 100.0
+            if abs(closes[k] / closes[k - 1] - 1) >= lim - 1e-4:
+                limits += 1
     limit_freq = limits / n
     # 趋势持续性: 自相关 lag1 of returns 符号一致率
     rets = [closes[k] / closes[k - 1] - 1 for k in range(1, n) if closes[k - 1] > 0]

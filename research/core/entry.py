@@ -62,21 +62,34 @@ def entry_zone(poi, price, invalid_price, atr_pct=0.02, fee_pct=0.2):
             "late_flag": dist_atr > 1.5}
 
 
-def fill_in_zone(daily, i, zone, max_bars=5):
-    """入场撮合语义(骨架): 从 i+1 起 max_bars 根内, 价格回到 zone → 成交价。
-    aggressive: 触 zone_high 即成; optimal: 触 mid 成; conservative: 触 zone_low 成。
-    返回 None 或 {fill_idx, fill_price, mode}。若 max_bars 内先破 invalid → 放弃(假设失效)。"""
+def fill_in_zone(daily, i, zone, max_bars=5, fill_mode="STRICT_LIMIT"):
+    """入场撮合语义(第三轮深审 A4 三模式):
+      STRICT_LIMIT(生产默认): 必须真实触价 —— bar.low <= zone_high 才成交, 成交价=limit 触价
+        (zone_high 挂单价); 无 open fallback; 开盘即在 zone 下方(未破invalid)按开盘成交(可观测更优)。
+      TOUCH_LIMIT(宽松研究): 同 STRICT 但跳空穿越 zone 下方也按 zone_high 记(高估成交质量)。
+      MARKET_OPEN(最宽): i+1 开盘直接市价成交(无论位置)。
+    若 max_bars 内先破 invalid → INVALIDATED_BEFORE_FILL(模式无关)。"""
     if zone is None or i + 1 >= len(daily):
         return None
+    if fill_mode == "MARKET_OPEN":
+        k = i + 1
+        if k >= len(daily):
+            return None
+        b = daily[k]
+        if b["l"] <= zone["invalid_price"]:
+            return {"fill_idx": k, "fill_price": None, "mode": "INVALIDATED_BEFORE_FILL"}
+        return {"fill_idx": k, "fill_price": round(b["o"], 4), "mode": "MARKET_OPEN"}
     for k in range(i + 1, min(len(daily), i + 1 + max_bars)):
         b = daily[k]
         if b["l"] <= zone["invalid_price"]:
             return {"fill_idx": k, "fill_price": None, "mode": "INVALIDATED_BEFORE_FILL"}
         if b["l"] <= zone["zone_high"]:
-            # 进入 zone: 取 aggressive 成交(触上沿/回踩入区)
-            px = min(b["o"], zone["zone_high"]) if b["o"] <= zone["zone_high"] else zone["zone_high"]
-            # 若 bar 直接开在 zone 下方但未破 invalid: 以开盘成交(更优)
+            px = zone["zone_high"]  # 挂单价(触价成交)
+            # 开盘即低于 zone(未破invalid): 开盘可观测更优价, 按开盘成交
             if b["o"] < zone["zone_low"]:
                 px = b["o"]
-            return {"fill_idx": k, "fill_price": round(px, 4), "mode": "ZONE_TOUCH"}
+            elif b["o"] < zone["zone_high"]:
+                px = b["o"]  # 开盘已在 zone 内: 开盘价可成交
+            return {"fill_idx": k, "fill_price": round(px, 4),
+                    "mode": "STRICT_LIMIT" if fill_mode == "STRICT_LIMIT" else "TOUCH_LIMIT"}
     return None

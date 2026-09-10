@@ -70,5 +70,31 @@ ok("按距离升序", len(near) <= 2)
 print("== 6. 边界: i<25 返回空 ==")
 ok("早期无池", liquidity_pools(bs, 10) == [])
 
+print("== 7. 第三轮深审A1: 60D SSL 索引与价格同源 ==")
+# 构造: 窗口内最低low在位置40(单根孤立下探, 前后各3根更低不成立→不形成确认swing, 60D池不EQ合并)
+px2 = ([10.0 + 0.02*k for k in range(40)] + [9.0] +
+       [10.0 + 0.02*k for k in range(1, 30)])
+bs2 = bars(px2)
+i2 = len(bs2) - 1
+pools2 = liquidity_pools(bs2, i2)
+p60_ssl = [p for p in pools2 if p["kind"] == "60D" and p["side"] == "SSL"]
+if p60_ssl:
+    p0 = p60_ssl[0]
+    w60 = bs2[max(0, i2 - 60):i2]
+    min_low = min(b["l"] for b in w60)
+    ok("60D SSL price=min(window low)", abs(p0["price"] - min_low) < 1e-9, f"{p0['price']} vs {min_low}")
+    ok("60D SSL idx 同源(索引指向最低low那根)",
+       abs(bs2[p0["idx"]]["l"] - min_low) < 1e-9,
+       f"idx={p0['idx']} l={bs2[p0['idx']]['l']} vs min={min_low}")
+    ok("idx 在窗口内", max(0, i2 - 60) <= p0["idx"] < i2)
+else:
+    # 60D 池可能被 EQ 合并到 SWING 池 —— 退而验证任一 SSL 池 price==min_low 且 idx 同源
+    ssl_all = [p for p in pools2 if p["side"] == "SSL"]
+    w60 = bs2[max(0, i2 - 60):i2]
+    min_low = min(b["l"] for b in w60)
+    hit = [p for p in ssl_all if abs(p["price"] - min_low) < 1e-9 and abs(bs2[p["idx"]]["l"] - min_low) < 1e-9]
+    ok("SSL 池 price==min_low 且 idx 同源(EQ合并兼容)", len(hit) >= 1,
+       f"pools={[(p['kind'], p['price'], p['idx']) for p in ssl_all]} min={min_low}")
+
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

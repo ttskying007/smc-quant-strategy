@@ -64,10 +64,16 @@ def liquidity_pools(daily, i, lookback=120):
         add_pool("PDH", "BSL", daily[i - 1]["h"], i - 1)
         add_pool("PDL", "SSL", daily[i - 1]["l"], i - 1)
     # 60/120日高/低(只取窗口内、i之前)
+    # FIX(2026-09-09, 第三轮深审A1): 60D SSL 索引错误——原代码价格取窗口最低low但索引
+    # 用 max(key=low) 指向最高low的bar, price/idx/age/touch_count 不同源, 污染下游
+    # 评分/SL/TP。改为 min(key=low) 使索引与价格同根K线。
     w60 = daily[max(0, i - 60):i]
     if w60:
-        add_pool("60D", "BSL", max(b["h"] for b in w60), max(range(len(w60)), key=lambda k: w60[k]["h"]) + max(0, i - 60))
-        add_pool("60D", "SSL", min(b["l"] for b in w60), max(range(len(w60)), key=lambda k: w60[k]["l"]) + max(0, i - 60))
+        b0_60 = max(0, i - 60)
+        _hi_i = max(range(len(w60)), key=lambda k: w60[k]["h"]) + b0_60
+        _lo_i = min(range(len(w60)), key=lambda k: w60[k]["l"]) + b0_60
+        add_pool("60D", "BSL", daily[_hi_i]["h"], _hi_i)
+        add_pool("60D", "SSL", daily[_lo_i]["l"], _lo_i)
     # 评分
     for p in pools:
         age, tc = p["_score_raw"]

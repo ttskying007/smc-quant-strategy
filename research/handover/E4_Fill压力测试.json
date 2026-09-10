@@ -1,0 +1,105 @@
+{
+  "results": {
+    "STRICT_LIMIT@0.05": {
+      "n": 965,
+      "fill_rate": 0.588,
+      "all_avg": 5.04,
+      "oos_n": 198,
+      "oos_avg": 4.824,
+      "oos_pf": 3.06
+    },
+    "STRICT_LIMIT@0.1": {
+      "n": 965,
+      "fill_rate": 0.588,
+      "all_avg": 4.988,
+      "oos_n": 198,
+      "oos_avg": 4.771,
+      "oos_pf": 3.03
+    },
+    "STRICT_LIMIT@0.2": {
+      "n": 965,
+      "fill_rate": 0.588,
+      "all_avg": 4.883,
+      "oos_n": 198,
+      "oos_avg": 4.666,
+      "oos_pf": 2.95
+    },
+    "STRICT_LIMIT@0.3": {
+      "n": 965,
+      "fill_rate": 0.588,
+      "all_avg": 4.778,
+      "oos_n": 198,
+      "oos_avg": 4.562,
+      "oos_pf": 2.88
+    },
+    "LIMIT_OR_OPEN@0.05": {
+      "n": 1640,
+      "fill_rate": 1.0,
+      "all_avg": 5.45,
+      "oos_n": 362,
+      "oos_avg": 4.76,
+      "oos_pf": 3.33
+    },
+    "LIMIT_OR_OPEN@0.1": {
+      "n": 1640,
+      "fill_rate": 1.0,
+      "all_avg": 5.398,
+      "oos_n": 362,
+      "oos_avg": 4.707,
+      "oos_pf": 3.28
+    },
+    "LIMIT_OR_OPEN@0.2": {
+      "n": 1640,
+      "fill_rate": 1.0,
+      "all_avg": 5.292,
+      "oos_n": 362,
+      "oos_avg": 4.603,
+      "oos_pf": 3.19
+    },
+    "LIMIT_OR_OPEN@0.3": {
+      "n": 1640,
+      "fill_rate": 1.0,
+      "all_avg": 5.187,
+      "oos_n": 362,
+      "oos_avg": 4.498,
+      "oos_pf": 3.1
+    },
+    "MARKET_OPEN@0.05": {
+      "n": 1640,
+      "fill_rate": 1.0,
+      "all_avg": 5.016,
+      "oos_n": 362,
+      "oos_avg": 4.41,
+      "oos_pf": 3.03
+    },
+    "MARKET_OPEN@0.1": {
+      "n": 1640,
+      "fill_rate": 1.0,
+      "all_avg": 4.964,
+      "oos_n": 362,
+      "oos_avg": 4.357,
+      "oos_pf": 2.99
+    },
+    "MARKET_OPEN@0.2": {
+      "n": 1640,
+      "fill_rate": 1.0,
+      "all_avg": 4.859,
+      "oos_n": 362,
+      "oos_avg": 4.253,
+      "oos_pf": 2.91
+    },
+    "MARKET_OPEN@0.3": {
+      "n": 1640,
+      "fill_rate": 1.0,
+      "all_avg": 4.754,
+      "oos_n": 362,
+      "oos_avg": 4.149,
+      "oos_pf": 2.83
+    }
+  },
+  "verdict": {
+    "strict_minus_market30": 0.675,
+    "all_models_oos_positive": true,
+    "execution_illusion_risk": false
+  }
+}

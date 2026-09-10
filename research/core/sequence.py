@@ -183,3 +183,165 @@ def run_sequence(daily, i, direction="LONG", timeframe="D1", symbol=""):
         if m.is_invalid():
             break
     return m
+
+
+# ============================================================
+# V2(2026-09-09, 第三轮深审 A2/A3): 完整因果链 FSM —— 无占位
+# A2: SHIFT/POI/RETEST 真实语义(core.mss + core.fvg_ob 接线)
+# A3: 因果绑定 —— sweep 绑定 target_pool; reclaim 收复 sweep 引用的前高;
+#     全事件 parent_event_id 链, 任何一环断可诊断。
+# ============================================================
+EVENT_SEQ_V2 = ("LIQUIDITY", "SWEEP", "RECLAIM", "DISPLACEMENT", "SHIFT", "POI", "RETEST")
+
+
+class SequenceMachineV2:
+    """完整因果链状态机: 每事件带 id/parent_event_id/结构引用。"""
+
+    def __init__(self, symbol="", timeframe="D1"):
+        self.symbol = symbol
+        self.timeframe = timeframe
+        self.events = []
+        self.rejected = []
+        self._next_id = 1
+
+    def _emit(self, etype, ts, price, strength, parent_id, extra=None):
+        ev = {"id": self._next_id, "event_type": etype, "ts": ts, "price": round(float(price), 4),
+              "strength": strength, "parent_event_id": parent_id, "symbol": self.symbol,
+              "timeframe": self.timeframe}
+        if extra:
+            ev.update(extra)
+        self._next_id += 1
+        self.events.append(ev)
+        return ev["id"]
+
+    def setup(self):
+        """完整链则返回 setup dict, 否则 None(断链可从 events/rejected 诊断)。"""
+        if len(self.events) < len(EVENT_SEQ_V2):
+            return None
+        kinds = [e["event_type"] for e in self.events]
+        if tuple(kinds[-len(EVENT_SEQ_V2):]) != EVENT_SEQ_V2:
+            return None
+        sweep_ev = [e for e in self.events if e["event_type"] == "SWEEP"][-1]
+        poi_ev = [e for e in self.events if e["event_type"] == "POI"][-1]
+        retest_ev = [e for e in self.events if e["event_type"] == "RETEST"][-1]
+        return {"state": "ENTRY_READY", "sequence": "→".join(kinds),
+                "swept_pool": sweep_ev.get("target_pool"),
+                "poi": poi_ev.get("poi"),
+                "retest_price": retest_ev["price"],
+                "events": [e["id"] for e in self.events]}
+
+
+def run_sequence_v2(daily, i, symbol="", timeframe="D1", lookback=40,
+                    pool_min_score=40, disp_min=50, retest_bars=8):
+    """完整事件链重建(决策时点 i, 无前视)。
+    链: 池(score>=阈值) → 扫该池(破后收回, 绑定池) → 收复 sweep 前可见前高(因果绑定)
+        → 位移(>=阈值) → MSS/BOS 上破(core.mss) → POI(FVG 优先/OB 兜底)
+        → 重测 POI(<=retest_bars, 未破失效位 poi.low×0.97)。
+    任一环失败返回部分链(诊断友好)。"""
+    import core.liquidity as LQ
+    import core.displacement as DS
+    import core.mss as MSS
+    import core.fvg_ob as FO
+    m = SequenceMachineV2(symbol, timeframe)
+    if i < 60:
+        return m
+    try:
+        from core.structure import atr_of
+        atr = atr_of(daily, i - 1) or 0
+    except Exception:
+        atr = 0
+    atr_pct = (atr / (daily[i - 1]["c"] or 1)) if atr else 0.02
+    tol = max(0.003, atr_pct * 0.5)
+    w0 = max(60, i - lookback)
+    # 1) 流动性池
+    pools = LQ.liquidity_pools(daily, w0 + 1)
+    ssl = [p for p in pools if p["side"] == "SSL" and p["score"] >= pool_min_score]
+    if not ssl:
+        return m
+    pool = ssl[0]
+    _id_pool = m._emit("LIQUIDITY", daily[w0 + 1]["t"], pool["price"], pool["score"], None,
+                       {"target_pool": {"kind": pool["kind"], "side": "SSL", "price": pool["price"]}})
+    # 2) 扫损(绑定该池)
+    sweep_i = None
+    _id_sw = None
+    for k in range(w0 + 2, i + 1):
+        b = daily[k]
+        if b["l"] <= pool["price"] * (1 - tol) and b["c"] > pool["price"]:
+            _id_sw = m._emit("SWEEP", b["t"], pool["price"], 60, _id_pool,
+                             {"target_pool": {"kind": pool["kind"], "side": "SSL", "price": pool["price"]}})
+            sweep_i = k
+            break
+        if b["c"] < pool["price"] * (1 - 2 * tol):
+            m.rejected.append({"why": "BREAK_DOWN_BEFORE_SWEEP", "at": b["t"]})
+            return m
+    if sweep_i is None:
+        return m
+    # A3: reclaim 的因果 level = sweep 前可见前高(sweep 引用)
+    reclaim_level = max(x["h"] for x in daily[max(0, sweep_i - 5):sweep_i])
+    # 3) 收复(绑定 reclaim_level)
+    recl_i = None
+    for k in range(sweep_i + 1, min(len(daily), sweep_i + 6)):
+        if daily[k]["c"] > reclaim_level:
+            _id_rc = m._emit("RECLAIM", daily[k]["t"], reclaim_level, 55, _id_sw,
+                             {"reclaim_level": reclaim_level})
+            recl_i = k
+            break
+        if daily[k]["c"] < pool["price"] * (1 - 2 * tol):
+            m.rejected.append({"why": "BREAK_AFTER_SWEEP", "at": daily[k]["t"]})
+            return m
+    if recl_i is None:
+        return m
+    # 4) 位移
+    disp_i = None
+    for k in range(recl_i, min(len(daily), recl_i + 6)):
+        sc = DS.displacement_score(daily, k)
+        if sc["score"] >= disp_min and daily[k]["c"] > daily[k]["o"]:
+            _id_dp = m._emit("DISPLACEMENT", daily[k]["t"], daily[k]["c"], sc["score"], _id_rc,
+                             {"disp_bucket": sc.get("bucket")})
+            disp_i = k
+            break
+    if disp_i is None:
+        return m
+    # 5) 结构转移(core.mss)
+    shift_i = None
+    for k in range(disp_i, min(len(daily), disp_i + 13)):
+        s5 = MSS.structure_shift(daily, k)
+        if s5 and s5["direction"] == "LONG":
+            _id_sh = m._emit("SHIFT", daily[k]["t"], s5["level"], s5["strength"], _id_dp,
+                             {"shift_type": s5["type"], "trend_before": s5["trend_before"]})
+            shift_i = k
+            break
+    if shift_i is None:
+        return m
+    # 6) POI(FVG 优先, OB 兜底) —— 转移后 3 根内
+    poi_i = None
+    poi = None
+    _id_poi = None
+    for k in range(shift_i, min(len(daily), shift_i + 4)):
+        f6 = FO.fvg_at(daily, k)
+        ob6 = FO.order_block(daily, k, "BULL")
+        if f6:
+            _id_poi = m._emit("POI", daily[k]["t"], f6["mid"], 60, _id_sh,
+                              {"poi": {"type": "FVG", "low": f6["low"], "high": f6["high"],
+                                       "mid": f6["mid"], "size_atr": f6["size_atr"]}})
+            poi_i, poi = k, f6
+            break
+        if ob6:
+            _id_poi = m._emit("POI", daily[k]["t"], ob6["mid"], 50, _id_sh,
+                              {"poi": {"type": "OB", "low": ob6["low"], "high": ob6["high"],
+                                       "mid": ob6["mid"], "bars_len": ob6["bars_len"]}})
+            poi_i, poi = k, ob6
+            break
+    if poi_i is None:
+        return m
+    # 7) 重测(未破失效位)
+    for k in range(poi_i + 1, min(len(daily), poi_i + 1 + retest_bars)):
+        b = daily[k]
+        if b["c"] < poi["low"] * 0.97:
+            m.rejected.append({"why": "INVALIDATED_BEFORE_RETEST", "at": b["t"]})
+            return m
+        if poi["low"] <= b["l"] <= poi["high"] * 1.02:
+            m._emit("RETEST", b["t"], b["l"], 50, _id_poi)
+            return m
+    m.rejected.append({"why": "NO_RETEST_IN_WINDOW"})
+    return m

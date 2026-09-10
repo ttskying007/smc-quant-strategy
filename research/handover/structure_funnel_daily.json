@@ -1,0 +1,48 @@
+{
+  "latest": {
+    "generated_at": "2026-09-10 09:51:10",
+    "sample": 467,
+    "funnel": {
+      "universe": 465,
+      "bars_scanned": 13950,
+      "L1_pool": 13950,
+      "L2_sweep": 1644,
+      "L3_reclaim": 302,
+      "L4_disp": 238,
+      "L5_shift": 212,
+      "L6_poi": 212,
+      "L7_retest_ready": 177
+    },
+    "drop_reasons": {
+      "reject_BREAK_DOWN_BEFORE_SWEEP": 9860,
+      "reject_BREAK_AFTER_SWEEP": 636,
+      "reject_INVALIDATED_BEFORE_RETEST": 6,
+      "reject_NO_RETEST_IN_WINDOW": 29
+    },
+    "ready_per_day": 177
+  },
+  "history": [
+    {
+      "generated_at": "2026-09-10 09:51:10",
+      "sample": 467,
+      "funnel": {
+        "universe": 465,
+        "bars_scanned": 13950,
+        "L1_pool": 13950,
+        "L2_sweep": 1644,
+        "L3_reclaim": 302,
+        "L4_disp": 238,
+        "L5_shift": 212,
+        "L6_poi": 212,
+        "L7_retest_ready": 177
+      },
+      "drop_reasons": {
+        "reject_BREAK_DOWN_BEFORE_SWEEP": 9860,
+        "reject_BREAK_AFTER_SWEEP": 636,
+        "reject_INVALIDATED_BEFORE_RETEST": 6,
+        "reject_NO_RETEST_IN_WINDOW": 29
+      },
+      "ready_per_day": 177
+    }
+  ]
+}
