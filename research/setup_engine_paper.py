@@ -120,13 +120,43 @@ closed = [s for s in sigs if s.get("ret_pct") is not None]
 avg = round(sum(s["ret_pct"] for s in closed) / len(closed), 3) if closed else None
 w = sum(s["ret_pct"] for s in closed if s["ret_pct"] > 0)
 l_ = abs(sum(s["ret_pct"] for s in closed if s["ret_pct"] <= 0))
-# 晋级门预演(V3 §十六): 七道门按 closed 样本逐项计算, 未达标如实显示
+# 晋级门完整实现(V3 §十六, 七道门全部可计算, 未达标如实显示)
+# G1 样本 / G2 一致性 / G3 集中度 —— 台账自身可算
 gates = {"G1_sample": len(closed) >= 30,
          "G2_edge": (len(closed) > 0 and avg is not None and avg > 0
-                     and (w / l_ > 1 if l_ > 0 else True))}
+                     and ((w / l_ > 1) if l_ > 0 else True))}
 top1 = max((abs(s["ret_pct"]) for s in closed), default=0)
 tot = sum(abs(s["ret_pct"]) for s in closed) or 1
-gates["G3_concentration"] = len(closed) > 0 and top1 / tot < 0.10
+top5 = sum(sorted((abs(s["ret_pct"]) for s in closed), reverse=True)[:5])
+gates["G3_concentration"] = len(closed) > 0 and top1 / tot < 0.10 and top5 / tot < 0.25
+# G4 与回测方向一致: 回测 OOS 基准(修正后全面回测复盘.json) avg>0, PAPER 同向且差距<3pp
+_bt = None
+try:
+    _bt = json.load(open(r"E:\test\smc_project\research\handover\V3修正后全面回测复盘.json",
+                         encoding="utf-8")).get("total", {}).get("oos", {})
+except Exception:
+    pass
+_bt_avg = (_bt or {}).get("avg")
+gates["G4_backtest_consistency"] = bool(
+    _bt_avg is not None and avg is not None and _bt_avg > 0 and avg > 0
+    and abs(avg - _bt_avg) < 3.0) if closed else False
+# G5 执行偏差: 逐笔 |paper_fill − backtest_fill| 均值 <1%(当前台账无逐笔 backtest 配对 → 未采集=None → 如实"未评估")
+_have_fill_dev = any(s.get("fill_dev_pct") is not None for s in closed)
+if _have_fill_dev:
+    _devs = [s["fill_dev_pct"] for s in closed if s.get("fill_dev_pct") is not None]
+    gates["G5_fill_deviation"] = (sum(_devs) / len(_devs)) < 1.0
+else:
+    gates["G5_fill_deviation"] = None          # 未采集 → 如实标 None(不假装通过)
+# G6 回撤: closed 累计权益 MDD 不超 OOS 回测 MDD(-22.2pt 折算按占比) —— 阈值 OOS mdd_pct 保守值
+_eq, _pk, _mdd = 0.0, 0.0, 0.0
+for s in sorted(closed, key=lambda x: x.get("fill_date") or x["date"]):
+    _eq += s["ret_pct"]
+    _pk = max(_pk, _eq)
+    _mdd = min(_mdd, _eq - _pk)
+gates["G6_drawdown"] = (_mdd > -25.0) if closed else False    # 预注册: |MDD|≤25pt
+# G7 持续性: 30 closed 只是最低门槛; days>=20 交易日且目标 60~100 closed
+_days = led.get("summary", {}).get("days_accum", 0)
+gates["G7_persistence"] = len(closed) >= 30 and _days >= 20
 led["summary"] = {
     "ledger_type": "SAMPLED_PAPER",                       # 禁止混淆: 非全市场
     "sampling": f"[::{SAMPLE}] 抽样监测, 每日{RECENT_DECISIONS}个决策窗",
@@ -134,7 +164,9 @@ led["summary"] = {
     "total": len(sigs), "open": len([s for s in sigs if s.get("status") == "OPEN"]),
     "closed": len(closed), "avg_closed": avg,
     "pf_closed": round(w / l_, 2) if l_ > 0 else None,
-    "promotion_gates_preview": gates,                      # 完整7门在 closed>=30 时全量评估
+    "promotion_gates": gates,                                # 七道门全量(G5 未采集=None 如实)
+    "gate_notes": "G5 执行偏差需 paper/backtest 逐笔配对 fill_dev_pct 字段(PHASE E 采集); "
+                  "其余六门已可计算。全部通过才可评估 MICRO REAL。",
     "days_accum": led.get("summary", {}).get("days_accum", 0) + 1, "last_run": today}
 json.dump(led, open(LEDGER, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 print(f"新 READY: {n_new}  结算: {n_settled}  仍OPEN: {n_still_open}")

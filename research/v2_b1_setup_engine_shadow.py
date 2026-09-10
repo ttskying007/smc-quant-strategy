@@ -70,7 +70,7 @@ for fp in files:
         passes_all = ok_r20 and ok_stage and ok_fvg
         if passes_all:
             gate_stats["pass_all"] += 1
-        # 回测(两条臂共用退出): entry=retest bar 次日, SL=invalid-1.5ATR宽, 15bar时间退出
+        # 回测(两条臂共用退出): V3 P0-1 升级 —— 统一走 core.setup_exit 单源(SL/TP3R/TIME)
         setup = m.setup()
         poi = setup["poi"]
         zone = {"zone_low": poi["low"], "zone_high": poi["high"], "invalid_price": poi["low"] * 0.97,
@@ -79,25 +79,13 @@ for fp in files:
         if fill is None or fill.get("fill_price") is None:
             continue
         fi = fill["fill_idx"]
-        atr = 0.02 * fill["fill_price"]
-        try:
-            from core.structure import atr_of
-            a_ = atr_of(daily, fi - 1)
-            if a_: atr = a_
-        except Exception:
-            pass
         fill_px = fill["fill_price"]
-        sl = zone["invalid_price"] - 1.5 * atr
-        ret = None
-        for k in range(fi + 1, min(n, fi + 16)):
-            b = daily[k]
-            if b["l"] <= sl:
-                ret = (sl / fill_px - 1) * 100 - FEE
-                break
-            if k == min(n - 1, fi + 15):
-                ret = (b["c"] / fill_px - 1) * 100 - FEE
-        if ret is None:
+        from core.setup_exit import settle_from_record, EXIT_VERSION
+        res = settle_from_record(daily, fi, fill_px, zone["invalid_price"], fee_pct=FEE,
+                                 max_bars=15, tp_rr=3.0)
+        if res.get("status") not in ("SL", "TP", "TIME"):
             continue
+        ret = res["ret_pct"]
         arm_all.append((daily[i]["t"], ret))
         if passes_all:
             arm_gate.append((daily[i]["t"], ret))

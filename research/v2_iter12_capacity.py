@@ -81,8 +81,13 @@ for cash in (1_000_000, 5_000_000, 10_000_000):
         "conclusion": ("完整部署" if b5 < 5 else ("部分截断(可行)" if b20 < 20 else "严重容量约束")),
         "binding_5/10/20": [b5, b10, b20]}
 out = {"method": "固定名义仓位成交可行性(非组合复利); v2复利口径天文数字教训已记录",
+       # V3审计§四: 结论范围限定 —— 本测试只在"1640笔历史EVENT交易+当前pos_pct仓位公式+
+       # 日成交量×participation假设"内成立; 不证明未来universe无容量问题, 不含盘口/分钟级
+       # /冲击成本/订单拆分。升级表述见 handover/第九轮审计执行报告.md V3节。
+       "scope_limitation": "仅覆盖历史EVENT样本1640笔与固定名义仓位假设; 非全universe前瞻容量证明",
        "stats": stats, "verdict": verdict,
-       "conclusion": verdict["10M"]["conclusion"]}
+       "conclusion": verdict["10M"]["conclusion"],
+       "conclusion_statement": "历史样本固定仓位假设下1000万级尚可部署; 当前主要瓶颈是信号稀缺"}
 json.dump(out, open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                  "handover", "ITER12_容量模拟.json"), "w", encoding="utf-8"),
           ensure_ascii=False, indent=2, default=str)

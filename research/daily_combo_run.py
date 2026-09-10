@@ -160,6 +160,17 @@ def _run_main_steps():
     # FIX(2026-09-08, 审计方向7): 漏斗监控 —— 记录当日漏斗到历史 + ±2σ 报警（≥8天基线后生效）
     rc8 = run("funnel_monitor.py", timeout=120)
     step_status["funnel_monitor"] = rc8
+    # FIX(2026-09-10, V3 P0-3/PAPER 累积): 三个 V3 累积器接入每日调度
+    #   structure_funnel_daily —— 结构引擎层漏斗(含丢失候选前向收益, Phase B)
+    #   funnel_history_accum —— selection_funnel 60日历史(±2σ 基线)
+    #   setup_engine_paper  —— 统一 Setup Engine PAPER 台账(SAMPLED, 七道门)
+    # 三者均 best-effort(失败不阻断生产链, 只记录状态) —— 累积器性质=证据采集, 不影响生产资格
+    rc9 = run("structure_funnel_daily.py", timeout=1800)
+    step_status["structure_funnel"] = rc9
+    rc10 = run("funnel_history_accum.py", timeout=300)
+    step_status["funnel_accum"] = rc10
+    rc11 = run("setup_engine_paper.py", timeout=1800)
+    step_status["setup_paper"] = rc11
     # FIX(2026-08-22): 运行状态记录（每步成功/失败 + 数据日期 + 兜底标注）
     _data_date = ""
     try:
