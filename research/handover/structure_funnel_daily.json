@@ -1,48 +1,148 @@
 {
   "latest": {
-    "generated_at": "2026-09-10 09:51:10",
+    "generated_at": "2026-09-10 15:50:56",
     "sample": 467,
     "funnel": {
       "universe": 465,
       "bars_scanned": 13950,
-      "L1_pool": 13950,
+      "L1_liquidity": 13950,
       "L2_sweep": 1644,
-      "L3_reclaim": 302,
-      "L4_disp": 238,
-      "L5_shift": 212,
-      "L6_poi": 212,
-      "L7_retest_ready": 177
+      "L3_reclaim": 304,
+      "L4_displacement": 240,
+      "L5_shift": 213,
+      "L6_poi": 213,
+      "L7_retest": 178
     },
     "drop_reasons": {
-      "reject_BREAK_DOWN_BEFORE_SWEEP": 9860,
-      "reject_BREAK_AFTER_SWEEP": 636,
+      "reject_BREAK_DOWN_BEFORE_SWEEP": 9847,
+      "reject_BREAK_AFTER_SWEEP": 634,
       "reject_INVALIDATED_BEFORE_RETEST": 6,
       "reject_NO_RETEST_IN_WINDOW": 29
     },
-    "ready_per_day": 177
+    "lost_candidate_forward_return": {
+      "L3_lost_fwd5": {
+        "n": 9760,
+        "avg": 1.913,
+        "median": 1.102,
+        "pct_pos": 58.8
+      },
+      "L3_lost_fwd10": {
+        "n": 7727,
+        "avg": 2.535,
+        "median": 1.554,
+        "pct_pos": 58.8
+      },
+      "L4_lost_fwd5": {
+        "n": 1131,
+        "avg": 1.127,
+        "median": 0.288,
+        "pct_pos": 51.6
+      },
+      "L5_lost_fwd5": {
+        "n": 56,
+        "avg": 2.653,
+        "median": 1.14,
+        "pct_pos": 53.6
+      },
+      "L5_lost_fwd10": {
+        "n": 49,
+        "avg": 2.087,
+        "median": 1.204,
+        "pct_pos": 55.1
+      },
+      "L4_lost_fwd10": {
+        "n": 878,
+        "avg": 1.787,
+        "median": 0.075,
+        "pct_pos": 50.2
+      },
+      "L6_lost_fwd5": {
+        "n": 25,
+        "avg": 2.905,
+        "median": 2.251,
+        "pct_pos": 60.0
+      },
+      "L6_lost_fwd10": {
+        "n": 24,
+        "avg": 1.489,
+        "median": 0.797,
+        "pct_pos": 50.0
+      }
+    },
+    "ready_per_day": 178
   },
   "history": [
     {
-      "generated_at": "2026-09-10 09:51:10",
+      "generated_at": "2026-09-10 15:50:56",
       "sample": 467,
       "funnel": {
         "universe": 465,
         "bars_scanned": 13950,
-        "L1_pool": 13950,
+        "L1_liquidity": 13950,
         "L2_sweep": 1644,
-        "L3_reclaim": 302,
-        "L4_disp": 238,
-        "L5_shift": 212,
-        "L6_poi": 212,
-        "L7_retest_ready": 177
+        "L3_reclaim": 304,
+        "L4_displacement": 240,
+        "L5_shift": 213,
+        "L6_poi": 213,
+        "L7_retest": 178
       },
       "drop_reasons": {
-        "reject_BREAK_DOWN_BEFORE_SWEEP": 9860,
-        "reject_BREAK_AFTER_SWEEP": 636,
+        "reject_BREAK_DOWN_BEFORE_SWEEP": 9847,
+        "reject_BREAK_AFTER_SWEEP": 634,
         "reject_INVALIDATED_BEFORE_RETEST": 6,
         "reject_NO_RETEST_IN_WINDOW": 29
       },
-      "ready_per_day": 177
+      "lost_candidate_forward_return": {
+        "L3_lost_fwd5": {
+          "n": 9760,
+          "avg": 1.913,
+          "median": 1.102,
+          "pct_pos": 58.8
+        },
+        "L3_lost_fwd10": {
+          "n": 7727,
+          "avg": 2.535,
+          "median": 1.554,
+          "pct_pos": 58.8
+        },
+        "L4_lost_fwd5": {
+          "n": 1131,
+          "avg": 1.127,
+          "median": 0.288,
+          "pct_pos": 51.6
+        },
+        "L5_lost_fwd5": {
+          "n": 56,
+          "avg": 2.653,
+          "median": 1.14,
+          "pct_pos": 53.6
+        },
+        "L5_lost_fwd10": {
+          "n": 49,
+          "avg": 2.087,
+          "median": 1.204,
+          "pct_pos": 55.1
+        },
+        "L4_lost_fwd10": {
+          "n": 878,
+          "avg": 1.787,
+          "median": 0.075,
+          "pct_pos": 50.2
+        },
+        "L6_lost_fwd5": {
+          "n": 25,
+          "avg": 2.905,
+          "median": 2.251,
+          "pct_pos": 60.0
+        },
+        "L6_lost_fwd10": {
+          "n": 24,
+          "avg": 1.489,
+          "median": 0.797,
+          "pct_pos": 50.0
+        }
+      },
+      "ready_per_day": 178
     }
   ]
 }

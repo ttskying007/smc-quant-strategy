@@ -76,12 +76,21 @@ class SequenceMachine:
         self._last_ts = None
 
     def _dt(self, ts):
+        """V3审计§八修复: 旧版只取 str(ts)[:8] 按日算 Δt —— 60m/15m/5m 接入后
+        09:31→09:45 与 09:31→14:50 无法区分。现支持 YYYYMMDDHHMM(12位)分钟精度,
+        8位回退日级(向后兼容日线事件)。"""
         if self._last_ts is None:
             return None
         try:
             import datetime as dt
-            a = dt.datetime.strptime(str(ts)[:8], "%Y%m%d")
-            b = dt.datetime.strptime(str(self._last_ts)[:8], "%Y%m%d")
+            sa, sb = str(ts), str(self._last_ts)
+            if len(sa) >= 12 and len(sb) >= 12:
+                a = dt.datetime.strptime(sa[:12], "%Y%m%d%H%M")
+                b = dt.datetime.strptime(sb[:12], "%Y%m%d%H%M")
+                d = (a - b).total_seconds() / 86400.0   # 天为单位的小数(分钟级)
+                return round(d, 6)
+            a = dt.datetime.strptime(sa[:8], "%Y%m%d")
+            b = dt.datetime.strptime(sb[:8], "%Y%m%d")
             return (a - b).days
         except Exception:
             return None

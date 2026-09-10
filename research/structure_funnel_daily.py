@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""E1: Structure Engine 每日 Funnel artifact(第三轮深审)
-每日(或回补指定日)用完整链引擎(run_sequence_v2)扫描全市场抽样,
-输出每层 input/output/pass_rate/drop_reason —— 第三轮深审 E1 验收:
-'任何一天 BUY=0 都能解释' 在结构引擎层同样成立。
-输出: handover/structure_funnel_daily.json(滚动保留 30 天历史)。
+"""E1: Structure Engine 每日 Funnel artifact(第三轮深审) —— V3升级版
+V3 Phase B 要求: 每层不只记 count, 还要记【丢失候选的前向收益】—— 回答
+"系统在哪里杀掉了最多机会"(被杀的候选后来涨没涨)。
 层: universe → pool → sweep → reclaim → disp → shift → poi → retest(READY)
+每层额外: 丢失候选样本(下一层未通过的) 的 5D/10D 前向收益(决策点次日起)。
+输出: handover/structure_funnel_daily.json(滚动30天)。
 """
 import glob, io, json, os, sys, time
 from collections import defaultdict
@@ -24,7 +24,16 @@ RECENT_BARS = 30          # 只扫最近30根(每日增量)
 
 files = sorted(glob.glob(KL + os.sep + "*_daily_800.json"))[::SAMPLE_STRIDE]
 funnel = defaultdict(int)
+lost_ret = defaultdict(list)     # V3 Phase B: 各层丢失候选的前向收益(5D/10D)
 today = time.strftime("%Y%m%d")
+
+def fwd_ret(daily, i, days):
+    """决策点 i 的 days 日前向收益(次日起)。数据不足 → None。"""
+    n = len(daily)
+    if i + 1 + days >= n:
+        return None
+    base = daily[i + 1]["o"]
+    return round((daily[min(n - 1, i + 1 + days)]["c"] / base - 1) * 100, 3) if base else None
 
 for fp in files:
     try:
@@ -39,7 +48,6 @@ for fp in files:
     code = os.path.basename(fp).split("_")[0]
     n = len(daily)
     for i in range(max(150, n - RECENT_BARS), n):
-        # 只统计最近窗口; 每 bar 尝试完整链(诊断哪层断)
         try:
             m = run_sequence_v2(daily, i, symbol=code)
         except Exception:
@@ -47,20 +55,33 @@ for fp in files:
             continue
         funnel["bars_scanned"] += 1
         kinds = {e["event_type"] for e in m.events}
-        for layer, ev in (("L1_pool", "LIQUIDITY"), ("L2_sweep", "SWEEP"), ("L3_reclaim", "RECLAIM"),
-                          ("L4_disp", "DISPLACEMENT"), ("L5_shift", "SHIFT"), ("L6_poi", "POI"),
-                          ("L7_retest_ready", "RETEST")):
+        reached = ["LIQUIDITY", "SWEEP", "RECLAIM", "DISPLACEMENT", "SHIFT", "POI", "RETEST"]
+        deepest = 0
+        for li, ev in enumerate(reached):
             if ev in kinds:
-                funnel[layer] += 1
+                funnel[f"L{li+1}_{ev.lower()}"] += 1
+                deepest = li + 1
+        # V3 Phase B: 每个断层的丢失候选前向收益(到达层 Lk 但未到 Lk+1 的 bar)
+        for li in range(len(reached) - 1):
+            if deepest == li:      # 链停在 L(li+1), 丢失在下一层
+                r5, r10 = fwd_ret(daily, i, 5), fwd_ret(daily, i, 10)
+                if r5 is not None:
+                    lost_ret[f"L{li+2}_lost_fwd5"].append(r5)
+                if r10 is not None:
+                    lost_ret[f"L{li+2}_lost_fwd10"].append(r10)
         if m.rejected:
             funnel["reject_" + m.rejected[0]["why"]] += 1
 
-layers = ["universe", "bars_scanned", "L1_pool", "L2_sweep", "L3_reclaim", "L4_disp",
-          "L5_shift", "L6_poi", "L7_retest_ready"]
+layers = ["universe", "bars_scanned", "L1_liquidity", "L2_sweep", "L3_reclaim",
+          "L4_displacement", "L5_shift", "L6_poi", "L7_retest"]
 entry = {"generated_at": time.strftime("%Y-%m-%d %H:%M:%S"), "sample": len(files),
          "funnel": {k: funnel[k] for k in layers},
          "drop_reasons": {k: v for k, v in funnel.items() if k.startswith("reject_")},
-         "ready_per_day": funnel["L7_retest_ready"]}
+         "lost_candidate_forward_return": {                      # V3 Phase B
+             k: {"n": len(v), "avg": round(sum(v) / len(v), 3),
+                 "median": round(sorted(v)[len(v) // 2], 3), "pct_pos": round(len([x for x in v if x > 0]) / len(v) * 100, 1)}
+             for k, v in lost_ret.items() if v},
+         "ready_per_day": funnel["L7_retest"]}
 
 # 滚动历史(30天)
 hist = []
@@ -81,4 +102,7 @@ print(f"== 结构引擎每日 Funnel({len(files)}股抽样×{RECENT_BARS}bar) ==
 for k in layers:
     print(f"  {k:16s}: {funnel[k]}")
 print("  拒因:", dict(entry["drop_reasons"]))
-print(f"READY: {funnel['L7_retest_ready']} → 已写 {OUT}")
+print(f"READY: {funnel['L7_retest']} → 已写 {OUT}")
+print("丢失候选前向收益(V3 Phase B):")
+for k, v in entry.get("lost_candidate_forward_return", {}).items():
+    print(f"  {k}: n={v['n']} avg={v['avg']}% pos={v['pct_pos']}%")

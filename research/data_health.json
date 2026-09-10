@@ -1,5 +1,5 @@
 {
-  "ts": "2026-09-09 15:30:13",
+  "ts": "2026-09-10 15:30:12",
   "sources": {
     "sina": {
       "ok": true,
@@ -11,11 +11,11 @@
     },
     "eastmoney": {
       "ok": false,
-      "detail": "HTTP Error 502: Bad Gateway"
+      "detail": "Remote end closed connection without response"
     },
     "ths_fuyao": {
       "ok": false,
-      "detail": "HTTP Error 429: Too Many Requests"
+      "detail": "<urlopen error [SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] ssl/tls "
     },
     "netease": {
       "ok": false,

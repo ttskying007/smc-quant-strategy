@@ -1,0 +1,58 @@
+{
+  "window": "OOS 20250701+ 800股抽样",
+  "families": {
+    "A_full": {
+      "n": 830,
+      "avg": 1.612,
+      "wr": 55.3,
+      "pf": 1.48
+    },
+    "B_no_reclaim": {
+      "n": 773,
+      "avg": 1.634,
+      "wr": 55.4,
+      "pf": 1.51
+    },
+    "C_trunc": {
+      "n": 2606,
+      "avg": 0.196,
+      "wr": 47.2,
+      "pf": 1.05
+    },
+    "D_poi_only": {
+      "n": 60639,
+      "avg": 0.878,
+      "wr": 48.4,
+      "pf": 1.25
+    },
+    "E_reverse": {
+      "n": 86,
+      "avg": 2.229,
+      "wr": 53.5,
+      "pf": 1.8
+    }
+  },
+  "tests": {
+    "A_vs_B(收复RECLAIM独立信息)": {
+      "delta": 0.022,
+      "n_b": 773,
+      "verdict": "RECLAIM可简化"
+    },
+    "A_vs_C(后半结构必要性)": {
+      "delta": -1.416,
+      "n_c": 2606,
+      "verdict": "UNKNOWN(样本不足)"
+    },
+    "A_vs_D(流动性先导必要性)": {
+      "delta": -0.734,
+      "n_d": 60639,
+      "verdict": "UNKNOWN(样本不足)"
+    },
+    "A_vs_E(顺序信息量检验§74)": {
+      "delta": 0.617,
+      "n_e": 86,
+      "verdict": "UNKNOWN(样本不足)"
+    }
+  },
+  "runtime_s": 268
+}

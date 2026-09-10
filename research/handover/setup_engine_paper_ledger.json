@@ -10,8 +10,14 @@
       "invalid_price": 21.3885,
       "poi_type": "OB",
       "sequence": "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST",
-      "status": "OPEN",
-      "ret_pct": null
+      "status": "TIME",
+      "ret_pct": -1.29,
+      "filled_price": 22.02,
+      "fill_date": "20260908",
+      "exit_version": "setup_exit_v1",
+      "sl": 20.091,
+      "tp": 27.807,
+      "exit_reason": "TIME_STOP"
     },
     {
       "code": "000951",
@@ -23,8 +29,14 @@
       "invalid_price": 21.3885,
       "poi_type": "OB",
       "sequence": "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST",
-      "status": "OPEN",
-      "ret_pct": null
+      "status": "TIME",
+      "ret_pct": -1.2,
+      "filled_price": 22.0,
+      "fill_date": "20260909",
+      "exit_version": "setup_exit_v1",
+      "sl": 20.1006,
+      "tp": 27.6981,
+      "exit_reason": "TIME_STOP"
     },
     {
       "code": "000951",
@@ -37,7 +49,12 @@
       "poi_type": "OB",
       "sequence": "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST",
       "status": "OPEN",
-      "ret_pct": null
+      "ret_pct": null,
+      "filled_price": 22.43,
+      "fill_date": "20260910",
+      "exit_version": "setup_exit_v1",
+      "sl": 20.1521,
+      "tp": 29.2638
     },
     {
       "code": "300569",
@@ -129,16 +146,44 @@
       "sequence": "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST",
       "status": "OPEN",
       "ret_pct": null
+    },
+    {
+      "setup_id": "000951_20260910_OB_v1",
+      "engine_version": "setup_engine_v1",
+      "exit_version": "setup_exit_v1",
+      "code": "000951",
+      "date": "20260910",
+      "recorded_at": "2026-09-10 15:55:50",
+      "zone_low": 22.05,
+      "zone_high": 22.92,
+      "optimal_entry": 22.485,
+      "invalid_price": 21.3885,
+      "poi_type": "OB",
+      "sequence": "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST",
+      "family": "SMC_REVERSAL",
+      "order_type": "LIMIT_RETRACE",
+      "status": "OPEN",
+      "ret_pct": null,
+      "exit_reason": null
     }
   ],
   "days": 0,
   "summary": {
-    "total": 10,
-    "open": 10,
-    "closed": 0,
-    "avg_closed": null,
-    "pf_closed": null,
-    "days_accum": 1,
+    "ledger_type": "SAMPLED_PAPER",
+    "sampling": "[::10] 抽样监测, 每日3个决策窗",
+    "exit_version": "setup_exit_v1",
+    "engine_version": "setup_engine_v1",
+    "total": 11,
+    "open": 9,
+    "closed": 2,
+    "avg_closed": -1.245,
+    "pf_closed": 0.0,
+    "promotion_gates_preview": {
+      "G1_sample": false,
+      "G2_edge": false,
+      "G3_concentration": false
+    },
+    "days_accum": 2,
     "last_run": "20260910"
   }
 }

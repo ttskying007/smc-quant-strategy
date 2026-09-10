@@ -153,6 +153,8 @@ if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--refresh", action="store_true", help="扫描前刷新关键股票（持仓+事件）")
+    # FIX(2026-09-10, V3审计§十二): --production 此前未注册, getattr(args,"production",False) 永远 False → fail-closed 为死代码。补注册。
+    ap.add_argument("--production", action="store_true", help="生产模式: manifest/artifact fail-closed(缺失即硬失败)")
     args = ap.parse_args()
     if args.refresh:
         print("刷新关键股票（持仓+近期事件）...", flush=True)
