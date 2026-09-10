@@ -1,0 +1,17 @@
+{
+  "days": [
+    {
+      "d8": "20260910",
+      "e": 0.5584,
+      "f1": 0.0565,
+      "f2": -0.1409,
+      "f3": 0.0019,
+      "mid_proxy": "512100",
+      "mid_stale_days": 0,
+      "asof_stale": false,
+      "exposure_coef": 1.0,
+      "recorded_at": "2026-09-10 23:17:49"
+    }
+  ],
+  "version": "escore_v1"
+}

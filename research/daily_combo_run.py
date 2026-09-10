@@ -174,6 +174,12 @@ def _run_main_steps():
     # V4 第十轮审计: L2 被拒事件前向收益追踪(每日跑, 事件走完后自动积累对照)
     rc12 = run("v4_l2_reject_tracker.py", timeout=600)
     step_status["l2_reject_tracker"] = rc12
+    # V4 D1: E-score 前置——指数日线刷新(wdh/pull_index_daily, 权益 F2/F3 数据源)
+    rc13 = run(r"..\wdh\pull_index_daily.py", timeout=300)
+    step_status["index_refresh"] = rc13
+    # V4 D1: E-score 每日快照(SHADOW 双臂前置, 供 PAPER/组合层单源读取)
+    rc14 = run("escore_daily.py", timeout=900)
+    step_status["escore_daily"] = rc14
     # FIX(2026-08-22): 运行状态记录（每步成功/失败 + 数据日期 + 兜底标注）
     _data_date = ""
     try:
