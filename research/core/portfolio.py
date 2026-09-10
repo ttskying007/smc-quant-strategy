@@ -176,12 +176,14 @@ class DailyPortfolioEngine:
 
     def __init__(self, init_cash=1_000_000.0, fee_pct=0.2, slippage_pct=0.1,
                  max_total_exposure=0.8, max_single=0.25, max_daily_opens=5,
-                 kill_daily_loss=0.03):
+                 kill_daily_loss=0.03, max_sector=3, kill_days=2):
         self.init_cash = float(init_cash)
         self.cash = float(init_cash)
         self.fee = fee_pct / 100.0
         self.slip = slippage_pct / 100.0
         self.max_total_exposure = max_total_exposure
+        self.max_sector = max_sector            # V3-A P1-2: 行业集中度强制门
+        self.kill_days = kill_days             # V3-A P0-3: kill 持续【交易日】数
         self.max_single = max_single
         self.max_daily_opens = max_daily_opens
         self.kill_daily_loss = kill_daily_loss
@@ -191,7 +193,10 @@ class DailyPortfolioEngine:
         self.daily_pnl = []         # 每日已实现+未实现盈亏记录
         self.equity_hist = []       # (date, equity)
         self.trade_log = []         # 已平仓 [{code, ret, hold_days, reason, day}]
-        self.kill_until = None      # 杀开关截止日
+        self.kill_until = None      # 兼容字段(已由 kill_trading_days 替代, 见 on_day ④)
+        self.kill_trading_days = 0  # V3-A P0-3: 剩余禁开仓【交易日】数
+        self.kill_events = []       # kill 触发记录
+        self.cancelled_orders = []  # V3-A P1-3: TTL 过期撤单记录
         self.day_pnl = 0.0
 
     # ---- 工具 ----
@@ -215,22 +220,25 @@ class DailyPortfolioEngine:
         """一个交易日的完整推进。market: {code: {o,h,l,c, limit_up(可选bool),
         limit_down(可选bool), suspended(可选bool)}}。sector_of: {code: 板块}。"""
         self.day_pnl = 0.0
+        # V3-A P0-3: day_pnl 改为【权益日差异】(含未实现) —— 旧实现只累计平仓盈亏,
+        # 持仓暴跌(未平仓)不触发 kill switch 的语义漏洞修复
+        _eq_prev = self.equity_hist[-1][1] if self.equity_hist else self.init_cash
         # ① 持仓退出(T+1: buy_day==d8 不可卖)
         for code in list(self.positions.keys()):
             p = self.positions[code]
             m = market.get(code)
             if not m or m.get("suspended"):
-                p["bars_held"] += 1
-                continue
+                continue          # 停牌日不计持有(P0-2: 只数可交易日)
             sellable = p["buy_day"] != d8
             if not sellable:
-                p["bars_held"] += 1
+                # T+1: 买入日 bars_held 保持 0(当日不计入持有交易日 —— P0-2 对齐)
                 continue
+            # 可卖日: bars_held+1 在【退出检查前】完成 —— 第N个持有日检查N>=bars_max
+            p["bars_held"] += 1
             px_exit = None
             reason = None
-            # 跌停不能卖
+            # 跌停不能卖(仍计持有日)
             if m.get("limit_down"):
-                p["bars_held"] += 1
                 continue
             if m["l"] <= p["sl"]:
                 px_exit = min(m["o"], p["sl"])   # 跳空低开按开盘
@@ -241,6 +249,9 @@ class DailyPortfolioEngine:
                 px_exit = px_exit * (1 - self.slip)
                 reason = "TP"
             elif p["bars_held"] >= p.get("bars_max", 15):
+                # V3-A P0-2 off-by-one 修复: bars_held 语义 = 已完整持有的交易日数
+                # (fill 日=0, 次日=1...); bars_max=15 → 第 15 个持有日收盘退出,
+                # 与 core.setup_exit(fi+max_bars) 黄金一致(黄金测试锁死)。
                 px_exit = m["c"] * (1 - self.slip)
                 reason = "TIME"
             if px_exit is not None:
@@ -254,8 +265,6 @@ class DailyPortfolioEngine:
                                        "pnl_cash": round(gross - fee - p["cost"], 2),
                                        "hold_days": p["bars_held"]})
                 del self.positions[code]
-            else:
-                p["bars_held"] += 1
         # ② 挂单撮合(先到价先成; 涨停拒买/停牌跳过)
         filled_today = []
         for o in list(self.orders):
@@ -267,48 +276,81 @@ class DailyPortfolioEngine:
             if code in self.positions:
                 continue
             m = market.get(code)
-            if not m or m.get("suspended") or m.get("limit_up"):
+            if not m or m.get("suspended"):
                 continue
-            # 限价触价: 当日 low <= entry_limit(或开盘低于限价按开盘)
-            # fill_or_open=True: 当日未触价 → 开盘兜底成交(事件腿回测语义: 信号日
-            # low≤0.99x→限价成, 否则当日 open 成); False: 纯限价, 未触价次日再试
-            if m["l"] <= o["entry_limit"] or o.get("fill_or_open"):
-                px = min(m["o"], o["entry_limit"]) * (1 + self.slip)
-                # 风控准入(总暴露/单票/日开仓数)
-                equity = self._equity(market)
-                pos_pct = float(o.get("position_pct") or 0)
-                cur_exposure = 1 - (self.cash / equity) if equity else 0
-                if self.kill_until and d8 <= self.kill_until:
-                    continue
-                if cur_exposure + pos_pct > self.max_total_exposure:
-                    continue
-                if len(filled_today) >= self.max_daily_opens:
-                    break
-                shares = int(equity * pos_pct / px)
-                # 容量上限: cap_shares 截断(成交量参与率约束)
-                cap_sh = o.get("cap_shares")
-                if cap_sh is not None:
-                    shares = min(shares, int(cap_sh))
-                cost = shares * px
-                fee = cost * self.fee
-                if shares <= 0 or cost + fee > self.cash:
-                    continue
-                self.cash -= cost + fee
-                self.positions[code] = {"entry_px": px, "shares": shares,
-                                        "sl": o.get("sl"), "tp": o.get("tp"),
-                                        "bars_max": o.get("bars_max", 15),
-                                        "bars_held": 0, "buy_day": d8,
-                                        "cost": cost + fee}
-                filled_today.append(code)
+            # P1-3 订单 TTL: max_pending_days(默认5, 可交易日)过期撤单 —— Setup 只在
+            # 自己有效窗口内有效, 禁止"一个月前的信号还在等触价"。
+            # 计数法(不依赖日历): 订单自带 _pend_days, 每个可交易日 +1, 超 TTL 撤。
+            mpd = int(o.get("max_pending_days") or 5)
+            o["_pend_days"] = int(o.get("_pend_days", 0)) + 1
+            if o["_pend_days"] > mpd:
+                self.cancelled_orders.append({"code": code, "day": d8,
+                                              "reason": "TTL_EXPIRED",
+                                              "pending_days": o["_pend_days"]})
                 self.orders.remove(o)
+                continue
+            if m.get("limit_up"):
+                continue
+            # 限价撮合 —— V3-A 执行语义锁死(第五轮审计 P0-1):
+            # 触价: low <= entry_limit → 成交价 = min(open, entry_limit)(开盘更优按开盘)
+            # fill_or_open=True 且未触价: 按【开盘价】成交(不是 entry_limit! 旧实现
+            #   min(m['o'], entry_limit) 在 open>limit 且全天未触价时会伪造 limit 价成交
+            #   —— 回测执行幻觉, 本轮修复)
+            # 未触价且无 fill_or_open: 挂单继续等待(TTL 见 o['max_pending_days'])
+            touched = m["l"] <= o["entry_limit"]
+            if touched:
+                px = min(m["o"], o["entry_limit"]) * (1 + self.slip)
+            elif o.get("fill_or_open"):
+                px = m["o"] * (1 + self.slip)          # 开盘兜底 = 真实开盘价
+            else:
+                continue                               # 未触价: 不成交(限价语义)
+            # ---- 以下仅在确定成交价 px 后执行(风控准入) ----
+            # P1-2 行业集中度强制门: sector_of 提供时, 单行业持仓 >= max_sector 拒新开仓
+            if sector_of:
+                sec = sector_of.get(code)
+                if sec is not None:
+                    held_secs = [sector_of.get(c) for c in self.positions]
+                    if held_secs.count(sec) >= self.max_sector:
+                        continue
+            # P0-3 kill switch: 交易日推进(非自然日) —— 剩余禁开仓交易日 > 0 即拒
+            if self.kill_trading_days > 0:
+                continue
+            equity = self._equity(market)
+            pos_pct = float(o.get("position_pct") or 0)
+            cur_exposure = 1 - (self.cash / equity) if equity else 0
+            if cur_exposure + pos_pct > self.max_total_exposure:
+                continue
+            if len(filled_today) >= self.max_daily_opens:
+                break
+            shares = int(equity * pos_pct / px)
+            # 容量上限: cap_shares 截断(成交量参与率约束)
+            cap_sh = o.get("cap_shares")
+            if cap_sh is not None:
+                shares = min(shares, int(cap_sh))
+            cost = shares * px
+            fee = cost * self.fee
+            if shares <= 0 or cost + fee > self.cash:
+                continue
+            self.cash -= cost + fee
+            self.positions[code] = {"entry_px": px, "shares": shares,
+                                    "sl": o.get("sl"), "tp": o.get("tp"),
+                                    "bars_max": o.get("bars_max", 15),
+                                    "bars_held": 0, "buy_day": d8,
+                                    "cost": cost + fee}
+            filled_today.append(code)
+            self.orders.remove(o)
         # ③ 当日权益记录
         eq = self._equity(market)
+        self.day_pnl = eq - _eq_prev                     # 权益日差异(含未实现)
         self.equity_hist.append((d8, round(eq, 2)))
         self.daily_pnl.append({"day": d8, "pnl": self.day_pnl, "equity": round(eq, 2)})
-        # ④ 杀开关: 单日亏损超限 → 次日起停止开仓 2 日
+        # ④ 杀开关 —— V3-A P0-3: 交易日推进(非自然日)。
+        #   触发日 → 之后 self.kill_days(默认2)个【交易日】禁开仓, 逐日递减。
+        if self.kill_trading_days > 0:
+            self.kill_trading_days -= 1
         if self.day_pnl / max(eq, 1e-9) <= -self.kill_daily_loss:
-            self.kill_until = d8  # 次日比较用 <= 会在下一日继续触发; 简化: 当日起 2 日内禁开仓
-            self.kill_until = str(int(d8) + 2)  # 粗粒度(自然日+2), 交易日历由调用方给
+            self.kill_trading_days = self.kill_days    # e.g. 2 → 接下来2个交易日
+            self.kill_events.append({"day": d8, "day_pnl": round(self.day_pnl, 2)})
         return eq
 
     # ---- 结果 ----

@@ -189,7 +189,11 @@
       "order_type": "LIMIT_RETRACE",
       "status": "OPEN",
       "ret_pct": null,
-      "exit_reason": null
+      "exit_reason": null,
+      "filled_price": 4.72,
+      "fill_date": "20260910",
+      "sl": 4.2948,
+      "tp": 5.9956
     }
   ],
   "days": 0,
@@ -209,11 +213,11 @@
       "G3_concentration": false,
       "G4_backtest_consistency": false,
       "G5_fill_deviation": null,
-      "G6_drawdown": true,
+      "G6_trade_sequence_drawdown_proxy": true,
       "G7_persistence": false
     },
     "gate_notes": "G5 执行偏差需 paper/backtest 逐笔配对 fill_dev_pct 字段(PHASE E 采集); 其余六门已可计算。全部通过才可评估 MICRO REAL。",
-    "days_accum": 3,
+    "days_accum": 4,
     "last_run": "20260910"
   }
 }

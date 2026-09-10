@@ -147,13 +147,15 @@ if _have_fill_dev:
     gates["G5_fill_deviation"] = (sum(_devs) / len(_devs)) < 1.0
 else:
     gates["G5_fill_deviation"] = None          # 未采集 → 如实标 None(不假装通过)
-# G6 回撤: closed 累计权益 MDD 不超 OOS 回测 MDD(-22.2pt 折算按占比) —— 阈值 OOS mdd_pct 保守值
+# G6 回撤: closed 序列 drawdown proxy(V3-A 命名诚实化: 非组合级 mark-to-market MDD;
+#   真组合 MDD 由 DailyPortfolioEngine.equity_hist 提供, Phase E Setup→Portfolio 合并后启用)
 _eq, _pk, _mdd = 0.0, 0.0, 0.0
 for s in sorted(closed, key=lambda x: x.get("fill_date") or x["date"]):
     _eq += s["ret_pct"]
     _pk = max(_pk, _eq)
     _mdd = min(_mdd, _eq - _pk)
-gates["G6_drawdown"] = (_mdd > -25.0) if closed else False    # 预注册: |MDD|≤25pt
+gates["G6_trade_sequence_drawdown_proxy"] = (_mdd > -25.0) if closed else False   # 预注册 |MDD|≤25pt
+gates.pop("G6_drawdown", None)
 # G7 持续性: 30 closed 只是最低门槛; days>=20 交易日且目标 60~100 closed
 _days = led.get("summary", {}).get("days_accum", 0)
 gates["G7_persistence"] = len(closed) >= 30 and _days >= 20

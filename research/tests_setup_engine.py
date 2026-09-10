@@ -65,7 +65,9 @@ for k in range(97, 102):
 setup = build_setup(daily, len(daily) - 1, "TEST01")
 if setup:
     ok("Setup 生成", setup is not None)
-    ok("setup_id 稳定键", setup["setup_id"].startswith("TEST01_20260101") or "_" in setup["setup_id"], setup["setup_id"])
+    ok("setup_id 稳定键", setup["setup_id"].startswith("SU-") and len(setup["setup_id"]) == 15
+       and setup.get("setup_id_legacy", "").startswith("TEST01"), setup["setup_id"])
+    ok("setup_id 幂等(同输入同hash)", build_setup(daily, len(daily) - 1, "TEST01")["setup_id"] == setup["setup_id"])
     ok("双版本标记", setup["engine_version"] == ENGINE_VERSION and setup["exit_version"] == EXIT_VERSION)
     ok("family 默认", setup["family"] == "SMC_REVERSAL")
     v, why = validate_setup(setup)

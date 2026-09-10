@@ -32,11 +32,21 @@ def build_setup(daily, i, code, family="SMC_REVERSAL"):
     poi = s["poi"]
     d8 = str(daily[i]["t"])[:8]
     seq_sig = s["sequence"]
-    # setup_id: 稳定键 = code+date+poi type(幂等, 重放同键)
-    setup_id = f"{code}_{d8}_{poi['type']}_v1"
+    # V3-A P1(第五轮审计§十一): setup_id 粒度升级 —— code+date+poi_type 在同日
+    # 双 sequence/双 pool/双 POI 时会碰撞。改 hash(symbol+decision_ts+sequence+
+    # swept_pool+poi几何+engine_version) 前 12 位; 保留旧字段 setup_id_legacy
+    # (兼容历史台账)。事件粒度不丢失: 不同链→不同 id。
+    import hashlib as _hl
+    _key = "|".join([str(code), d8, seq_sig,
+                     str(round(s.get("swept_pool", {}).get("price", 0), 4)),
+                     str(round(poi["low"], 4)), str(round(poi["high"], 4)),
+                     ENGINE_VERSION])
+    setup_id = "SU-" + _hl.md5(_key.encode("utf-8")).hexdigest()[:12]
+    setup_id_legacy = f"{code}_{d8}_{poi['type']}_v1"
     # 3R 结构位与 SL 由 setup_exit 统一计算口径(此处先给决策时点已知的字段)
     return {
         "setup_id": setup_id,
+        "setup_id_legacy": setup_id_legacy,     # P1: 旧格式保留(台账迁移期双写)
         "engine_version": ENGINE_VERSION,
         "exit_version": EXIT_VERSION,
         "symbol": code, "signal_date": d8, "decision_idx": i,
@@ -48,7 +58,11 @@ def build_setup(daily, i, code, family="SMC_REVERSAL"):
         "zone": {"low": poi["low"], "high": poi["high"], "optimal": poi["mid"]},
         "entry_limit": round(poi["mid"], 4),          # 挂单价=POI 中值(研究起点)
         "order_type": "LIMIT_RETRACE",                # A5: 严格限价, 未触价 PENDING
-        "valid_from": d8,                              # 次日撮合由消费方推进
+        # V3-A P1(§十二): 时间语义显式化 —— signal_at=信号日; eligible_at=最早可撮合日
+        # (A股 T+1 语义: 次日); expires_at=有效期(setup_exit 窗口); 废弃模糊的 valid_from
+        "signal_at": d8,
+        "eligible_at": d8,                             # 研究回测: 决策日即可试撮(次日撮合由消费方)
+        "valid_from": d8,                              # 兼容字段(=signal_at, 勿再新增语义)
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
 
