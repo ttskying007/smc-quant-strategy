@@ -1,0 +1,43 @@
+{
+  "window": "OOS 20250701+ 全市场[::2][:2000] 与FamilyDB同universe",
+  "A_full": {
+    "n": 2201,
+    "avg": 1.409,
+    "wr": 50.7,
+    "pf": 1.39,
+    "mfe_mae": {
+      "mfe": 9.51,
+      "mae": -7.83
+    },
+    "oos_ci": [
+      0.92,
+      1.901
+    ]
+  },
+  "E_rev2": {
+    "n": 67540,
+    "avg": 0.678,
+    "wr": 46.9,
+    "pf": 1.2,
+    "mfe_mae": {
+      "mfe": 8.46,
+      "mae": -7.42
+    },
+    "oos_ci": [
+      0.603,
+      0.754
+    ],
+    "avg_discount_pct_at_fill": 0.066,
+    "n_discount": 67540
+  },
+  "delta_E_rev2_minus_A_full": -0.731,
+  "preregistered": {
+    "R1_样本充足(n>=300)": true,
+    "R2_折价深(>1.5%)且MAE更小": false,
+    "R3_Δavg>0.5pp(晚扫优)": false,
+    "R3_中性(|Δ|<0.5)": false,
+    "R3_晚扫劣(<-0.5)": true
+  },
+  "mechanism": "晚扫=sweep-into-POI(inducement): 更深折价入场假设",
+  "runtime_s": 4944
+}

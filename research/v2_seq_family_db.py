@@ -229,7 +229,8 @@ tests = {
                     else ("顺序不携带信息" if delta(a, e) is not None and abs(delta(a, e)) < 0.5 and e["n"] >= 30
                           else "UNKNOWN(样本不足)"))},
 }
-out = {"window": f"OOS {OOS}+ 800股抽样", "families": S, "tests": tests,
+out = {"window": f"OOS {OOS}+ 全市场[::2][:{len(FILES)}](实际{len(FILES)}股) 与V4同universe",
+       "families": S, "tests": tests,
        "runtime_s": round(time.time() - t0)}
 for v, s in S.items():
     print(f"  {v:14s}: {s}")
