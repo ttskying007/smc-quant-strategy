@@ -1,0 +1,70 @@
+{
+  "results": [
+    {
+      "name": "C1 paper_sim→core.execution.try_fill",
+      "status": "PASS",
+      "detail": "line ~940"
+    },
+    {
+      "name": "C2 paper_sim→core.execution.try_exit",
+      "status": "PASS",
+      "detail": "line ~1038"
+    },
+    {
+      "name": "C3 paper_sim→core.events.classify_title_detailed",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "C4 paper_sim→core.structure(消除重复)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "C5 scanner→wdh_engine.build_seeds",
+      "status": "TO_UNIFY",
+      "detail": "旧语义入口(§十一); PAPER 七道门通过后切换 core.setup_engine"
+    },
+    {
+      "name": "C6 scanner→paper_sim.stage_and_deep",
+      "status": "TO_UNIFY",
+      "detail": "跨文件依赖; 统一后 stage=Context Feature 仅入 setup 元数据"
+    },
+    {
+      "name": "C7 scanner --production fail-closed 可达",
+      "status": "PASS",
+      "detail": "V3修复: 参数已注册"
+    },
+    {
+      "name": "C8 涨跌停→core(板块规则)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "C9 paper_sim 每日入口(--select/--monitor)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "C10 PAPER→core.setup_exit(单源退出)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "C11 PAPER→core.setup_engine(统一Setup)",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "summary": {
+    "checked": 11,
+    "pass": 9,
+    "to_unify": 2,
+    "to_unify_items": [
+      "C5 scanner→wdh_engine.build_seeds",
+      "C6 scanner→paper_sim.stage_and_deep"
+    ],
+    "generated_at": "2026-09-10 16:11:19",
+    "note": "C5/C6=V3§十一已确认的旧语义分叉; 切换条件=PAPER七道门通过(冻结), 不提前动生产"
+  }
+}

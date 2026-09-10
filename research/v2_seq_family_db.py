@@ -33,7 +33,7 @@ OOS = "20250701"
 FEE = 0.2
 POOL_MIN, DISP_MIN, RETEST_BARS = 40, 50, 8
 
-FILES = sorted(glob.glob(KL + os.sep + "*_daily_800.json"))[::5][:800]
+FILES = sorted(glob.glob(KL + os.sep + "*_daily_800.json"))[::2][:2000]   # 全市场2/3抽样(F7验收线需分年份样本; 800股首跑的E n=86不够)
 
 def variants_at(daily, i):
     """决策点 i 的五变体判定。返回 {variant: setup_dict or None}(setup 含 poi/invalid)。"""
