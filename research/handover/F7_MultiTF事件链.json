@@ -1,18 +1,19 @@
 {
-  "window": "2026-04→2026-05(60m/15m 重叠窗, 仅2个月)",
-  "d1_ready": 347,
-  "m60_confirmed": 6,
+  "window": "2026-03→2026-09(60m 扩窗后 ~5 个月, 2026-09-12 重跑)",
+  "d1_ready": 2333,
+  "m60_confirmed": 72,
   "armA_d1_only": {
-    "n": 75,
-    "avg": -2.213,
-    "pf": 0.69
+    "n": 645,
+    "avg": 0.341,
+    "pf": 1.06
   },
   "armB_mtf_confirmed": {
-    "n": 6,
-    "avg": -5.271,
-    "pf": 0.38
+    "n": 72,
+    "avg": 6.78,
+    "pf": 2.72
   },
-  "delta_avg_pp": -3.058,
-  "verdict": "数据窗不足/差异不显著 —— 结论: 待更长缓存(诚实未知)",
-  "runtime_s": 54
+  "delta_avg_pp": 6.439,
+  "acceptance_n": "PRELIMINARY(30-100)",
+  "verdict": "MTF 链携带增量信息",
+  "runtime_s": 281
 }

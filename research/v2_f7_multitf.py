@@ -2,9 +2,9 @@
 """F7 / V2 ITERATION 4: Multi-TF Parent/Child 事件链实验(数据可行性受限版)
 蓝图 §23-26: Multi-TF 从"条件"升级为"角色": HTF=Context / MTF=Structure / LTF=Setup。
 
-数据现实(诚实声明): 60m 缓存覆盖 2025-11→2026-05(500根), 15m 覆盖 2026-04→2026-07。
-D1/60m/15m 三层重叠窗 = 2026-04→2026-05 仅 2 个月 —— 无法做跨年 WF, 只能做
-重叠窗内的 Parent/Child 链可行性验证 + D1-only 对照。
+数据现实(2026-09-12 更新): 60m 缓存已扩至 2026-03-09→2026-09-04(9119 文件, 持续更新中)。
+D1/60m 重叠窗 = 2026-03→2026-09 ~5 个月(原 2 个月); 15m 仍至 2026-07。
+验收线(冻结): n<30 UNKNOWN / 30-100 PRELIMINARY / ≥100 VALIDATION / ≥200 STRONG。
 
 实验设计(单一假设, 预注册):
   假设: D1 决策点的 READY 信号, 若同日 60m 图上有"收复完成"(子链 RECLAIMED 以上),
@@ -49,7 +49,7 @@ def load15(code):
                      "c": float(b["c"]), "v": float(b.get("v") or 0)} for b in raw]
     return None
 
-files = sorted(glob.glob(D1_KL + os.sep + "*_daily_800.json"))[::5][:400]
+files = sorted(glob.glob(D1_KL + os.sep + "*_daily_800.json"))[::2][:2000]   # 60m 覆盖广→扩样本([::5][:400]→[::2][:2000])
 armA, armB = [], []
 n_ready = n_conf = 0
 t0 = time.time()
@@ -123,9 +123,12 @@ delta = round(sB.get("avg", 0) - sA.get("avg", 0), 3) if sB.get("avg") is not No
 verdict = ("MTF 链携带增量信息" if delta is not None and delta >= 1.0 and sB.get("n", 0) >= 30
            else ("MTF 链反向(需警惕)" if delta is not None and delta <= -1.0 and sB.get("n", 0) >= 30
                  else "数据窗不足/差异不显著 —— 结论: 待更长缓存(诚实未知)"))
-out = {"window": "2026-04→2026-05(60m/15m 重叠窗, 仅2个月)",
+out = {"window": "2026-03→2026-09(60m 扩窗后 ~5 个月, 2026-09-12 重跑)",
        "d1_ready": n_ready, "m60_confirmed": n_conf,
        "armA_d1_only": sA, "armB_mtf_confirmed": sB, "delta_avg_pp": delta,
+       "acceptance_n": ("UNKNOWN(<30)" if (sB.get("n") or 0) < 30 else
+                        "PRELIMINARY(30-100)" if (sB.get("n") or 0) < 100 else
+                        "VALIDATION(100-200)" if (sB.get("n") or 0) < 200 else "STRONG(≥200)"),
        "verdict": verdict, "runtime_s": round(time.time() - t0)}
 print(f"D1 READY: {n_ready}  60m 确认: {n_conf}")
 print(f"臂A(D1-only): {sA}")
