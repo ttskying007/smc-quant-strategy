@@ -777,7 +777,9 @@
       "asof_stale": false,
       "exposure_coef": 0.75,
       "recorded_at": "2026-09-11 11:00:51",
-      "backfilled": true
+      "backfilled": true,
+      "f1_coverage": 0.993,
+      "asof_note": "mid_stale_days=1 是 fqkline 501 窗口的正确表现: 主链指数文件更新于 09-10 23:17(含 0910 收盘), 0911 盘前决策用最近可得收盘=0910(无未来函数); stale 检测捕获并降 coef 0.75 —— 机制按设计工作"
     }
   ],
   "version": "escore_v1"
