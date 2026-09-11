@@ -1,0 +1,30 @@
+{
+  "low": {
+    "filled_n": 1582,
+    "filled_avg": -0.574,
+    "chase_n": 6252,
+    "chase_avg": 0.754
+  },
+  "mid": {
+    "filled_n": 1819,
+    "filled_avg": 4.804,
+    "chase_n": 6337,
+    "chase_avg": 3.39
+  },
+  "high": {
+    "filled_n": 1568,
+    "filled_avg": 3.856,
+    "chase_n": 7446,
+    "chase_avg": 3.734
+  },
+  "_preregistered": {
+    "N2_high档逆向选择更强(high gap < mid gap − 1pp)": true,
+    "N3_差距各档相近(逆向选择非主因)": false,
+    "gaps_filled_minus_chase": {
+      "low": -1.328,
+      "mid": 1.414,
+      "high": 0.122
+    },
+    "note": "gap=成交avg−追买avg; high 的 gap 若显著小于 mid → high 幸存成交的逆向选择确证"
+  }
+}
