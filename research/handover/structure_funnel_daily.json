@@ -1,75 +1,75 @@
 {
   "latest": {
-    "generated_at": "2026-09-10 15:50:56",
+    "generated_at": "2026-09-11 19:02:38",
     "sample": 467,
     "funnel": {
       "universe": 465,
       "bars_scanned": 13950,
       "L1_liquidity": 13950,
-      "L2_sweep": 1644,
-      "L3_reclaim": 304,
-      "L4_displacement": 240,
-      "L5_shift": 213,
-      "L6_poi": 213,
-      "L7_retest": 178
+      "L2_sweep": 1596,
+      "L3_reclaim": 276,
+      "L4_displacement": 218,
+      "L5_shift": 190,
+      "L6_poi": 190,
+      "L7_retest": 159
     },
     "drop_reasons": {
-      "reject_BREAK_DOWN_BEFORE_SWEEP": 9847,
-      "reject_BREAK_AFTER_SWEEP": 634,
+      "reject_BREAK_DOWN_BEFORE_SWEEP": 9774,
+      "reject_BREAK_AFTER_SWEEP": 608,
       "reject_INVALIDATED_BEFORE_RETEST": 6,
-      "reject_NO_RETEST_IN_WINDOW": 29
+      "reject_NO_RETEST_IN_WINDOW": 25
     },
     "lost_candidate_forward_return": {
       "L3_lost_fwd5": {
-        "n": 9760,
-        "avg": 1.913,
-        "median": 1.102,
-        "pct_pos": 58.8
+        "n": 9811,
+        "avg": 0.935,
+        "median": 0.413,
+        "pct_pos": 53.2
       },
       "L3_lost_fwd10": {
-        "n": 7727,
-        "avg": 2.535,
-        "median": 1.554,
-        "pct_pos": 58.8
+        "n": 7747,
+        "avg": 1.332,
+        "median": 0.659,
+        "pct_pos": 54.1
       },
       "L4_lost_fwd5": {
-        "n": 1131,
-        "avg": 1.127,
-        "median": 0.288,
-        "pct_pos": 51.6
+        "n": 1108,
+        "avg": 0.084,
+        "median": -0.355,
+        "pct_pos": 46.7
       },
       "L5_lost_fwd5": {
-        "n": 56,
-        "avg": 2.653,
-        "median": 1.14,
-        "pct_pos": 53.6
+        "n": 52,
+        "avg": 0.882,
+        "median": 1.1,
+        "pct_pos": 53.8
       },
       "L5_lost_fwd10": {
-        "n": 49,
-        "avg": 2.087,
-        "median": 1.204,
-        "pct_pos": 55.1
+        "n": 48,
+        "avg": 0.834,
+        "median": 1.249,
+        "pct_pos": 60.4
       },
       "L4_lost_fwd10": {
-        "n": 878,
-        "avg": 1.787,
-        "median": 0.075,
-        "pct_pos": 50.2
+        "n": 879,
+        "avg": 0.173,
+        "median": -0.409,
+        "pct_pos": 45.6
       },
       "L6_lost_fwd5": {
-        "n": 25,
-        "avg": 2.905,
+        "n": 22,
+        "avg": 2.798,
         "median": 2.251,
-        "pct_pos": 60.0
+        "pct_pos": 54.5
       },
       "L6_lost_fwd10": {
-        "n": 24,
-        "avg": 1.489,
-        "median": 0.797,
-        "pct_pos": 50.0
+        "n": 21,
+        "avg": 1.273,
+        "median": -2.315,
+        "pct_pos": 42.9
       }
     },
-    "ready_per_day": 178
+    "ready_per_day": 159
   },
   "history": [
     {
@@ -143,6 +143,78 @@
         }
       },
       "ready_per_day": 178
+    },
+    {
+      "generated_at": "2026-09-11 19:02:38",
+      "sample": 467,
+      "funnel": {
+        "universe": 465,
+        "bars_scanned": 13950,
+        "L1_liquidity": 13950,
+        "L2_sweep": 1596,
+        "L3_reclaim": 276,
+        "L4_displacement": 218,
+        "L5_shift": 190,
+        "L6_poi": 190,
+        "L7_retest": 159
+      },
+      "drop_reasons": {
+        "reject_BREAK_DOWN_BEFORE_SWEEP": 9774,
+        "reject_BREAK_AFTER_SWEEP": 608,
+        "reject_INVALIDATED_BEFORE_RETEST": 6,
+        "reject_NO_RETEST_IN_WINDOW": 25
+      },
+      "lost_candidate_forward_return": {
+        "L3_lost_fwd5": {
+          "n": 9811,
+          "avg": 0.935,
+          "median": 0.413,
+          "pct_pos": 53.2
+        },
+        "L3_lost_fwd10": {
+          "n": 7747,
+          "avg": 1.332,
+          "median": 0.659,
+          "pct_pos": 54.1
+        },
+        "L4_lost_fwd5": {
+          "n": 1108,
+          "avg": 0.084,
+          "median": -0.355,
+          "pct_pos": 46.7
+        },
+        "L5_lost_fwd5": {
+          "n": 52,
+          "avg": 0.882,
+          "median": 1.1,
+          "pct_pos": 53.8
+        },
+        "L5_lost_fwd10": {
+          "n": 48,
+          "avg": 0.834,
+          "median": 1.249,
+          "pct_pos": 60.4
+        },
+        "L4_lost_fwd10": {
+          "n": 879,
+          "avg": 0.173,
+          "median": -0.409,
+          "pct_pos": 45.6
+        },
+        "L6_lost_fwd5": {
+          "n": 22,
+          "avg": 2.798,
+          "median": 2.251,
+          "pct_pos": 54.5
+        },
+        "L6_lost_fwd10": {
+          "n": 21,
+          "avg": 1.273,
+          "median": -2.315,
+          "pct_pos": 42.9
+        }
+      },
+      "ready_per_day": 159
     }
   ]
 }

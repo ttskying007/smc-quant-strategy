@@ -20,7 +20,7 @@ if not os.path.exists(SRC):
     print("无 selection_result.json, 跳过")
     sys.exit(0)
 sr = json.load(open(SRC, encoding="utf-8"))
-gen_day = str(sr.get("generated_at") or sr.get("date") or time.strftime("%Y%m%d"))[:10].replace("-", "")
+gen_day = str(sr.get("generated_at") or sr.get("selected_at") or time.strftime("%Y%m%d"))[:10].replace("-", "")
 
 # ① 当日全部候选: 通过(days/new_orders) + 被拒(skipped_detail)
 ledger = {"rejects": [], "summary": {}}
@@ -33,7 +33,9 @@ seen = {(r.get("code"), r.get("date")) for r in ledger.get("rejects", [])}
 n_new = 0
 for r in (sr.get("skipped_detail") or []):
     code = str(r.get("symbol") or r.get("code") or "").split(".")[0]
-    d8 = str(r.get("date") or r.get("signal_date") or gen_day)[:8].replace("-", "")
+    # 日期规范化: "2026-09-10"→"20260910"; "2026-09-10 00:00:00"/"20260910" 均兼容
+    _d = str(r.get("date") or r.get("signal_date") or gen_day)
+    d8 = _d[:10].replace("-", "").replace("/", "")[:8]
     reason = str(r.get("reason") or r.get("skip_reason") or "?")[:60]
     if not code or (code, d8) in seen:
         continue

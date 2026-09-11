@@ -1,5 +1,5 @@
 {
-  "ts": "2026-09-10 15:30:12",
+  "ts": "2026-09-11 15:30:23",
   "sources": {
     "sina": {
       "ok": true,
@@ -11,18 +11,20 @@
     },
     "eastmoney": {
       "ok": false,
-      "detail": "Remote end closed connection without response"
+      "detail": "HTTP Error 502: Bad Gateway"
     },
     "ths_fuyao": {
       "ok": false,
-      "detail": "<urlopen error [SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] ssl/tls "
+      "detail": "HTTP Error 429: Too Many Requests"
     },
     "netease": {
       "ok": false,
-      "detail": "<urlopen error [SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] ssl/tls "
+      "detail": "<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occur"
     }
   },
-  "coverage": 97.8,
-  "latest": "20260908",
-  "alerts": []
+  "coverage": 39.5,
+  "latest": "20260910",
+  "alerts": [
+    "数据覆盖率低 39.5%"
+  ]
 }

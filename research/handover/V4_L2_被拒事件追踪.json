@@ -16,14 +16,6 @@
     }
   },
   "rejected_by_reason": {
-    "阶段=UPTREND(非ACCUM/DOWNTREND)": {
-      "fwd5": {
-        "n": 0
-      },
-      "fwd10": {
-        "n": 0
-      }
-    },
     "无K线数据": {
       "fwd5": {
         "n": 0
