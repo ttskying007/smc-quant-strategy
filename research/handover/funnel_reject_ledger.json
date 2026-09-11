@@ -172,17 +172,17 @@
       "code": "300925",
       "date": "20260904",
       "reason": "ADX=5.777777777777741<20",
-      "fwd5": null,
+      "fwd5": -7.26,
       "fwd10": null,
-      "filled": false
+      "filled": true
     },
     {
       "code": "688602",
       "date": "20260904",
       "reason": "ADX=5.454545454545418<20",
-      "fwd5": null,
+      "fwd5": -1.31,
       "fwd10": null,
-      "filled": false
+      "filled": true
     },
     {
       "code": "600905",
@@ -193,6 +193,17 @@
       "filled": false
     }
   ],
-  "summary": {},
+  "summary": {
+    "ADX=5.777777777777741<20": {
+      "n": 1,
+      "avg_fwd5": -7.26,
+      "avg_fwd10": null
+    },
+    "ADX=5.454545454545418<20": {
+      "n": 1,
+      "avg_fwd5": -1.31,
+      "avg_fwd10": null
+    }
+  },
   "days_accum": 3
 }

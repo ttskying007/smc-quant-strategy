@@ -65,29 +65,31 @@ def get_daily(code):
 n_fill = 0
 today8 = time.strftime("%Y%m%d")
 for r in ledger.get("rejects", []):
-    if r.get("fwd5") is not None:
-        continue
     d = get_daily(r["code"])
     if not d:
         continue
     idx = {b["t"]: k for k, b in enumerate(d)}
     i0 = idx.get(r["date"])
-    if i0 is None or i0 + 11 >= len(d):
+    if i0 is None:
         continue
-    buy = d[i0 + 1]["o"]
-    if buy <= 0:
+    buy = d[i0 + 1]["o"] if i0 + 1 < len(d) and d[i0 + 1]["o"] > 0 else None
+    if buy is None:
         continue
-    f5 = d[min(i0 + 5, len(d) - 1)]
-    f10 = d[min(i0 + 10, len(d) - 1)]
-    r["fwd5"] = round((f5["c"] / buy - 1) * 100, 2)
-    r["fwd10"] = round((f10["c"] / buy - 1) * 100, 2)
-    r["filled"] = True
-    n_fill += 1
+    # FIX(2026-09-13): fwd5 与 fwd10 解耦 —— 旧条件 i0+11>=len 全挡, fwd5 到期(T+5)就该回填,
+    # 09-04 事件 fwd5 早已可算却被 fwd10 门槛绑死(过度保守)
+    if r.get("fwd5") is None and i0 + 5 < len(d):
+        r["fwd5"] = round((d[i0 + 5]["c"] / buy - 1) * 100, 2)
+        n_fill += 1
+    if r.get("fwd10") is None and i0 + 10 < len(d):
+        r["fwd10"] = round((d[i0 + 10]["c"] / buy - 1) * 100, 2)
+        n_fill += 1
+    if r.get("fwd5") is not None:
+        r["filled"] = True
 
 # ③ 90 日滚动
 ledger["rejects"] = [r for r in ledger["rejects"]
                      if r["date"] >= "20260601"][-KEEP * 40:]   # 数量上限粗控
-# ④ 汇总: 按原因组
+# ④ 汇总: 按原因组(fwd10 可能未到期 → 分母只计已回填)
 from collections import defaultdict
 grp = defaultdict(list)
 for r in ledger["rejects"]:
@@ -96,9 +98,10 @@ for r in ledger["rejects"]:
         grp[key].append((r["fwd5"], r["fwd10"]))
 summary = {}
 for k, v in sorted(grp.items(), key=lambda kv: -len(kv[1])):
+    f10s = [b for _, b in v if b is not None]
     summary[k] = {"n": len(v),
                   "avg_fwd5": round(sum(a for a, _ in v) / len(v), 2),
-                  "avg_fwd10": round(sum(b for _, b in v) / len(v), 2)}
+                  "avg_fwd10": round(sum(f10s) / len(f10s), 2) if f10s else None}
 ledger["summary"] = summary
 ledger["days_accum"] = ledger.get("days_accum", 0) + (1 if n_new else 0)
 json.dump(ledger, open(LEDGER, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
