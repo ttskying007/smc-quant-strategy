@@ -54,12 +54,17 @@ def _idx_at(arr, d8, days=20):
             "asof": w[-1][0]}
 
 
-def breadth_newhigh_pct(d8, kt_dir=KT, min_sample=200, _cache={}):
-    """F1: d8 当日全市场 20D 新高占比(0-1)。结果按 d8 缓存(重复调用只算一次)。"""
+def breadth_newhigh_pct(d8, kt_dir=KT, min_sample=200, min_coverage=None, _cache={}):
+    """F1: d8 当日全市场 20D 新高占比(0-1)。结果按 d8 缓存(重复调用只算一次)。
+    min_coverage: 期望的最小可算样本(默认 None=不检查); 提供时返回 (pct, meta) ——
+    样本不足以覆盖全市场横截面时 pct 标 degraded(数据新鲜度治理: 09:00 选股用
+    部分市场算的广度是脏 E, 调仓因子宁缺毋滥)。"""
     if d8 in _cache:
         return _cache[d8]
     nh = {"hit": 0, "n": 0}
+    total_files = 0
     for fp in sorted(glob.glob(os.path.join(kt_dir, "*_daily_800.json"))):
+        total_files += 1
         try:
             raw = json.load(open(fp, encoding="utf-8"))
         except Exception:
@@ -82,6 +87,12 @@ def breadth_newhigh_pct(d8, kt_dir=KT, min_sample=200, _cache={}):
         if cl[k][1] >= max(x[1] for x in cl[k - 20:k]):
             nh["hit"] += 1
     pct = (nh["hit"] / nh["n"]) if nh["n"] >= min_sample else None
+    if min_coverage is not None and total_files:
+        # 覆盖率 = 当日有数据的文件占比(新鲜度治理)
+        cov = nh["n"] / total_files
+        _cache[d8] = (pct, {"n_sample": nh["n"], "files": total_files,
+                            "coverage": round(cov, 3), "degraded": cov < min_coverage})
+        return _cache[d8]
     _cache[d8] = pct
     return pct
 

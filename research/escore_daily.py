@@ -72,12 +72,23 @@ if any(d["d8"] == d_today for d in hist["days"]):
     print(f"{d_today} 已记录(幂等, 回填已保存), 跳过当日新算")
     sys.exit(0)
 
-f1 = breadth_newhigh_pct(d_today)
+# F1 带覆盖率门槛(数据新鲜度治理: 09:00 部分市场算的广度=脏E, 宁缺毋滥)
+f1_meta = breadth_newhigh_pct(d_today, min_coverage=0.60)
+if isinstance(f1_meta, tuple):
+    f1, cov_meta = f1_meta
+    if cov_meta.get("degraded"):
+        print(f"⚠ F1 覆盖率 {cov_meta['coverage']} < 60%(数据未刷完) → E 置 None(脏数据宁缺)")
+        f1 = None
+else:
+    f1 = f1_meta
+    cov_meta = None
 e, meta = escore_for_date(d_today, f1=f1, with_meta=True)
 entry = {"d8": d_today, "e": e, "f1": meta.get("f1"), "f2": meta.get("f2_off_high"),
          "f3": meta.get("f3_r20"), "mid_proxy": meta.get("mid_proxy"),
          "mid_stale_days": meta.get("mid_stale_days"), "asof_stale": meta.get("asof_stale"),
          "exposure_coef": exposure_coef(e),
+         "f1_coverage": (cov_meta or {}).get("coverage"),
+         "f1_degraded": (cov_meta or {}).get("degraded"),
          "recorded_at": time.strftime("%Y-%m-%d %H:%M:%S")}
 hist["days"].append(entry)
 hist["days"].sort(key=lambda d: d["d8"])
