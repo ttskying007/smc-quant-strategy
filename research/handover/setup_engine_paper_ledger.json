@@ -21,7 +21,8 @@
       "escore": 0.6756,
       "exposure_coef": 1.0,
       "escore_proxy": "512100",
-      "family": "SMC_REVERSAL"
+      "family": "SMC_REVERSAL",
+      "fill_dev_pct": 2.068
     },
     {
       "code": "000951",
@@ -44,7 +45,8 @@
       "escore": 0.8066,
       "exposure_coef": 1.0,
       "escore_proxy": "512100",
-      "family": "SMC_REVERSAL"
+      "family": "SMC_REVERSAL",
+      "fill_dev_pct": 2.157
     },
     {
       "code": "000951",
@@ -67,7 +69,8 @@
       "exposure_coef": 1.0,
       "escore_proxy": "512100",
       "family": "SMC_REVERSAL",
-      "exit_reason": "TIME_STOP"
+      "exit_reason": "TIME_STOP",
+      "fill_dev_pct": 0.245
     },
     {
       "code": "300569",
@@ -90,7 +93,8 @@
       "escore": 0.8066,
       "exposure_coef": 1.0,
       "escore_proxy": "512100",
-      "family": "SMC_REVERSAL"
+      "family": "SMC_REVERSAL",
+      "fill_dev_pct": 0.211
     },
     {
       "code": "600195",
@@ -146,7 +150,8 @@
       "fill_date": "20260911",
       "exit_version": "setup_exit_v1",
       "sl": 48.5886,
-      "tp": 77.4343
+      "tp": 77.4343,
+      "fill_dev_pct": 2.104
     },
     {
       "code": "600642",
@@ -203,7 +208,8 @@
       "exit_version": "setup_exit_v1",
       "sl": 2.8502,
       "tp": 3.5693,
-      "exit_reason": "TIME_STOP"
+      "exit_reason": "TIME_STOP",
+      "fill_dev_pct": 1.942
     },
     {
       "setup_id": "000951_20260910_OB_v1",
@@ -229,7 +235,8 @@
       "filled_price": 21.68,
       "fill_date": "20260911",
       "sl": 20.1489,
-      "tp": 26.2734
+      "tp": 26.2734,
+      "fill_dev_pct": 3.58
     },
     {
       "setup_id": "300569_20260909_OB_v1",
@@ -255,7 +262,8 @@
       "tp": 5.9956,
       "escore": 0.7366,
       "exposure_coef": 1.0,
-      "escore_proxy": "512100"
+      "escore_proxy": "512100",
+      "fill_dev_pct": 0.422
     },
     {
       "setup_id": "SU-a897d453fd73",
@@ -275,9 +283,9 @@
       "escore": 0.5584,
       "exposure_coef": 1.0,
       "escore_proxy": "512100",
-      "status": "OPEN",
+      "status": "INVALIDATED",
       "ret_pct": null,
-      "exit_reason": null
+      "exit_reason": "INVALIDATED_BEFORE_FILL"
     },
     {
       "setup_id": "SU-286f31708aba",
@@ -365,7 +373,12 @@
       "escore_proxy": "512100",
       "status": "OPEN",
       "ret_pct": null,
-      "exit_reason": null
+      "exit_reason": null,
+      "filled_price": 55.8,
+      "fill_date": "20260911",
+      "fill_dev_pct": 2.104,
+      "sl": 48.5886,
+      "tp": 77.4343
     },
     {
       "setup_id": "SU-7f0f6d1f4d24",
@@ -387,7 +400,12 @@
       "escore_proxy": "512100",
       "status": "OPEN",
       "ret_pct": null,
-      "exit_reason": null
+      "exit_reason": null,
+      "filled_price": 55.8,
+      "fill_date": "20260911",
+      "fill_dev_pct": 2.104,
+      "sl": 48.5886,
+      "tp": 77.4343
     },
     {
       "setup_id": "SU-1c6acd7ff9c0",
@@ -463,7 +481,7 @@
     "exit_version": "setup_exit_v1",
     "engine_version": "setup_engine_v1",
     "total": 21,
-    "open": 15,
+    "open": 14,
     "closed": 6,
     "avg_closed": -0.515,
     "pf_closed": 0.68,
@@ -472,7 +490,8 @@
       "G2_edge": false,
       "G3_concentration": false,
       "G4_backtest_consistency": false,
-      "G5_fill_deviation": null,
+      "G5_fill_deviation": false,
+      "G5_note": "proxy定义(偏离区中值) n=6 avg=1.174%",
       "G6_trade_sequence_drawdown_proxy": true,
       "G7_persistence": false
     },

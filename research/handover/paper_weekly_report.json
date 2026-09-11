@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-11 19:03:47",
+  "generated_at": "2026-09-11 21:33:23",
   "milestone": {
     "days_accum": 7,
     "closed": 6,
@@ -19,7 +19,8 @@
   },
   "exit_dist": {
     "TIME_STOP": 6,
-    "OPEN": 15
+    "OPEN": 14,
+    "INVALIDATED_BEFORE_FILL": 1
   },
   "alerts": [
     "负收益集中: 4/6 closed 为负"

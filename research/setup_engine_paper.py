@@ -91,6 +91,11 @@ for sig in led.get("signals", []):
         continue
     fi, fpx = fill["fill_idx"], fill["fill_price"]
     sig["filled_price"], sig["fill_date"] = fpx, dd[fi]["t"]
+    # G5 采集(执行偏差代理): |fill − optimal(区中值)|/optimal —— 单源退出口径下
+    # PAPER 与回测共用 fill_in_zone, 真实差异来自数据时点; 该字段度量执行质量
+    # (偏离中值越远 = 追价越差), G5 门 <1% 线待 Phase E 逐笔配对后切换正式定义
+    if sig.get("optimal_entry"):
+        sig["fill_dev_pct"] = round(abs(fpx - sig["optimal_entry"]) / sig["optimal_entry"] * 100, 3)
     # P0-1: 统一退出(与回测同源); 旧分叉(注释TP3/实际无TP)已消除
     res = settle_from_record(dd, fi, fpx, sig["invalid_price"], fee_pct=FEE, max_bars=15, tp_rr=3.0)
     sig["exit_version"] = res["exit_version"]
@@ -186,13 +191,16 @@ _bt_avg = (_bt or {}).get("avg")
 gates["G4_backtest_consistency"] = bool(
     _bt_avg is not None and avg is not None and _bt_avg > 0 and avg > 0
     and abs(avg - _bt_avg) < 3.0) if closed else False
-# G5 执行偏差: 逐笔 |paper_fill − backtest_fill| 均值 <1%(当前台账无逐笔 backtest 配对 → 未采集=None → 如实"未评估")
+# G5 执行偏差: fill_dev_pct(执行质量代理: |fill−区中值|%) 均值<1% —— Phase E 逐笔
+# 配对 backtest_fill 后切换正式定义(|paper_fill − backtest_fill|<1%)
 _have_fill_dev = any(s.get("fill_dev_pct") is not None for s in closed)
 if _have_fill_dev:
     _devs = [s["fill_dev_pct"] for s in closed if s.get("fill_dev_pct") is not None]
     gates["G5_fill_deviation"] = (sum(_devs) / len(_devs)) < 1.0
+    gates["G5_note"] = f"proxy定义(偏离区中值) n={len(_devs)} avg={round(sum(_devs)/len(_devs),3)}%"
 else:
     gates["G5_fill_deviation"] = None          # 未采集 → 如实标 None(不假装通过)
+    gates["G5_note"] = "未采集(Phase E 逐笔配对后正式化)"
 # G6 回撤: closed 序列 drawdown proxy(V3-A 命名诚实化: 非组合级 mark-to-market MDD;
 #   真组合 MDD 由 DailyPortfolioEngine.equity_hist 提供, Phase E Setup→Portfolio 合并后启用)
 _eq, _pk, _mdd = 0.0, 0.0, 0.0
