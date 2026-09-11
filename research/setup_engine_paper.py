@@ -88,6 +88,13 @@ for sig in led.get("signals", []):
             sig["exit_reason"] = "INVALIDATED_BEFORE_FILL"
             sig["exit_version"] = EXIT_VERSION
             n_settled += 1
+        elif fill is None and i0 + 5 < n:
+            # V3-A 统一语义(2026-09-13 修): fill 窗走完未触及 → EXPIRED(回测 TTL_EXPIRED 同语义),
+            # 旧代码直接 continue → 信号永远 OPEN(状态机缺口, 审计发现 600195/600642 09-04 两笔)
+            sig["status"] = "EXPIRED"
+            sig["exit_reason"] = "FILL_WINDOW_EXPIRED"
+            sig["exit_version"] = EXIT_VERSION
+            n_settled += 1
         continue
     fi, fpx = fill["fill_idx"], fill["fill_price"]
     sig["filled_price"], sig["fill_date"] = fpx, dd[fi]["t"]

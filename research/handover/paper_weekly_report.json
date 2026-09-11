@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-11 21:33:23",
+  "generated_at": "2026-09-12 02:46:21",
   "milestone": {
-    "days_accum": 7,
+    "days_accum": 8,
     "closed": 6,
     "next_gate": "G7 30closed+20d",
     "pct_to_30": 20.0
@@ -19,7 +19,8 @@
   },
   "exit_dist": {
     "TIME_STOP": 6,
-    "OPEN": 14,
+    "FILL_WINDOW_EXPIRED": 2,
+    "OPEN": 12,
     "INVALIDATED_BEFORE_FILL": 1
   },
   "alerts": [

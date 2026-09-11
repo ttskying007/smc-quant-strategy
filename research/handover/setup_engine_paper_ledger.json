@@ -106,12 +106,14 @@
       "invalid_price": 6.0722,
       "poi_type": "FVG",
       "sequence": "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST",
-      "status": "OPEN",
+      "status": "EXPIRED",
       "ret_pct": null,
       "escore": 0.6215,
       "exposure_coef": 1.0,
       "escore_proxy": "512100",
-      "family": "SMC_REVERSAL"
+      "family": "SMC_REVERSAL",
+      "exit_reason": "FILL_WINDOW_EXPIRED",
+      "exit_version": "setup_exit_v1"
     },
     {
       "code": "600195",
@@ -163,12 +165,14 @@
       "invalid_price": 7.8958,
       "poi_type": "OB",
       "sequence": "LIQUIDITY→SWEEP→RECLAIM→DISPLACEMENT→SHIFT→POI→RETEST",
-      "status": "OPEN",
+      "status": "EXPIRED",
       "ret_pct": null,
       "escore": 0.6215,
       "exposure_coef": 1.0,
       "escore_proxy": "512100",
-      "family": "SMC_REVERSAL"
+      "family": "SMC_REVERSAL",
+      "exit_reason": "FILL_WINDOW_EXPIRED",
+      "exit_version": "setup_exit_v1"
     },
     {
       "code": "601577",
@@ -481,7 +485,7 @@
     "exit_version": "setup_exit_v1",
     "engine_version": "setup_engine_v1",
     "total": 21,
-    "open": 14,
+    "open": 12,
     "closed": 6,
     "avg_closed": -0.515,
     "pf_closed": 0.68,
@@ -496,7 +500,7 @@
       "G7_persistence": false
     },
     "gate_notes": "G5 执行偏差需 paper/backtest 逐笔配对 fill_dev_pct 字段(PHASE E 采集); 其余六门已可计算。全部通过才可评估 MICRO REAL。",
-    "days_accum": 7,
-    "last_run": "20260911"
+    "days_accum": 8,
+    "last_run": "20260912"
   }
 }
