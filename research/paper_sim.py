@@ -280,24 +280,38 @@ def adaptive_hold(base_hold=10, proxy=None):
 
 
 def adx14_of(bs, i):
-    if i < 30:
+    """标准 Wilder ADX(14) —— 2026-09-12 修复:
+    旧实现返回单窗 DX(|PDI-MDI|/(PDI+MDI)), 不是 ADX(DX 的平滑均值) → 系统性偏低
+    (0.33/5.78/5.45 vs 标准 13.06/7.55/13.46), ADX>=20 拒绝门过严错杀边界股。
+    新实现: Wilder 平滑 TR/+DM/-DM → PDI/MDI → DX → ADX(DX 的 14 期 Wilder 平滑)。"""
+    n = 14
+    need = n * 2 + 2
+    if i < need:
         return None
-    plus_dm = minus_dm = tr_sum = 0.0
-    for k in range(i - 14, i):
+    lo = max(1, i - 120)                 # warm-up 尽量长(<=120 bars, 递归平滑对 warm-up 敏感)
+    trs, pdms, mdms = [], [], []
+    for k in range(lo, i + 1):
         h, l, pc = bs[k]["h"], bs[k]["l"], bs[k - 1]["c"]
         up = h - bs[k - 1]["h"]
         dn = bs[k - 1]["l"] - l
-        plus_dm += up if (up > dn and up > 0) else 0
-        minus_dm += dn if (dn > up and dn > 0) else 0
-        tr = max(h - l, abs(h - pc), abs(l - pc))
-        tr_sum += tr
-    if tr_sum <= 0:
+        pdms.append(up if (up > dn and up > 0) else 0)
+        mdms.append(dn if (dn > up and dn > 0) else 0)
+        trs.append(max(h - l, abs(h - pc), abs(l - pc)))
+    # Wilder 首值 = 前 n 和, 之后迭代平滑
+    if len(trs) < need:
         return None
-    pdi = 100 * plus_dm / tr_sum
-    mdi = 100 * minus_dm / tr_sum
-    if pdi + mdi == 0:
+    tr_s = sum(trs[:n]); pd_s = sum(pdms[:n]); md_s = sum(mdms[:n])
+    dxs = []
+    for k in range(n, len(trs)):
+        tr_s = tr_s - tr_s / n + trs[k]
+        pd_s = pd_s - pd_s / n + pdms[k]
+        md_s = md_s - md_s / n + mdms[k]
+        pdi = 100 * pd_s / tr_s if tr_s else 0
+        mdi = 100 * md_s / tr_s if tr_s else 0
+        dxs.append(100 * abs(pdi - mdi) / (pdi + mdi) if (pdi + mdi) else 0)
+    if not dxs:
         return None
-    return 100 * abs(pdi - mdi) / (pdi + mdi)
+    return sum(dxs[-n:]) / n
 
 
 def bars_of(code):
