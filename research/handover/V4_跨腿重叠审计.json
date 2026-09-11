@@ -1,0 +1,12 @@
+{
+  "X1_交集非空": false,
+  "X2_重叠期敞口失真": false,
+  "X3_阶段互斥分离": true,
+  "交集": [],
+  "v0_stage分布": {
+    "DOWNTREND": 77,
+    "ACCUM": 43,
+    "MARKUP": 2,
+    "UPTREND": 17
+  }
+}
