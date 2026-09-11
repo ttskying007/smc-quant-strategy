@@ -48,17 +48,19 @@ def fwd(code, d8, days):
     if not dd:
         return None
     idx = next((k for k, b in enumerate(dd) if b["t"] == d8), None)
-    if idx is None or idx + 1 + days >= len(dd):
+    # FIX(2026-09-13): off-by-one —— 旧守卫 idx+1+days>=len 比 T+days 卖点严一格,
+    # 09-04 事件 T+5=09-11(idx+5=len-1)已可算却被拒. 正确守卫: 卖点 idx+days 必须存在.
+    if idx is None or idx + days >= len(dd):
         return None
     base = dd[idx + 1]["o"]       # 次日开盘(与事件腿入场同语义)
-    return round((dd[min(len(dd) - 1, idx + 1 + days)]["c"] / base - 1) * 100, 3)
+    return round((dd[min(len(dd) - 1, idx + days)]["c"] / base - 1) * 100, 3)
 
 def cohort(items, label):
     r5, r10 = [], []
     for it in items:
         code = str(it.get("code") or it.get("symbol") or "").split(".")[0]
-        d8 = str(it.get("date") or it.get("event_date") or it.get("day") or "")[:8]
-        d8 = d8.replace("-", "")
+        # FIX(2026-09-13): "2026-09-10"被[:8]截成"2026-09-"—— 与 funnel_reject_detail 同源bug
+        d8 = str(it.get("date") or it.get("event_date") or it.get("day") or "")[:10].replace("-", "")
         if len(d8) != 8:
             continue
         a, b = fwd(code, d8, 5), fwd(code, d8, 10)
