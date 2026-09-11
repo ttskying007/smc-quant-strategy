@@ -1,0 +1,46 @@
+{
+  "low": {
+    "attempt": 3922,
+    "filled": 1305,
+    "invalidated": 1286,
+    "fill_rate_pct": 33.3,
+    "invalid_rate_pct": 32.8,
+    "avg_ret_filled": 0.019,
+    "n_ret": 1305
+  },
+  "mid": {
+    "attempt": 2662,
+    "filled": 875,
+    "invalidated": 730,
+    "fill_rate_pct": 32.9,
+    "invalid_rate_pct": 27.4,
+    "avg_ret_filled": 3.346,
+    "n_ret": 875
+  },
+  "high": {
+    "attempt": 1944,
+    "filled": 503,
+    "invalidated": 356,
+    "fill_rate_pct": 25.9,
+    "invalid_rate_pct": 18.3,
+    "avg_ret_filled": 3.745,
+    "n_ret": 503
+  },
+  "_preregistered": {
+    "M1_跳过机理(fill high < mid−5pp)": true,
+    "M2_失效机理(invalid 随 E 升)": false,
+    "M3_双否→mid峰另有原因": false
+  },
+  "_e_cut": {
+    "q33": 0.4136,
+    "q67": 0.5577
+  },
+  "_note": "OOS 20250701+; attempted=A_full 链完成(挂单尝试); fill=5bar STRICT_LIMIT; 与 V4_结构腿E交叉 同 universe",
+  "_仲裁(单源settle_setup+原分档q33=0.4559/q67=0.5562)": {
+    "low": {"n": 1486, "avg": -0.429, "wr": 42.0, "pf": 0.91},
+    "mid": {"n": 689, "avg": 4.826, "wr": 64.9, "pf": 3.32},
+    "high": {"n": 508, "avg": 3.474, "wr": 56.3, "pf": 2.41},
+    "结论": "mid 峰复现(与原交叉实验 4.66/3.35 一致); 先前OOS期分位仲裁(mid3.35≈high3.49)是分档基准伪影 —— mid 峰真实"
+  },
+  "_机理合成": "mid-E 峰双机理: ①M1 跳过(过热环境价跑过POI, fill 25.9%<mid 32.9%) ②成交质量(单源口径 mid 已成交 avg4.83>high3.47 —— 高E日幸存成交存在逆向选择: 好POI直接跑掉, 挂得进的偏弱); invalid_rate 随E降(32.8→18.3, 低E环境POI更容易击穿) —— 三梯度全部同向自洽"
+}
