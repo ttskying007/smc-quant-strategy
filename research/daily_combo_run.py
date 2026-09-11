@@ -108,6 +108,10 @@ def _run_main_steps():
     #    replaces slow 600/day batch — full market (~4657) done in ~75 min, coverage 4.8%->100%
     rc0 = run("incremental_refresh.py", "--workers", "3", cwd=WDH, timeout=10800)
     step_status["refresh"] = rc0
+    # 0b. 数据新鲜度治理(2026-09-12): 腾讯源双源复核 —— 只补新浪没刷上的(末bar<今日),
+    #     kline 端点+append+11%跳变守卫; 幂等(已最新文件自动跳过). 09-12 实战: 覆盖 39.5%→99.3%
+    rc0b = run(r"pull_tencent_incremental.py", cwd=WDH, timeout=3600)
+    step_status["kline_incremental"] = rc0b
     # 1. refresh key stocks (holdings + recent events) from Sina
     rc = run("refresh_holdings_sina.py", cwd=WDH, timeout=1200)
     step_status["holdings"] = rc
@@ -177,9 +181,6 @@ def _run_main_steps():
     # V3-C 升级: 全漏斗被拒候选身份+前向收益(每类拒绝放走多少收益)
     rc16 = run("funnel_reject_detail.py", timeout=600)
     step_status["funnel_reject_detail"] = rc16
-    # 数据新鲜度治理(2026-09-12): 选股前先增量刷新日线(昨日增量未跑完→39.8%覆盖致脏E)
-    rc00 = run(r"..\wdh\pull_tencent_incremental.py", timeout=3600)
-    step_status["kline_incremental"] = rc00
     # V4 D1: E-score 前置——指数日线刷新(wdh/pull_index_daily, 权益 F2/F3 数据源)
     rc13 = run(r"..\wdh\pull_index_daily.py", timeout=300)
     step_status["index_refresh"] = rc13
