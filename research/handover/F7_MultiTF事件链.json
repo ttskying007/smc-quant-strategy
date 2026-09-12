@@ -1,19 +1,19 @@
 {
   "window": "2026-03→2026-09(60m 扩窗后 ~5 个月, 2026-09-12 重跑)",
   "d1_ready": 2408,
-  "m60_confirmed": 88,
+  "m60_confirmed": 34,
   "armA_d1_only": {
     "n": 678,
     "avg": 0.291,
     "pf": 1.05
   },
   "armB_mtf_confirmed": {
-    "n": 88,
-    "avg": 5.84,
-    "pf": 2.65
+    "n": 34,
+    "avg": -2.162,
+    "pf": 0.56
   },
-  "delta_avg_pp": 5.549,
+  "delta_avg_pp": -2.453,
   "acceptance_n": "PRELIMINARY(30-100)",
-  "verdict": "MTF 链携带增量信息",
-  "runtime_s": 224
+  "verdict": "MTF 链反向(需警惕)",
+  "runtime_s": 293
 }
