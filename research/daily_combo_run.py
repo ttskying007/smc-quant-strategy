@@ -112,6 +112,11 @@ def _run_main_steps():
     #     kline 端点+append+11%跳变守卫; 幂等(已最新文件自动跳过). 09-12 实战: 覆盖 39.5%→99.3%
     rc0b = run(r"pull_tencent_incremental.py", cwd=WDH, timeout=3600)
     step_status["kline_incremental"] = rc0b
+    # 0c. 数据新鲜度治理(2026-09-13, §50): 60min 缓存刷新 —— m60 接口 ifzq.gtimg.cn
+    #     (rc0/rc0b 只刷日频; 60min 曾断供 5 交易日, F7 armB VALIDATION 被阻塞)
+    #     全量 9119 只 ~25min(0.15s/只限速), 幂等(接口每次全量覆盖 count=500)
+    rc0c = run("refresh_60min_full.py", timeout=3600)
+    step_status["refresh_60min"] = rc0c
     # 1. refresh key stocks (holdings + recent events) from Sina
     rc = run("refresh_holdings_sina.py", cwd=WDH, timeout=1200)
     step_status["holdings"] = rc
