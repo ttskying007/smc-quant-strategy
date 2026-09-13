@@ -103,6 +103,30 @@ def main():
 
 def _run_main_steps():
     step_status = {}
+    # FIX(2026-09-14, R31 第八轮审计 6.1): 统一 run_id 事务合同 —— 原各阶段
+    # 产出(run_status/manifest/各 json)无统一标识, 下游无法验证"消费的是
+    # 本次 run 的产物"(审计: "每一阶段输出带 run_id/as_of_date/source_hash/
+    # code_version/config_hash, 下游只接受上游 manifest 通过且 run_id 完全
+    # 匹配的输入")。R31 落地第一步: run 顶部生成 run_id 一次, 全程传播——
+    # ①run_transaction.json(本次 run 的输出索引, 记录各阶段产物+run_id+
+    #   code_version+config_hash+as_of); ②经 SMC_RUN_ID 环境变量传各阶段;
+    # ③run_status.json/manifest 携带同 run_id; ④尾部校验一致才 eligible。
+    import hashlib as _hl
+    _run_id = "daily-" + time.strftime("%Y%m%d-%H%M%S")
+    _code_ver = ""
+    try:
+        with open(os.path.join(RESEARCH, "paper_sim.py"), "rb") as _f:
+            _code_ver = _hl.sha256(_f.read()).hexdigest()[:12]
+    except Exception:
+        pass
+    _cfg_hash = ""
+    try:
+        with open(os.path.join(RESEARCH, "config.py"), "rb") as _f:
+            _cfg_hash = _hl.sha256(_f.read()).hexdigest()[:12]
+    except Exception:
+        pass
+    os.environ["SMC_RUN_ID"] = _run_id
+    print(f"[run_id] {_run_id} | code_version={_code_ver} | config_hash={_cfg_hash}", flush=True)
     # FIX(2026-08-22) P1-3: 数据源健康检查（失败告警）
     try:
         hc = subprocess.run([PY, os.path.join(RESEARCH, "data_health_check.py")], capture_output=True, timeout=120, cwd=RESEARCH)
@@ -230,6 +254,8 @@ def _run_main_steps():
     _frontend_complete = step_status.get("dashboard", 1) == 0
     _production_eligible = _data_complete and _signal_complete and _execution_complete and _frontend_complete
     json.dump({"run_at": time.strftime("%Y-%m-%d %H:%M:%S"), "steps": step_status,
+               # R31(第八轮 6.1): run_status 携带统一 run_id(与 manifest 同源)
+               "run_id": _run_id, "code_version": _code_ver, "config_hash": _cfg_hash,
                "data_latest_date": _data_date,
                "data_complete": _data_complete,
                "signal_complete": _signal_complete,
@@ -255,7 +281,7 @@ def _run_main_steps():
     try:
         import core.manifest as _CM
         _m = _CM.build_manifest(
-            run_id="daily-" + time.strftime("%Y%m%d-%H%M%S"),
+            run_id=_run_id,  # R31(6.1): 统一 run_id(顶部生成, 全程传播)
             strategy_id="smc_combined", strategy_version="v20f",
             params={"steps": step_status},
             data_asof=_data_date, data_snapshot_id="kline_tencent_" + _data_date,
@@ -301,6 +327,39 @@ def _run_main_steps():
             json.dump(_rs, open(_rs_p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
         except Exception:
             pass
+    # R31(第八轮审计 6.1): run_transaction.json —— 本次 run 的输出索引+一致性校验。
+    # 下游(监控/发布/前端)消费产物前可校验: run_id 匹配 + manifest_ok + eligible。
+    # 校验规则: run_status 与 manifest 的 run_id 必须一致(顶部生成传播是唯一来源);
+    # 不一致 = 产物跨 run 混装(异常路径), eligible 强制 False。
+    _tx_consistent = True
+    try:
+        _rs_p = os.path.join(RESEARCH, "run_status.json")
+        _rs_tx = json.load(open(_rs_p, encoding="utf-8")) if os.path.exists(_rs_p) else {}
+        _tx_consistent = (_rs_tx.get("run_id") == _run_id)
+    except Exception:
+        _tx_consistent = False
+    if not _tx_consistent:
+        print(f"[run_tx] ⚠ run_id 不一致(run_status={(_rs_tx.get('run_id') if _tx_consistent is False else '?')}) → eligible=False", flush=True)
+        _production_eligible = False
+    _transaction = {
+        "run_id": _run_id,
+        "as_of_date": _data_date,
+        "code_version": _code_ver,
+        "config_hash": _cfg_hash,
+        "code_watch": "R26 mtime 版本守卫(sim_scheduler 7 模块)",
+        "cost_model_version": "COST_V1_FEE_TOTAL_020_SLIP_SIDE_001",
+        "adx_impl_version": "ADX14_WILDER_20260912",
+        "steps": step_status,
+        "manifest_ok": _manifest_ok,
+        "production_eligible": _production_eligible,
+        "run_id_consistent": _tx_consistent,
+        "artifacts": {"run_status": "run_status.json",
+                      "manifest": "run_manifest.json",
+                      "dashboard": "combo_dashboard.json"},
+    }
+    json.dump(_transaction, open(os.path.join(RESEARCH, "run_transaction.json"), "w", encoding="utf-8"),
+              ensure_ascii=False, indent=2)
+    print(f"[run_tx] {_run_id} eligible={_production_eligible} consistent={_tx_consistent} → run_transaction.json", flush=True)
     print(f"DONE: batch={rc0} refresh={rc} scan={rc2} sim={rc3} dashboard={rc4} manifest_ok={_manifest_ok}", flush=True)
 
 if __name__ == "__main__":
