@@ -2,7 +2,16 @@
 """生成 v20e 回测 CSV：事件腿（rank_score 6特征 + 回踩买点 ×0.99 + 分层 TP/SL）+ 延续腿（固定10日）
 新 rank_score 特征（阶段跨度/ADX跨度/周线/放量分级/连续放量）的生产回测
 FIX(2026-09-08, 第七轮审计 消除平行实现): 事件过滤改用 core.events.classify_title
-（生产 paper_sim 与回测同一套分类；PROGRESS_WITH_DELTA 放开后回测同步纳入）。"""
+（生产 paper_sim 与回测同一套分类；PROGRESS_WITH_DELTA 放开后回测同步纳入）。
+
+⚠ 实现分叉显式标注(R22, 第八轮审计 P1-7): 本文件的 ADX 过滤仍是 **legacy 单窗
+DX**(|PDI-MDI|/(PDI+MDI), 非平滑 ADX) —— 冻结基线 n=1639(±1) 依赖该口径,
+改动=毁基线。生产(paper_sim EVENT 腿)已在用 core/indicators.adx14_of(Wilder
+平滑 ADX, 2026-09-12 修复, 系统性偏高约 5-13pp) → 回测 universe 与生产
+universe 存在已知分叉, 本 CSV 的事件腿数字**不得直接作为生产事件腿证据**
+(审计 P1-7 判定保持)。统一需研究级重基线决策(重跑全事件回测+全测试链+冻结
+基线重认定), 不属于本轮接线范围。任何新代码需要 ADX 时只允许 import
+core.indicators.adx14_of。"""
 import csv, io, json, os, sqlite3, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from core.events import classify_title
