@@ -12,10 +12,10 @@ from collections import defaultdict
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG  # 审计 P1: 统一路径/解释器（FIX 2026-09-13 R4: 必须先于 WDH_DIR 使用）
 # FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径(WDH_DIR)
 sys.path.insert(0, CFG.WDH_DIR)
 import wdh_engine as we
-import config as CFG  # 审计 P1: 统一路径/解释器
 
 KT = CFG.KT_CACHE
 OUT = CFG.RESEARCH_DIR
