@@ -28,7 +28,8 @@
 import io, json, os, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+# 教训#7(R10): stdout wrap 只在 __main__ —— 本模块被 reject_stress_gate import,
+# 模块级 wrap 会双包(调用方已 wrap), GC 关闭首个 wrapper → "I/O operation on closed file"
 
 import paper_sim
 from core.execution import simulate, entry_ok
@@ -246,4 +247,5 @@ def main():
 
 
 if __name__ == "__main__":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.exit(main())
