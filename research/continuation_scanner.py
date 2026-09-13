@@ -153,7 +153,9 @@ for p in sorted(os.listdir(KT)):
         continue
     vw = pv / vol
     # FIX(2026-08-22): VWAP threshold 5% -> 10% (research: monotonic improvement, 10% = +8.56%)
-    if (daily[i]["c"] - vw) / vw < 0.09:
+    # FIX(2026-09-13, 第八轮审计 5.9): 0.09 → 0.10 —— 与 paper_sim.sub_signals_cont()
+    # 及注释口径统一(原 9% 使生产 scanner 信号集与回测/文档不一致, 审计 §5.9)。
+    if (daily[i]["c"] - vw) / vw < 0.10:
         continue
     w20 = daily[i - 20:i]
     vol20 = sum((b["h"] - b["l"]) / b["c"] for b in w20) / 20 if len(w20) == 20 else 0
@@ -170,7 +172,15 @@ for p in sorted(os.listdir(KT)):
     if n % 1500 == 0:
         print(f"  {n} files, cands {len(cands)}", flush=True)
 
-print(f"扫描完成: {n} files, latest={latest}, 延续候选: {len(cands)}")
+print(f"扫描完成: {n} files, latest={latest}, 延续候选(阈值10%): {len(cands)}")
+# FIX(2026-09-13, 第八轮审计 5.9): freshness gate —— 与 current_scanner 同语义,
+# 每只候选股最新 bar 必须等于全市场最新交易日(旧数据不产生延续信号, 审计 §5.9:
+# "可能旧数据产生延续信号")。两阶段: 全市场 latest 已在循环中收集, 此处过滤。
+_n_before = len(cands)
+cands = [c for c in cands if c.get("signal_date") == latest]
+_dropped = _n_before - len(cands)
+if _dropped:
+    print(f"freshness gate: 剔除 {_dropped} 个旧数据候选(signal_date != {latest})")
 for c in cands[:10]:
     print(f"  {c['symbol']}: signal={c['signal_date']} ref={c['reference_price']} support={c['support']}")
 

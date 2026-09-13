@@ -121,7 +121,10 @@ def _run_main_steps():
     rc = run("refresh_holdings_sina.py", cwd=WDH, timeout=1200)
     step_status["holdings"] = rc
     # 2. scan current with freshness gate (only latest-data signals)
-    rc2 = run("current_scanner.py", "--refresh", timeout=2400)
+    # FIX(2026-09-13, 第八轮审计 6.2): 传 --production —— 该分支含 freshness/artifact
+    # 硬门禁(缺失即硬失败), 生产链必须走生产模式而非研究默认(审计 §6.2:
+    # "生产入口存在"与"生产入口实际使用"不一致)。
+    rc2 = run("current_scanner.py", "--refresh", "--production", timeout=2400)
     step_status["scanner"] = rc2
     # 2b. continuation scanner (MARKUP structure support, v20c leg)
     rc2b = run("continuation_scanner.py", timeout=1800)
@@ -178,6 +181,16 @@ def _run_main_steps():
     step_status["structure_funnel"] = rc9
     rc10 = run("funnel_history_accum.py", timeout=300)
     step_status["funnel_accum"] = rc10
+    # FIX(2026-09-13, 第八轮审计 5.7): E-score 数据链前置 —— 原顺序先跑
+    # setup_engine_paper(184)再刷新指数+escore_daily(193/196), 当日新 Setup 读的是
+    # 旧 E-score 快照, 只在下一次运行才补到新快照。正确顺序: 指数刷新 →
+    # E-score 快照 → Setup/Selection 消费(审计 §5.7 "决策时点环境分数")。
+    # V4 D1: E-score 前置——指数日线刷新(wdh/pull_index_daily, 权益 F2/F3 数据源)
+    rc13 = run(r"..\wdh\pull_index_daily.py", timeout=300)
+    step_status["index_refresh"] = rc13
+    # V4 D1: E-score 每日快照(SHADOW 双臂前置, 供 PAPER/组合层单源读取)
+    rc14 = run("escore_daily.py", timeout=900)
+    step_status["escore_daily"] = rc14
     rc11 = run("setup_engine_paper.py", timeout=1800)
     step_status["setup_paper"] = rc11
     # V4 第十轮审计: L2 被拒事件前向收益追踪(每日跑, 事件走完后自动积累对照)
@@ -186,12 +199,6 @@ def _run_main_steps():
     # V3-C 升级: 全漏斗被拒候选身份+前向收益(每类拒绝放走多少收益)
     rc16 = run("funnel_reject_detail.py", timeout=600)
     step_status["funnel_reject_detail"] = rc16
-    # V4 D1: E-score 前置——指数日线刷新(wdh/pull_index_daily, 权益 F2/F3 数据源)
-    rc13 = run(r"..\wdh\pull_index_daily.py", timeout=300)
-    step_status["index_refresh"] = rc13
-    # V4 D1: E-score 每日快照(SHADOW 双臂前置, 供 PAPER/组合层单源读取)
-    rc14 = run("escore_daily.py", timeout=900)
-    step_status["escore_daily"] = rc14
     # PAPER 周期报告(观察期监控: 里程碑/E分布/家族分布/异常预警)
     rc15 = run("paper_weekly_report.py", timeout=300)
     step_status["paper_weekly_report"] = rc15
