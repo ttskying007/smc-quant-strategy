@@ -148,4 +148,9 @@ def is_known_not_filled_why(w):
         return True, "current"
     if w == "unknown":  # 历史 PENDING 记录缺 why 的兜底值
         return True, "legacy(unknown 兜底)"
+    # R27: 撤单单(EXPIRED)的 not_filled_reason 允许携带撤单原因
+    # (R8 BAD_GEOMETRY_FILL_GE_SL / R18 CAPACITY_REJECT_FILL 同步写两
+    # 字段 —— 撤单原因与策略拒绝分开可审计的字段合同)。
+    if w in EXPIRE_REASONS:
+        return True, "expire_reason_synced(撤单单据)"
     return False, f"UNKNOWN_NOT_FILLED_WHY:{w}"

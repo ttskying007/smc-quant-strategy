@@ -35,7 +35,8 @@ SCAN = {"core/execution.py", "paper_sim.py", "core/setup_exit.py", "core/portfol
 ALLOWED = (EXIT_REASONS | NOT_FILLED_WHY | NOT_EXIT_WHY | ORDER_STATUS | ENTRY_MODES
            | LEGACY_ENTRY_MODES | SL_REASONS | SIM_REASONS | PAPER_EXITS | SE_STATUS
            | SE_EXIT_REASONS | ENTRY_FILL_MODES | PF_REASONS | DAY_STATUS | EXPIRE_REASONS
-           | {"HOLD_EXIT", "unknown", "TIMEOUT", "INIT", "SL", "TP", "TIME"})
+           | {"HOLD_EXIT", "unknown", "TIMEOUT", "INIT", "SL", "TP", "TIME",
+              "OFF_SESSION"})  # R27: realtime_log 时段守卫日志状态(非订单状态)
 for fn in SCAN:
     fp = os.path.join(HERE, fn)
     src = open(fp, encoding="utf-8", errors="replace").read()

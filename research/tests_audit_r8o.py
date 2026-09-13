@@ -26,9 +26,15 @@ led = json.load(open(os.path.join(HERE, "paper_ledger.json"), encoding="utf-8"))
 _157 = next((t for t in led if t.get("code") == "000157" and t.get("valid_from") == "20260914"), None)
 _203 = next((t for t in led if t.get("code") == "002203" and t.get("valid_from") == "20260914"), None)
 ok("000157 回滚为 PENDING_ORDER", _157 and _157["status"] == "PENDING_ORDER", _157 and _157["status"])
-ok("002203 回滚为 PENDING_ORDER", _203 and _203["status"] == "PENDING_ORDER", _203 and _203["status"])
+# R27 更新: 002203 回滚后被新 monitor 以 R8 守卫正确撤单(非法几何
+# limit 19.453>=sl 18.864, 触价成交必亏) —— 事故回滚恢复 T+1 语义后,
+# 守卫链正常接管。非 PENDING 也不是旧非法 FILLED 即为正确终态。
+ok("002203 回滚后由 R8 守卫处置(非旧非法FILLED)",
+   _203 and _203["status"] in ("PENDING_ORDER", "EXPIRED")
+   and _203.get("filled_price") in (None, False, "")
+   and not _203.get("_trade_logged_buy"), _203 and _203["status"])
+ok("002203 事故 note 仍在(历史痕迹)", _203 and "R26事故回滚" in (_203.get("note") or ""))
 ok("000157 事故 note 在", _157 and "R26事故回滚" in (_157.get("note") or ""))
-ok("002203 事故 note 在", _203 and "R26事故回滚" in (_203.get("note") or ""))
 ok("rollback_ts 在(两单)", _157 and _203 and _157.get("rollback_ts") and _203.get("rollback_ts"))
 ok("filled_price 清空(两单)", _157 and _203 and not _157.get("filled_price") and not _203.get("filled_price"))
 ok("_trade_logged_buy 复位(两单)", _157 and _203 and not _157.get("_trade_logged_buy")

@@ -1106,7 +1106,35 @@ def _append_trade_log(rec):
 
 
 def realtime_monitor():
-    """Check pending orders (price<=entry -> FILLED) and filled (TP/SL -> CLOSED)."""
+    """Check pending orders (price<=entry -> FILLED) and filled (TP/SL -> CLOSED).
+    FIX(2026-09-14, R27 交易时段守卫): 非 A 股交易时段(上海 09:30-11:30/13:00-15:00)
+    不执行撮合/平仓判定 —— R26 事故复盘发现午夜 monitor 用上一交易日极值回溯
+    撮合(002203 于 01:00 用周五价格触价, 靠 R8 几何守卫才未造成损害; 若其
+    几何合法即成错误成交)。Sina 盘后返回旧快照(px/open/high/low 全为上一
+    交易日值), 任何时段撮合=用历史数据回溯成交。守卫: 非时段直接跳过撮合
+    循环(不撤单不成交不平仓, 仅记一条日志) —— 订单在下一交易时段以当日
+    实时数据正常处理。R25 TTL 推进同样被时段守卫暂停(盘后到下一交易时段
+    才可能过期) —— 保守方向: 晚撤不早撤, 挂单最多多活一个时段, 不会
+    用旧快照提前处置。"""
+    # 交易时段守卫: 上海时区 HH:MM 判定
+    try:
+        from core.time_cn import shanghai_now
+        _h, _m = shanghai_now().hour, shanghai_now().minute
+        _hm = _h * 100 + _m
+        _in_session = (930 <= _hm <= 1130) or (1300 <= _hm <= 1500)
+        # 非交易日直接视为非时段(周末/节假日休市, Sina 返回旧快照)
+        from core.trading_calendar import is_td
+        if not is_td(cn_today()):
+            _in_session = False
+    except Exception:
+        _in_session = True  # 时区/日历不可用 → 保持旧行为(守卫是增强, 不因解析失败停摆)
+    if not _in_session:
+        _append_realtime_log({
+            "ts": cn_now("%Y-%m-%d %H:%M:%S"), "code": "-", "name": "时段守卫",
+            "price": None, "status": "OFF_SESSION",
+            "note": "非交易时段: 跳过撮合/平仓判定(防上一交易日快照回溯), 下一交易时段恢复",
+        })
+        return 0, 0
     led = load_ledger()
     pending = [t for t in led if t.get("status") == "PENDING_ORDER"]
     filled = [t for t in led if t.get("status") == "FILLED"]
