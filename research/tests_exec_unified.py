@@ -151,5 +151,36 @@ d8 = [{"t": "20260101", "o": 10.0, "h": 10.0, "l": 10.0, "c": 10.0, "v": 1000000
 r8 = EX.simulate(d8, 0, 10.0, 9.8, tp1=10.4, tp2=10.8, partial_tp1=0.3, stop_to_be=True, max_hold=15)
 ok("P1-6: 同K线 SL 优先于 TP（保守规则）", r8["reason"] in ("SL_HIT", "SL_GAP"), r8["reason"])
 
+print("== 7. 第七轮审计 P0-2/P1-1: 盘中极值触发 + CONT bar 计数时间止损 ==")
+# P0-2a: 盘中触 SL 后当前价回升 —— 旧语义(只看当前价)漏判, 新语义(low 极值)触发
+_pos7 = {"code": "000001", "filled_price": 10.0, "sl": 9.5, "tp1": 10.6, "tp2": 10.9,
+         "tp1_hit": False, "filled_at": "2026-09-10 09:31:00"}
+_snap7 = {"px": 10.3, "high": 10.35, "low": 9.4, "today": "20260913",
+          "bars_since_fill": 2}  # 盘中低点 9.4 < SL 9.5, 当前价回升到 10.3
+_r7a = EX.try_exit(_pos7, _snap7)
+ok("P0-2a: 盘中触SL后当前价回升仍触发", _r7a.get("exit") and _r7a["reason"] == "SL_HIT", str(_r7a))
+ok("P0-2a: SL 成交价=active_sl×(1-滑点) 非当前价", abs(_r7a["price"] - 9.5 * (1 - EX.SLIPPAGE)) < 0.01, str(_r7a.get("price")))
+# P0-2b: 盘中触 TP1 后当前价回落 —— 用 high 极值判定部分平仓
+_snap7b = {"px": 10.2, "high": 10.7, "low": 10.1, "today": "20260913", "bars_since_fill": 3}
+_r7b = EX.try_exit(_pos7, _snap7b)
+ok("P0-2b: 盘中触TP1后回落仍部分平仓", _r7b.get("partial") == "TP1", str(_r7b))
+# P0-2c: 无 high/low 的旧调用方 —— 退化为当前价语义(向后兼容)
+_snap7c = {"px": 10.3, "today": "20260913", "bars_since_fill": 2}
+_r7c = EX.try_exit(_pos7, _snap7c)
+ok("P0-2c: 无极值快照退化为当前价(不触发)", not _r7c.get("exit") and _r7c.get("why") == "HOLD", str(_r7c))
+# P1-1a: position 级 max_hold(CONT hold=10) 优先于 CFG.MAX_HOLD
+_pos7d = dict(_pos7); _pos7d["max_hold"] = 10
+_snap7d = {"px": 10.3, "high": 10.4, "low": 10.1, "today": "20260913", "bars_since_fill": 10}
+_r7d = EX.try_exit(_pos7d, _snap7d)
+ok("P1-1a: CONT max_hold=10 bar 计数触发 TIME_STOP", _r7d.get("exit") and _r7d["reason"] == "TIME_STOP", str(_r7d))
+# P1-1b: 周末/节假日不计 bar —— bars=9(周末两日不增)不触发
+_snap7e = {"px": 10.3, "high": 10.4, "low": 10.1, "today": "20260913", "bars_since_fill": 9}
+_r7e = EX.try_exit(_pos7d, _snap7e)
+ok("P1-1b: bars=9 < max_hold=10 不触发(交易日计数)", not _r7e.get("exit"), str(_r7e))
+# P1-1c: 无 max_hold 的 EVENT 持仓 —— 回退 CFG.MAX_HOLD(12)
+_snap7f = {"px": 10.3, "high": 10.4, "low": 10.1, "today": "20260913", "bars_since_fill": 12}
+_r7f = EX.try_exit(_pos7, _snap7f)  # 无 max_hold
+ok("P1-1c: EVENT 回退 CFG.MAX_HOLD(12)触发", _r7f.get("exit") and _r7f["reason"] == "TIME_STOP", str(_r7f))
+
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

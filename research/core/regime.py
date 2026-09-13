@@ -16,8 +16,10 @@
 """
 import json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import config as CFG
 
-KT_CACHE = r"E:\test\smc_project\hermes\kline_cache_etf"
+# FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 派生路径(ETF 指数缓存)
+KT_CACHE = os.path.join(CFG.HERMES_DIR, "kline_cache_etf")
 
 
 def _load_index(fn):

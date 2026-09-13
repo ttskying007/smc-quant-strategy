@@ -12,7 +12,8 @@ from collections import defaultdict
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, r"E:\test\smc_project\wdh")
+# FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径(WDH_DIR)
+sys.path.insert(0, CFG.WDH_DIR)
 import wdh_engine as we
 import config as CFG  # 审计 P1: 统一路径/解释器
 
@@ -88,7 +89,8 @@ def market_latest():
 def refresh_key_stocks():
     """Force-refresh holdings + recent-event stocks from Sina (small set, fast serial)."""
     try:
-        subprocess.run([PY, r"E:\test\smc_project\wdh\refresh_holdings_sina.py"], timeout=1200, capture_output=True)
+        # FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径(WDH_DIR)
+        subprocess.run([PY, os.path.join(CFG.WDH_DIR, "refresh_holdings_sina.py")], timeout=1200, capture_output=True)
     except Exception as e:
         print(f"关键股刷新失败(继续): {e}", flush=True)
 

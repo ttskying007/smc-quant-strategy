@@ -6,9 +6,10 @@ from collections import defaultdict
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, r"E:\test\smc_project\wdh")
-import wdh_engine as we
 import config as CFG  # 审计 P1: 统一路径
+# FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径(WDH_DIR)
+sys.path.insert(0, CFG.WDH_DIR)
+import wdh_engine as we
 
 KT = CFG.KT_CACHE
 PIVOT = 3
@@ -174,14 +175,16 @@ for c in cands[:10]:
     print(f"  {c['symbol']}: signal={c['signal_date']} ref={c['reference_price']} support={c['support']}")
 
 # merge into scanner result
+# FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径(RESEARCH_DIR)
+_CSR = os.path.join(CFG.RESEARCH_DIR, "current_scanner_result.json")
 try:
-    with open(r"E:\test\smc_project\research\current_scanner_result.json", encoding="utf-8") as fh:
+    with open(_CSR, encoding="utf-8") as fh:
         res = json.load(fh)
 except Exception:
     res = {}
 res["continuation_candidates"] = cands
 res["continuation_count"] = len(cands)
 res["latest_date"] = latest
-with open(r"E:\test\smc_project\research\current_scanner_result.json", "w", encoding="utf-8") as fh:
+with open(_CSR, "w", encoding="utf-8") as fh:
     json.dump(res, fh, ensure_ascii=False, indent=2)
 print("scanner result updated with continuation candidates")

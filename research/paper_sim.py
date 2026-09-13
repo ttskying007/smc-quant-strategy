@@ -105,9 +105,15 @@ def realtime_prices(codes):
                         _vol = float(vals[8]) if len(vals) > 8 and vals[8] else 0.0
                         # FIX(2026-09-05, 审计 G05): 返回今开 open（vals[1]），供 next_open 实时成交
                         _open = float(vals[1]) if len(vals) > 1 and vals[1] else 0.0
+                        # FIX(2026-09-13, 第七轮审计 P0-2): 透传当日 high/low（vals[4]/vals[5]），
+                        # 供 try_exit 盘中触发判定 —— 修复"只看当前价遗漏盘中 TP/SL 触发"，
+                        # 使实时纸面与日线回测的 OHLC 触发语义一致（盘中触过即算，不看当前价回落）。
+                        _high = float(vals[4]) if len(vals) > 4 and vals[4] else 0.0
+                        _low = float(vals[5]) if len(vals) > 5 and vals[5] else 0.0
                         # FIX(2026-08-22): skip 0.00 prices (Sina off-hours / failure) — don't return 0
                         if _px > 0:
-                            out[sym[2:]] = {"px": _px, "prev": _prev, "vol": _vol, "open": _open}
+                            out[sym[2:]] = {"px": _px, "prev": _prev, "vol": _vol, "open": _open,
+                                            "high": _high, "low": _low}
                     except Exception:
                         pass
         except Exception:
@@ -510,7 +516,8 @@ def daily_selection():
     """Scan new insider events -> create PENDING_ORDER entries.
     entry price = disclosure day close (limit order: buy only at or below)."""
     import sqlite3
-    conn = sqlite3.connect(r"E:\test\smc_project\announce\smc_announce.db")
+    # FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径
+    conn = sqlite3.connect(CFG.ANNOUNCE_DB)
     cur = conn.cursor()
     cur.execute("SELECT DISTINCT date FROM announce ORDER BY date DESC LIMIT 5")
     recent_days = [r[0] for r in cur.fetchall()]
@@ -679,11 +686,17 @@ def daily_selection():
                 "insider_amount_wan": _amt, "insider_pct": _pct, "insider_hint": _mag_hint,
                 "position_pct": _position_pct, "risk_dist_pct": round(_risk_dist / limit_px * 100, 2) if _risk_dist else None,
                 "filled_price": None, "filled_at": None,
-                "exit_reason": None, "pnl_pct": None, "entry_mode": "retrace",
+                "exit_reason": None, "pnl_pct": None,
+                # FIX(2026-09-13, 第七轮审计 P0-1): entry_mode 显式化 —— 旧名 "retrace" 是
+                # core.execution 的废弃别名(= limit_or_open 语义: 触价优先, 否则开盘兜底),
+                # 与账本 order_type="LIMIT_RETRACE" 字面矛盾。事件单设计意图就是"回踩限价+
+                # 开盘兜底"(研究 +0.47pp, F10 对账语义依赖), 故显式改写 limit_or_open;
+                # 严格限价单(未触价永不成交)才用 limit_retrace。
+                "entry_mode": "limit_or_open",
                 # FIX(2026-09-08, 复审 P1-1): 订单类型显式化 —— 每笔记录类型与时间边界。
-                # retrace = LIMIT_RETRACE(披露收盘×0.99限价, 次日低点触发), next_open = MARKET_T1_OPEN。
+                # limit_or_open = 触价优先(披露收盘×0.99), 未触则 T+1 实时 open 兜底; next_open = MARKET_T1_OPEN。
                 # submitted_at=信号生成日, eligible_at=valid_from(可成交首日), fill_rule=撮合规则。
-                "order_type": "LIMIT_RETRACE", "submitted_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "order_type": "LIMIT_OR_OPEN", "submitted_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "eligible_at": _next_td(dates, d8),
                 "fill_rule": "回踩挂单: low<=limit×0.99 成交, 否则 T+1 开盘兜底(实时open)",
                 "not_filled_reason": None,
@@ -824,7 +837,8 @@ def daily_selection():
         _raw = _kline_hit = _ev_cnt = 0
         _soft_delta = _hard = _soft = 0
         import sqlite3 as _sq3
-        _c2 = _sq3.connect(r"E:\test\smc_project\announce\smc_announce.db")
+        # FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径
+        _c2 = _sq3.connect(CFG.ANNOUNCE_DB)
         _cur2 = _c2.cursor()
         for _dd2 in recent_days:
             _cur2.execute("SELECT title FROM announce WHERE date=? AND (title LIKE '%增持%' OR title LIKE '%回购%')", (_dd2,))
@@ -954,6 +968,9 @@ def realtime_monitor():
             from core.execution import try_fill as _core_fill
             _snap = dict(_info or {})
             _snap["today"] = time.strftime("%Y%m%d")
+            # FIX(2026-09-13, 第七轮审计 P0-1): 旧 entry_mode="retrace"(废弃别名)统一映射为
+            # limit_or_open(其真实语义: 触价优先+开盘兜底)——与 daily_selection 写入的显式
+            # entry_mode="limit_or_open" 一致, 消除"字段字面 vs 撮合语义"不一致。
             _fo = {"code": t["code"], "entry_mode": t.get("entry_mode") or "retrace",
                    "reference_price": t.get("entry_price"),
                    "planned_sl": t.get("sl1") or t.get("sl_price"),
@@ -1024,27 +1041,11 @@ def realtime_monitor():
                 t["t1_locked"] = True  # T+1 锁定（今日买入不可卖）
                 continue
             t["t1_locked"] = False
-            # continuation leg: adaptive hold (market state) — FIX(2026-08-28)
-            if t.get("source") == "CONT" and t.get("filled_at"):
-                hold = int(t.get("hold") or 10)
-                try:
-                    _pr_hold = _market_proxy(t["code"])
-                    if _pr_hold is not None:
-                        hold = adaptive_hold(hold, _pr_hold)
-                except Exception:
-                    pass
-                # compute exit when hold days elapsed (approx: use filled_at + hold days vs now)
-                try:
-                    from datetime import datetime as _dt
-                    fdt = _dt.strptime(str(t["filled_at"])[:10], "%Y-%m-%d")
-                    days = (time.time() - fdt.timestamp()) / 86400
-                    if days >= hold:
-                        t["status"] = "CLOSED"
-                        t["exit_reason"] = "HOLD_EXIT"
-                        t["pnl_pct"] = round((_sell_px / ep - 1) * 100 - FEE, 4)
-                        n_close += 1
-                except Exception:
-                    pass
+            # FIX(2026-09-13, 第七轮审计 P1-1): 删除 CONT 独立自然日 HOLD_EXIT 分支
+            # （原实现按 Unix 自然日差退出, 混入周末/节假日, 且绕开统一 TP/SL/时间止损合同）。
+            # 延续腿持有期统一由 core.execution.try_exit 的时间止损判定:
+            # bars_since_fill(交易日 bar 计数) >= hold(写入 position 的 max_hold) → TIME_STOP。
+            # 旧行为对照: HOLD_EXIT(自然日) → 新行为 TIME_STOP(交易日 bar) — 语义更严: 周末不计时。
             if t["status"] == "FILLED":
                 # FIX(2026-09-08, 审计 P0-4 完结): 离场判定统一委托 core.execution.try_exit。
                 # 判定顺序(T+1锁→SL/BE→TP1部分→TP2全平→时间止损)与 simulate 逐 bar 完全一致，
@@ -1063,9 +1064,22 @@ def realtime_monitor():
                         _bars_sf = len(_ds2) - 1 - _ds2.index(_fd2)
                 except Exception:
                     pass
+                # FIX(2026-09-13, 第七轮审计 P1-1): max_hold 按腿透传 —— CONT 用自身
+                # hold(默认10)+adaptive_hold 市场状态自适应(语义保留, 从独立自然日分支
+                # 改为 try_exit 的 bar 计数参数); EVENT 用 CFG.MAX_HOLD(12)缺省。
+                _max_hold_4core = None
+                if t.get("source") == "CONT":
+                    _mh = int(t.get("hold") or 10)
+                    try:
+                        _pr_hold = _market_proxy(t["code"])
+                        if _pr_hold is not None:
+                            _mh = adaptive_hold(_mh, _pr_hold)
+                    except Exception:
+                        pass
+                    _max_hold_4core = _mh
                 _pos4core = {"code": t["code"], "filled_price": ep, "sl": sl1,
                              "tp1": tp1, "tp2": tp2, "tp1_hit": bool(t.get("tp1_hit")),
-                             "filled_at": t.get("filled_at", "")}
+                             "filled_at": t.get("filled_at", ""), "max_hold": _max_hold_4core}
                 _snap4core = dict(_info or {})
                 _snap4core["today"] = time.strftime("%Y%m%d")
                 _snap4core["bars_since_fill"] = _bars_sf

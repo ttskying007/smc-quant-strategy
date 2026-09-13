@@ -276,7 +276,11 @@ def try_exit(position, market_snapshot):
     """持仓 + 实时快照 → ExitResult。判定顺序与 simulate 逐 bar 完全一致：
     ① SL/BE（含 T+1 锁定：当日买入不可卖）→ ② TP1 部分平 → ③ TP2 全平 → ④ 时间止损。
     position: {code, filled_price(filled), sl, tp, tp1, tp2, tp1_hit, filled_at, asof_bars}
-    market_snapshot: {px, today, bars_since_fill}"""
+    market_snapshot: {px, today, bars_since_fill}
+    FIX(2026-09-13, 第七轮审计 P0-2): 快照含 high/low 时用极值触发判定 ——
+    px = max(px, high), px_low = min(px, low)。SL 用 px_low（盘中触及即算），
+    TP 用 px_high。当前价回落不掩盖已发生的触发（与日线回测 OHLC 语义一致）。
+    无 high/low 的旧调用方仍走当前价语义（向后兼容）。"""
     snap = market_snapshot or {}
     code = position.get("code") or ""
     px = snap.get("px")
@@ -293,23 +297,35 @@ def try_exit(position, market_snapshot):
     today = str(snap.get("today") or "")
     if today and str(position.get("filled_at") or "")[:10].replace("-", "") == today.replace("-", ""):
         return {"exit": False, "why": "T1_LOCKED"}
+    # P0-2: 盘中极值（快照有 high/low 时聚合；否则退化为当前价）
+    _hi = snap.get("high") or 0
+    _lo = snap.get("low") or 0
+    px_high = max(float(px), float(_hi)) if _hi else float(px)
+    px_low = min(float(px), float(_lo)) if _lo else float(px)
     sl = float(position.get("sl") or 0)
     tp1 = float(position.get("tp1") or 0)
     tp2 = float(position.get("tp2") or position.get("tp") or 0)
     tp1_hit = bool(position.get("tp1_hit"))
-    # ① active SL（TP1 后保本）—— 与 simulate 一致
+    # ① active SL（TP1 后保本）—— 与 simulate 一致（SL 用盘中低点）
     active_sl = sl if not tp1_hit else max(ep, sl)
-    if active_sl and px <= active_sl:
+    if active_sl and px_low <= active_sl:
         return {"exit": True, "reason": "BE" if (tp1_hit and abs(active_sl - ep) < 1e-6) else "SL_HIT",
-                "price": round(px * (1 - SLIPPAGE), 3)}
-    # ② TP1 部分平（未触过）
-    if not tp1_hit and tp1 and px >= tp1:
+                "price": round(active_sl * (1 - SLIPPAGE), 3)}
+    # ② TP1 部分平（未触过；用盘中高点）
+    if not tp1_hit and tp1 and px_high >= tp1:
         return {"exit": False, "partial": "TP1", "new_state": {"tp1_hit": True, "sl": ep}}
-    # ③ TP2 全平
-    if tp1_hit and tp2 and px >= tp2:
-        return {"exit": True, "reason": "TP2_RUNNER", "price": round(px * (1 - SLIPPAGE), 3)}
+    # ③ TP2 全平（用盘中高点）
+    if tp1_hit and tp2 and px_high >= tp2:
+        return {"exit": True, "reason": "TP2_RUNNER", "price": round(px_high * (1 - SLIPPAGE), 3)}
     # ④ 时间止损（未触 TP1 且超 max_hold）—— 最后判定
+    # FIX(2026-09-13, 第七轮审计 P1-1): position 级 max_hold 优先（CONT 延续腿持有期 10bar
+    # 等按腿配置），缺省回退 CFG.MAX_HOLD —— 延续腿不再走自然日分支, 统一由本核心按
+    # 交易日 bar 计数(bars_since_fill)判定。
     bars = snap.get("bars_since_fill")
-    if (not tp1_hit) and bars is not None and int(bars) >= (getattr(CFG, "MAX_HOLD", 12)):
+    _max_hold = position.get("max_hold")
+    if _max_hold is None and getattr(CFG, "MAX_HOLD", None) is None:
+        # 无任何配置时保守默认（不应发生: config 始终提供）
+        _max_hold = 12
+    if (not tp1_hit) and bars is not None and int(bars) >= int(_max_hold or getattr(CFG, "MAX_HOLD", 12)):
         return {"exit": True, "reason": "TIME_STOP", "price": round(px * (1 - SLIPPAGE), 3)}
     return {"exit": False, "why": "HOLD"}
