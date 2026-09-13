@@ -164,6 +164,23 @@ def _avg_vs_pass(rej_h, pass_h):
     return "comparable"
 
 
+def path_aware_expectation(s, sl_ret=-0.04, tp1_ret=0.03):
+    """R6(§9.2 纪律落地): 路径感知期望 —— sl_first 先离场者吃不到 h20。
+    E[path] = sl_first×SL收益 + tp1_no_sl×TP1收益 + neither×h20均值。
+    naive fwd 会把"先止损的样本"按 h20 计收益, 系统性高估被拒层价值;
+    该函数把 §9.2"只看上涨不足以证明可交易"变成可计算判据。
+    tp1_no_sl = min(max(0, tp1率-sl率), 1-sl_first)(保守夹挤)。"""
+    h20 = (s.get("fwd_avg") or {}).get("h20")
+    slf, tp1, sl = s.get("sl_first_rate"), s.get("tp1_hit_rate"), s.get("sl_hit_rate")
+    if h20 is None or slf is None or tp1 is None or sl is None:
+        return None
+    tp1_no_sl = min(max(0.0, tp1 - (sl or 0)), 1 - slf)
+    neither = max(0.0, 1 - slf - tp1_no_sl)
+    e = slf * sl_ret + tp1_no_sl * tp1_ret + neither * h20
+    return {"sl_first": slf, "tp1_no_sl": round(tp1_no_sl, 3), "neither": round(neither, 3),
+            "e_path": round(e, 4), "naive_h20": h20}
+
+
 def main():
     import argparse
     ap = argparse.ArgumentParser()
@@ -187,6 +204,7 @@ def main():
             "n_evaluable": s["evaluable"],
             "vs_passed": {f"h{h}": _avg_vs_pass(s["fwd_avg"].get(f"h{h}"), pas_avg.get(f"h{h}"))
                           for h in FWD_DAYS},
+            "path_aware": path_aware_expectation(s),
             "verdict": "watch(仅观察, 放宽需连续样本+n>=20+通过重放验证)",
         }
     report = {
@@ -202,9 +220,11 @@ def main():
     print(f"被拒记录 {rej['total_n']} 条, 可评估 {sum(s['evaluable'] for s in rej['per_stage'].values())}, 不可评估 {rej['unavailable']}")
     for stage, s in sorted(rej["per_stage"].items(), key=lambda kv: -kv[1]["n"]):
         v = verdicts.get(stage, {})
+        pa = path_aware_expectation(s)
+        pa_txt = f" E[path]={pa['e_path']:+.4f}(slf={pa['sl_first']:.2f},tp1ns={pa['tp1_no_sl']:.2f})" if pa else ""
         print(f"  {stage:16s} n={s['n']:4d} avail={s['evaluable']:4d} h20avg={s['fwd_avg'].get('h20')} "
               f"mfe={s['mfe_avg']} mae={s['mae_avg']} tp1={s['tp1_hit_rate']} sl={s['sl_hit_rate']} "
-              f"verdict={v.get('verdict','')}")
+              f"verdict={v.get('verdict','')}{pa_txt}")
     print(f"通过组对照: n={(pas.get('per_stage',{}).get('PASSED_ORDER',{}) or {}).get('n',0)} "
           f"h20avg={pas_avg.get('h20')}")
     print(f"已写 {OUT}")

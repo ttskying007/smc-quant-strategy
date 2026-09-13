@@ -1,0 +1,166 @@
+{
+  "generated_at": "2026-09-13 11:24:20",
+  "provenance": "backfill_replay",
+  "window": [
+    "20260521",
+    "20260813"
+  ],
+  "days": 60,
+  "rejected": {
+    "per_stage": {
+      "STAGE_MARKUP": {
+        "n": 19,
+        "evaluable": 19,
+        "full_window": 19,
+        "fwd_avg": {
+          "h5": -0.0245,
+          "h10": 0.021,
+          "h20": 0.0357
+        },
+        "fwd_n": {
+          "h5": 19,
+          "h10": 19,
+          "h20": 19
+        },
+        "mfe_avg": 0.1933,
+        "mae_avg": -0.1405,
+        "tp1_hit_rate": 0.368,
+        "sl_hit_rate": 0.526,
+        "sl_first_rate": 0.474
+      },
+      "EVENT_FILTER": {
+        "n": 1526,
+        "evaluable": 1207,
+        "full_window": 1198,
+        "fwd_avg": {
+          "h5": 0.0104,
+          "h10": 0.0228,
+          "h20": 0.0258
+        },
+        "fwd_n": {
+          "h5": 1207,
+          "h10": 1203,
+          "h20": 1198
+        },
+        "mfe_avg": 0.1351,
+        "mae_avg": -0.088,
+        "tp1_hit_rate": 0.514,
+        "sl_hit_rate": 0.48,
+        "sl_first_rate": 0.418
+      },
+      "ADX_LT20": {
+        "n": 150,
+        "evaluable": 150,
+        "full_window": 150,
+        "fwd_avg": {
+          "h5": 0.0273,
+          "h10": 0.047,
+          "h20": 0.0447
+        },
+        "fwd_n": {
+          "h5": 150,
+          "h10": 150,
+          "h20": 150
+        },
+        "mfe_avg": 0.1392,
+        "mae_avg": -0.0558,
+        "tp1_hit_rate": 0.64,
+        "sl_hit_rate": 0.413,
+        "sl_first_rate": 0.367
+      },
+      "DUP_EXISTING": {
+        "n": 87,
+        "evaluable": 0,
+        "full_window": 0,
+        "fwd_avg": {},
+        "fwd_n": {},
+        "mfe_avg": null,
+        "mae_avg": null,
+        "tp1_hit_rate": null,
+        "sl_hit_rate": null,
+        "sl_first_rate": null
+      },
+      "STAGE_UPTREND": {
+        "n": 65,
+        "evaluable": 65,
+        "full_window": 65,
+        "fwd_avg": {
+          "h5": -0.0079,
+          "h10": 0.0154,
+          "h20": 0.0565
+        },
+        "fwd_n": {
+          "h5": 65,
+          "h10": 65,
+          "h20": 65
+        },
+        "mfe_avg": 0.183,
+        "mae_avg": -0.1195,
+        "tp1_hit_rate": 0.538,
+        "sl_hit_rate": 0.677,
+        "sl_first_rate": 0.615
+      },
+      "STAGE_DISTRIB": {
+        "n": 7,
+        "evaluable": 7,
+        "full_window": 7,
+        "fwd_avg": {
+          "h5": 0.1266,
+          "h10": 0.2929,
+          "h20": 0.3972
+        },
+        "fwd_n": {
+          "h5": 7,
+          "h10": 7,
+          "h20": 7
+        },
+        "mfe_avg": 0.5814,
+        "mae_avg": -0.0717,
+        "tp1_hit_rate": 0.714,
+        "sl_hit_rate": 0.286,
+        "sl_first_rate": 0.286
+      },
+      "DATA_MISSING": {
+        "n": 132,
+        "evaluable": 0,
+        "full_window": 0,
+        "fwd_avg": {},
+        "fwd_n": {},
+        "mfe_avg": null,
+        "mae_avg": null,
+        "tp1_hit_rate": null,
+        "sl_hit_rate": null,
+        "sl_first_rate": null
+      }
+    },
+    "total_n": 1986,
+    "unavailable": 451
+  },
+  "passed_cohort": {
+    "per_stage": {
+      "PASSED_ORDER": {
+        "n": 94,
+        "evaluable": 92,
+        "full_window": 61,
+        "fwd_avg": {
+          "h5": -0.0205,
+          "h10": -0.0058,
+          "h20": -0.0114
+        },
+        "fwd_n": {
+          "h5": 90,
+          "h10": 78,
+          "h20": 61
+        },
+        "mfe_avg": 0.0802,
+        "mae_avg": -0.0788,
+        "tp1_hit_rate": 0.489,
+        "sl_hit_rate": 0.38,
+        "sl_first_rate": 0.304
+      }
+    },
+    "total_n": 94,
+    "unavailable": 2
+  },
+  "discipline": "研究级重放预览; 正式 n>=20 判定以生产账本前瞻积累为准"
+}

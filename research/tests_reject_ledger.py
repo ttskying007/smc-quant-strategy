@@ -9,7 +9,8 @@ sys.path.insert(0, HERE)
 # 注意: reject_forward_eval 模块级会重包 sys.stdout(utf-8), 本测试库不重复包
 # (双重 wrapper 会让先建的一层被 GC 关闭 → ValueError: I/O operation on closed file)
 import paper_sim  # noqa: E402
-from reject_forward_eval import eval_one, evaluate, _avg_vs_pass, FWD_DAYS  # noqa: E402
+from reject_forward_eval import (eval_one, evaluate, _avg_vs_pass, FWD_DAYS,  # noqa: E402
+                                 path_aware_expectation)
 
 PASS = FAIL = 0
 def ok(name, cond, detail=""):
@@ -131,6 +132,22 @@ ok("差>2% → rejected_better", _avg_vs_pass(0.06, 0.03).startswith("rejected_b
 ok("差<-2% → rejected_worse", _avg_vs_pass(0.01, 0.06).startswith("rejected_worse"))
 ok("|差|<=2% → comparable", _avg_vs_pass(0.05, 0.04) == "comparable")
 ok("缺数据 → insufficient", _avg_vs_pass(None, 0.03) == "insufficient_data")
+
+print("== 6. 路径感知期望 (path_aware_expectation, R6) ==")
+# 手算: slf=0.6, tp1=0.3, sl=0.5 → tp1_no_sl=min(max(0,0.3-0.5)=0, 0.4)=0; neither=0.4
+pa = path_aware_expectation({"fwd_avg": {"h20": 0.05}, "sl_first_rate": 0.6, "tp1_hit_rate": 0.3, "sl_hit_rate": 0.5})
+ok("夹挤: tp1_no_sl=0(先SL覆盖) neither=0.4", pa["tp1_no_sl"] == 0 and pa["neither"] == 0.4)
+ok("E[path]=0.6*(-4%)+0*3%+0.4*5%", pa["e_path"] == round(0.6 * -0.04 + 0 * 0.03 + 0.4 * 0.05, 4))
+# 先止损者吃不到 h20: slf=1 → E[path]=-4%
+pa2 = path_aware_expectation({"fwd_avg": {"h20": 0.30}, "sl_first_rate": 1.0, "tp1_hit_rate": 0.9, "sl_hit_rate": 0.95})
+ok("全先止损 → E[path]=SL收益", pa2["e_path"] == -0.04 and pa2["tp1_no_sl"] == 0.0)
+# naive vs path 方向反转案例(§9.2 纪律): h20=+5% 但 slf=0.615 → E[path]<0
+pa3 = path_aware_expectation({"fwd_avg": {"h20": 0.0565}, "sl_first_rate": 0.615, "tp1_hit_rate": 0.538, "sl_hit_rate": 0.677})
+ok("naive>0 但 E[path]<0(方向反转)", pa3["naive_h20"] == 0.0565 and pa3["e_path"] < 0, pa3)
+# 缺字段 → None
+ok("缺 h20 → None", path_aware_expectation({"fwd_avg": {"h20": None}, "sl_first_rate": 0.5,
+                                              "tp1_hit_rate": 0.5, "sl_hit_rate": 0.5}) is None)
+ok("缺率 → None", path_aware_expectation({"fwd_avg": {"h20": 0.05}, "tp1_hit_rate": 0.5}) is None)
 
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)
