@@ -11,7 +11,7 @@
 
 用法: python reject_forward_eval.py [--min-n 20] [--horizon 20]
 输出: handover/reject_forward_report.json + 控制台分层摘要。纯研究工具, 不改生产链。"""
-import io, json, os, sys, time
+import io, json, os, sys, time, random
 from collections import defaultdict
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -21,6 +21,11 @@ import paper_sim  # bars_of / structural_sltp / stage_and_deep / load_ledger
 
 ROOT = paper_sim.ROOT
 OUT = os.path.join(HERE, "handover", "reject_forward_report.json")
+# R9: 上证指数(超额基准) —— pull_index_daily 写入 <项目根>/hermes/kline_cache_etf/
+# (ROOT 是 research 目录; 指数缓存在项目根 hermes/ 下)
+_PROJ_ROOT = os.path.dirname(ROOT)
+INDEX_DIR = os.path.join(_PROJ_ROOT, "hermes", "kline_cache_etf")
+INDEX_FILE = os.path.join(INDEX_DIR, "SH_000001_daily.json")  # 上证指数(超额基准, pull_index_daily 维护)
 
 FWD_DAYS = (5, 10, 20)
 
@@ -94,6 +99,7 @@ def evaluate(records, bars_of=None, band_for=None, min_n=20):
             if key not in latest or str(r.get("ts", "")) >= str(latest[key].get("ts", "")):
                 latest[key] = r
     per_stage = defaultdict(lambda: {"n": 0, "avail": 0, "fwd": defaultdict(list),
+                                     "excess": defaultdict(list),
                                      "mfe": [], "mae": [], "tp1": 0, "sl": 0, "sl_first": 0, "full": 0})
     unavailable = 0
     for (code, d8), r in latest.items():
@@ -120,6 +126,10 @@ def evaluate(records, bars_of=None, band_for=None, min_n=20):
             v = ev[f"fwd{h}"]
             if v is not None:
                 s["fwd"][h].append(v)
+                # R9 §9.2 超额收益: 个股 fwd − 上证指数同窗 fwd(基准缺失 → 跳过, 不计 0)
+                _iv = index_fwd(d8, h)
+                if _iv is not None:
+                    s["excess"][h].append(round(v - _iv, 4))
         s["mfe"].append(ev["mfe"])
         s["mae"].append(ev["mae"])
         s["tp1"] += 1 if ev["tp1_hit"] else 0
@@ -128,10 +138,15 @@ def evaluate(records, bars_of=None, band_for=None, min_n=20):
     # 汇总
     agg = {}
     for stage, s in per_stage.items():
+        m20, lo20, hi20 = bootstrap_ci(s["fwd"][20])
+        ex20, exlo, exhi = bootstrap_ci(s["excess"][20])
         agg[stage] = {
             "n": s["n"], "evaluable": s["avail"], "full_window": s["full"],
             "fwd_avg": {f"h{h}": (round(sum(v) / len(v), 4) if v else None) for h, v in s["fwd"].items()},
             "fwd_n": {f"h{h}": len(v) for h, v in s["fwd"].items()},
+            "excess_avg": {f"h{h}": (round(sum(v) / len(v), 4) if v else None) for h, v in s["excess"].items()},
+            "h20_bootstrap_ci95": {"mean": m20, "lo": lo20, "hi": hi20, "n_boot": 2000},
+            "excess_h20_bootstrap_ci95": {"mean": ex20, "lo": exlo, "hi": exhi} if ex20 is not None else None,
             "mfe_avg": round(sum(s["mfe"]) / len(s["mfe"]), 4) if s["mfe"] else None,
             "mae_avg": round(sum(s["mae"]) / len(s["mae"]), 4) if s["mae"] else None,
             "tp1_hit_rate": round(s["tp1"] / s["avail"], 3) if s["avail"] else None,
@@ -162,6 +177,59 @@ def _avg_vs_pass(rej_h, pass_h):
     if d < -0.02:
         return f"rejected_worse({d:.4f})"
     return "comparable"
+
+
+# ============ R9(§9.2/§11.3 补全): 超额收益 + bootstrap 置信区间 ============
+
+_INDEX_BARS = None
+
+def _index_bars():
+    """上证指数日线(超额基准); 加载失败 → None(超额字段降级为 null, 不阻断)。"""
+    global _INDEX_BARS
+    if _INDEX_BARS is None:
+        try:
+            raw = json.load(open(INDEX_FILE, encoding="utf-8"))
+            bars = [{"t": str(b.get("t", "")).replace("-", ""), "c": float(b.get("c") or 0)}
+                    for b in raw if b.get("t") and b.get("c")]
+            bars.sort(key=lambda x: x["t"])
+            if bars:
+                _INDEX_BARS = bars
+        except Exception:
+            _INDEX_BARS = []
+    return _INDEX_BARS or None
+
+
+def index_fwd(d8, horizon):
+    """指数同窗前瞻收益(signal日→+horizon交易日); 无数据 → None。"""
+    bars = _index_bars()
+    if not bars:
+        return None
+    ds = [b["t"] for b in bars]
+    if d8 not in ds:
+        return None
+    i = ds.index(d8)
+    if i + horizon >= len(bars):
+        return None
+    return round(bars[i + horizon]["c"] / bars[i]["c"] - 1, 4)
+
+
+def bootstrap_ci(values, n_boot=2000, ci=0.95, seed=20260913):
+    """样本均值 bootstrap 置信区间(§11.3 指标最低集合)。
+    纯函数; values 空 → (None, None)。返回 (mean, lo, hi)。"""
+    if not values:
+        return None, None, None
+    rng = random.Random(seed)
+    n = len(values)
+    means = []
+    for _ in range(n_boot):
+        s = sum(values[rng.randrange(n)] for _ in range(n))
+        means.append(s / n)
+    means.sort()
+    a = (1 - ci) / 2
+    lo = means[int(a * n_boot)]
+    hi = means[min(n_boot - 1, int((1 - a) * n_boot))]
+    m = sum(values) / n
+    return round(m, 4), round(lo, 4), round(hi, 4)
 
 
 def path_aware_expectation(s, sl_ret=-0.04, tp1_ret=0.03):
@@ -214,6 +282,8 @@ def main():
         "passed_cohort": pas,
         "verdicts": verdicts,
         "discipline": "被拒层优于通过组仅是放宽必要条件; 还须重放真实成交/滑点/组合容量(§9.2 纪律)",
+        "r9_additions": {"excess_benchmark": "上证指数 SH_000001(pull_index_daily 维护; 基准缺失窗口跳过不计0)",
+                         "bootstrap": "h20 均值 2000 次 bootstrap 95% CI(§11.3 指标最低集合)"},
     }
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     json.dump(report, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
@@ -222,7 +292,10 @@ def main():
         v = verdicts.get(stage, {})
         pa = path_aware_expectation(s)
         pa_txt = f" E[path]={pa['e_path']:+.4f}(slf={pa['sl_first']:.2f},tp1ns={pa['tp1_no_sl']:.2f})" if pa else ""
+        ci = s.get("h20_bootstrap_ci95") or {}
+        ex = (s.get("excess_avg") or {}).get("h20")
         print(f"  {stage:16s} n={s['n']:4d} avail={s['evaluable']:4d} h20avg={s['fwd_avg'].get('h20')} "
+              f"CI95=[{ci.get('lo')},{ci.get('hi')}] 超额h20={ex} "
               f"mfe={s['mfe_avg']} mae={s['mae_avg']} tp1={s['tp1_hit_rate']} sl={s['sl_hit_rate']} "
               f"verdict={v.get('verdict','')}{pa_txt}")
     print(f"通过组对照: n={(pas.get('per_stage',{}).get('PASSED_ORDER',{}) or {}).get('n',0)} "

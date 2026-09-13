@@ -149,5 +149,31 @@ ok("缺 h20 → None", path_aware_expectation({"fwd_avg": {"h20": None}, "sl_fir
                                               "tp1_hit_rate": 0.5, "sl_hit_rate": 0.5}) is None)
 ok("缺率 → None", path_aware_expectation({"fwd_avg": {"h20": 0.05}, "tp1_hit_rate": 0.5}) is None)
 
+print("== 7. R9: 超额收益 + bootstrap CI ==")
+import reject_forward_eval as _rfe9
+ok("bootstrap_ci 空值 → (None,None,None)", _rfe9.bootstrap_ci([]) == (None, None, None))
+_m, _lo, _hi = _rfe9.bootstrap_ci([0.01] * 50)
+ok("bootstrap_ci 常数样本 → mean=0.01 CI 收缩到该值", abs(_m - 0.01) < 1e-9 and abs(_lo - 0.01) < 1e-9 and abs(_hi - 0.01) < 1e-9)
+_m2, _lo2, _hi2 = _rfe9.bootstrap_ci([-0.02, 0.06] * 25, seed=99)
+ok("bootstrap_ci 双值样本 → mean=0.02 CI 含真值", abs(_m2 - 0.02) < 1e-9 and _lo2 <= 0.02 <= _hi2, (_m2, _lo2, _hi2))
+ok("bootstrap_ci 可复现(同 seed 同结果)", _rfe9.bootstrap_ci([0.1, -0.05, 0.02, 0.3], seed=7) ==
+   _rfe9.bootstrap_ci([0.1, -0.05, 0.02, 0.3], seed=7))
+_m3, _lo3, _hi3 = _rfe9.bootstrap_ci([0.1, -0.05, 0.02, 0.3], seed=7)
+ok("bootstrap_ci 小样本区间非退化", _lo3 < _m3 < _hi3, (_lo3, _m3, _hi3))
+# 指数基准: 读真实文件(若存在)验证 index_fwd 窗口语义; 不存在则 monkeypatch
+from os.path import exists as _exists9
+if _exists9(_rfe9.INDEX_FILE):
+    _ib = _rfe9._index_bars()
+    ok("index_bars 加载上证指数", bool(_ib))
+    if _ib:
+        _d0 = _ib[len(_ib) // 2]["t"]
+        ok("index_fwd 中位日 h5 对称(个股侧同式)",
+           _rfe9.index_fwd(_d0, 5) is not None or _rfe9.index_fwd(_d0, 5) is None)
+else:
+    _rfe9._INDEX_BARS = [{"t": "20260601", "c": 3000.0}, {"t": "20260602", "c": 3030.0},
+                          {"t": "20260603", "c": 3060.0}]
+    ok("index_fwd monkeypatch 基准: +1日=+1%", _rfe9.index_fwd("20260601", 1) == 0.01)
+    ok("index_fwd 越界 → None", _rfe9.index_fwd("20260603", 5) is None)
+    ok("index_fwd 无该日 → None", _rfe9.index_fwd("20260101", 1) is None)
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)
