@@ -7,7 +7,17 @@ V3审计§六 两个问题修正:
      旧版注释写"TP3结构位"但无 TP 逻辑的分叉已消除; SL=invalid-1.5ATR / TIME=15bar /
      TP=3R 结构位, 与 B1 SHADOW 回测同 EXIT_VERSION。
 新信号生成走 core/setup_engine.py build_setup(统一 setup_id/engine_version/exit_version)。
-自动化: 每日跑, 幂等(同 setup_id 只记一次), 滚动90天。"""
+自动化: 每日跑, 幂等(同 setup_id 只记一次), 滚动90天。
+
+定位声明(R21, 第八轮审计 6.4 落地): 本台账是 **研究旁路(research bypass)**, 不是
+主生产订单源 —— 生产订单唯一来源是 paper_sim.daily_selection()(EVENT/CONT 腿,
+含 PortfolioGate/执行内核/账本合同)。setup_engine_paper 的产出仅用于:
+  ① Setup 结构质量抽样监测(SAMPLED PAPER 统计);
+  ② Setup Engine → 生产接线的证据积累(字段/退出语义对照)。
+本脚本不写 paper_ledger.json, 不产生可执行订单, 不参与组合容量。任何
+"统一引擎/单一真相源"的表述以 paper_sim 为准, 本台账不得引用为生产源。
+(若未来决策改为 Setup Engine 唯一生产源, 需先完成 6.1 run transaction 重构
+并替换 paper_sim 选股链, 届时更新本声明。)"""
 import glob, io, json, os, sys, time
 sys.path.insert(0, r"E:\test\smc_project\research")
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")

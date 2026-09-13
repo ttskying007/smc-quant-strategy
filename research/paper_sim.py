@@ -13,7 +13,8 @@
 """
 import io, json, os, sys, time, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import config as CFG  # 审计 P1: 统一路径/参数
+import config as CFG
+from core.time_cn import cn_now, cn_today  # R21(第八轮 P1-11): 上海时区时间单源  # 审计 P1: 统一路径/参数
 
 ROOT = CFG.RESEARCH_DIR
 KT = CFG.KT_CACHE
@@ -571,7 +572,7 @@ def _persist_rejects(records, root=None, cap=6000):
         except Exception:
             prev = []
         seen = {(r.get("code"), str(r.get("date", "")).replace("-", ""), r.get("stage")) for r in prev}
-        ts = time.strftime("%Y-%m-%d %H:%M:%S")
+        ts = cn_now("%Y-%m-%d %H:%M:%S")
         for r in records:
             k = (r.get("code"), str(r.get("date", "")).replace("-", ""), r.get("stage"))
             if k in seen:
@@ -790,7 +791,7 @@ def daily_selection():
                 "tp1": round(tp1, 3), "tp2": round(tp2, 3), "tp3": round(tp3, 3), "tp4": round(tp4, 3),
                 "sl1": round(sl1, 3), "sl2": round(sl2, 3), "anchor_note": anchor_note,
                 "status": "PENDING_ORDER", "paper": True, "source": "EVENT",
-                "created_at": time.strftime("%Y-%m-%d"), "pick_date": time.strftime("%Y-%m-%d"),
+                "created_at": cn_now("%Y-%m-%d"), "pick_date": cn_now("%Y-%m-%d"),
                 "sub_signals": subs, "stage": st, "v_ratio": v_ratio, "rank_score": rank_score,
                 "stage_span": _stage_span, "adx_span": _adx_span, "weekly_trend": _wt,
                 "insider_amount_wan": _amt, "insider_pct": _pct, "insider_hint": _mag_hint,
@@ -806,7 +807,7 @@ def daily_selection():
                 # FIX(2026-09-08, 复审 P1-1): 订单类型显式化 —— 每笔记录类型与时间边界。
                 # limit_or_open = 触价优先(披露收盘×0.99), 未触则 T+1 实时 open 兜底; next_open = MARKET_T1_OPEN。
                 # submitted_at=信号生成日, eligible_at=valid_from(可成交首日), fill_rule=撮合规则。
-                "order_type": "LIMIT_OR_OPEN", "submitted_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "order_type": "LIMIT_OR_OPEN", "submitted_at": cn_now("%Y-%m-%d %H:%M:%S"),
                 "eligible_at": _next_td(dates, d8),
                 "fill_rule": "回踩挂单: low<=limit×0.99 成交, 否则 T+1 开盘兜底(实时open)",
                 "not_filled_reason": None,
@@ -827,7 +828,7 @@ def daily_selection():
                              "position_pct": float(t2.get("position_pct") or 0.01)} for t2 in _live]
                 _pos_all.append({"code": code, "position_pct": _position_pct})
                 _ok_e, _why_e, _tot = portfolio_exposure_check(_pos_all)
-                _day_opens = [t2.get("created_at") == time.strftime("%Y-%m-%d")
+                _day_opens = [t2.get("created_at") == cn_now("%Y-%m-%d")
                               for t2 in _live] + [True]
                 _ok_t, _why_t = throttle_open(_day_opens, {}, max_positions=10,
                                               max_sector=3, max_daily_opens=5)
@@ -897,13 +898,13 @@ def daily_selection():
                 # tp1 保持 None(单目标语义, 不部分平仓/不移保本)。
                 "tp2": round(tp, 3),
                 "status": "PENDING_ORDER", "paper": True, "source": "CONT",
-                "created_at": time.strftime("%Y-%m-%d"), "pick_date": time.strftime("%Y-%m-%d"),
+                "created_at": cn_now("%Y-%m-%d"), "pick_date": cn_now("%Y-%m-%d"),
                 "sub_signals": subs2, "entry_mode": "next_open",
                 "filled_price": None,
                 "filled_at": None,
                 "exit_reason": None, "pnl_pct": None, "hold": 10,
                 # FIX(2026-09-08, 复审 P1-1): 订单类型显式化
-                "order_type": "MARKET_T1_OPEN", "submitted_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "order_type": "MARKET_T1_OPEN", "submitted_at": cn_now("%Y-%m-%d %H:%M:%S"),
                 "eligible_at": c.get("valid_from") or (_next_td(dates2, sig_d8) if (bs2 and ep) else ""),
                 "fill_rule": "T+1开盘市价(实时open, 带滑点)", "not_filled_reason": None,
                 # FIX(2026-09-13, 第八轮审计 P0-4): 开关快照(同 EVENT 订单)
@@ -954,12 +955,12 @@ def daily_selection():
                     "tp1": round(ep + risk, 3), "tp2": round(tp_smc, 3),
                     "sl1": round(sl_smc, 3),
                     "status": "PENDING_ORDER", "paper": True,
-                    "created_at": time.strftime("%Y-%m-%d"), "pick_date": time.strftime("%Y-%m-%d"),
+                    "created_at": cn_now("%Y-%m-%d"), "pick_date": cn_now("%Y-%m-%d"),
                     "position_pct": round(_pos, 4),
                     "r20": r20, "filled_price": None, "filled_at": None,
                     "exit_reason": None, "pnl_pct": None, "entry_mode": "next_open",
                     # FIX(2026-09-08, 复审 P1-1): 订单类型显式化
-                    "order_type": "MARKET_T1_OPEN", "submitted_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "order_type": "MARKET_T1_OPEN", "submitted_at": cn_now("%Y-%m-%d %H:%M:%S"),
                     "eligible_at": _next_td(dates3, (sig_d or ev_d).replace("-", "")),
                     "fill_rule": "T+1开盘市价(实时open, 带滑点)", "not_filled_reason": None,
                 })
@@ -985,7 +986,7 @@ def daily_selection():
         pass
     _sel_stats["selected"] = len(new_orders)
     try:
-        json.dump({"selected_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        json.dump({"selected_at": cn_now("%Y-%m-%d %H:%M:%S"),
                    "days": recent_days, "stats": _sel_stats,
                    "day_status": _day_status,
                    "new_orders": [{"code": o[0], "name": o[1], "date": o[2], "price": o[3]} for o in new_orders],
@@ -1026,7 +1027,7 @@ def daily_selection():
                               len(new_orders), bad_sl=_sel_stats.get("skipped_bad_sl", 0),
                               capacity=_sel_stats.get("capacity_reject", 0))
         funnel = {
-            "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "generated_at": cn_now("%Y-%m-%d %H:%M:%S"),
             "days": recent_days,
             "raw_announcements": _raw,
             "contains_buyback_or_increase": _raw,
@@ -1128,7 +1129,7 @@ def realtime_monitor():
             continue
         # FIX(2026-08-22): record price snapshot for analysis/review
         _append_realtime_log({
-            "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "ts": cn_now("%Y-%m-%d %H:%M:%S"),
             "code": t["code"], "name": t.get("name", ""), "price": cur_px,
             "status": t["status"],
             "mark_pnl_pct": round((cur_px / (t.get("filled_price") or t.get("entry_price") or 1) - 1) * 100, 2)
@@ -1139,7 +1140,7 @@ def realtime_monitor():
             # （停牌/涨跌停(板块)/valid_from/入场模式 一套语义，回测与纸面共用；本处只管写账本）
             from core.execution import try_fill as _core_fill
             _snap = dict(_info or {})
-            _snap["today"] = time.strftime("%Y%m%d")
+            _snap["today"] = cn_today()
             # FIX(2026-09-13, 第七轮审计 P0-1): 旧 entry_mode="retrace"(废弃别名)统一映射为
             # limit_or_open(其真实语义: 触价优先+开盘兜底)——与 daily_selection 写入的显式
             # entry_mode="limit_or_open" 一致, 消除"字段字面 vs 撮合语义"不一致。
@@ -1162,7 +1163,7 @@ def realtime_monitor():
                 t["note"] = (t.get("note", "") + f" | R8合同守卫: fill价{_fr['price']}>=" +
                              f"SL{_fo.get('planned_sl')} → 撤单(回测BAD_ENTRY同语义)").strip()
                 _append_realtime_log({
-                    "ts": time.strftime("%Y-%m-%d %H:%M:%S"), "code": t["code"],
+                    "ts": cn_now("%Y-%m-%d %H:%M:%S"), "code": t["code"],
                     "name": t.get("name", ""), "price": _fr["price"], "status": "EXPIRED",
                     "note": "BAD_GEOMETRY_FILL_GE_SL(R8 守卫)",
                 })
@@ -1186,7 +1187,7 @@ def realtime_monitor():
                     _pos_after.append({"code": t["code"],
                                        "position_pct": float(t.get("position_pct") or 0.01)})
                     _g_ok_e, _g_why_e, _ = portfolio_exposure_check(_pos_after)
-                    _today = time.strftime("%Y-%m-%d")
+                    _today = cn_now("%Y-%m-%d")
                     _day_opens = [t2.get("filled_at", "").startswith(_today) for t2 in _others
                                   if t2.get("status") == "FILLED"] + [True]
                     _g_ok_t, _g_why_t = throttle_open(_day_opens, {}, max_positions=10,
@@ -1203,7 +1204,7 @@ def realtime_monitor():
                     t["not_filled_reason"] = "CAPACITY_REJECT_FILL"
                     t["note"] = (t.get("note", "") + f" | R18成交前gate: {_gate_why} → 撤单").strip()
                     _append_realtime_log({
-                        "ts": time.strftime("%Y-%m-%d %H:%M:%S"), "code": t["code"],
+                        "ts": cn_now("%Y-%m-%d %H:%M:%S"), "code": t["code"],
                         "name": t.get("name", ""), "price": _fr["price"], "status": "EXPIRED",
                         "note": f"CAPACITY_REJECT_FILL({_gate_why})",
                     })
@@ -1211,7 +1212,7 @@ def realtime_monitor():
                 else:
                     t["status"] = "FILLED"
                     t["filled_price"] = _fr["price"]
-                    t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                    t["filled_at"] = cn_now("%Y-%m-%d %H:%M:%S")
                     # FIX(2026-09-08, 复审 P1-1): 成交记录撮合规则与价格来源
                     t["fill_rule"] = _fr.get("fill_rule") or t.get("fill_rule") or "core.execution:try_fill"
                     t["fill_price_source"] = _fr.get("price_source", "core")
@@ -1247,7 +1248,7 @@ def realtime_monitor():
             if t["status"] == "FILLED" and not t.get("_trade_logged_buy"):
                 t["_trade_logged_buy"] = True
                 _append_trade_log({
-                    "ts": time.strftime("%Y-%m-%d %H:%M:%S"), "code": t["code"], "name": t.get("name", ""),
+                    "ts": cn_now("%Y-%m-%d %H:%M:%S"), "code": t["code"], "name": t.get("name", ""),
                     "action": "BUY", "signal_combo": t.get("signal_combo", t.get("source", "")),
                     "signal_date": t.get("signal_date", ""),
                     "limit_entry": t.get("entry_price"),                       # F10: 挂单价(与 ledger 同源)
@@ -1268,7 +1269,7 @@ def realtime_monitor():
             # FIX(2026-09-04, 策略层): 卖出执行价 = 实时价 × (1 - SLIPPAGE)（卖出滑点）
             _sell_px = cur_px * (1 - SLIPPAGE)
             # FIX(2026-08-22): A股 T+1 规则 —— 买入当日不可卖出，TP/SL 无法生效
-            _today = time.strftime("%Y-%m-%d")
+            _today = cn_now("%Y-%m-%d")
             if t.get("filled_at") and str(t["filled_at"])[:10] == _today:
                 t["mark_price"] = cur_px
                 t["mark_pnl_pct"] = round((cur_px / ep - 1) * 100, 4)
@@ -1319,7 +1320,7 @@ def realtime_monitor():
                              # FIX(2026-09-13, 第七轮审计 P1-2): SL 状态版本随持仓传递
                              "sl_version": int(t.get("sl_version") or 0)}
                 _snap4core = dict(_info or {})
-                _snap4core["today"] = time.strftime("%Y%m%d")
+                _snap4core["today"] = cn_today()
                 _snap4core["bars_since_fill"] = _bars_sf
                 _xr = _core_exit(_pos4core, _snap4core)
                 if _xr.get("exit"):
@@ -1353,7 +1354,7 @@ def realtime_monitor():
                     # 显式 SL 变更, 落 sl_version/sl_reason/sl_updated_at 供逐笔对账
                     t["sl_version"] = int(t.get("sl_version") or 0) + 1
                     t["sl_reason"] = "TP1_MOVE_TO_BE"
-                    t["sl_updated_at"] = time.strftime("%Y%m%d")
+                    t["sl_updated_at"] = cn_today()
                     t["realized_pnl"] = 0.3 * (tp1 / ep - 1) * 100 - FEE * 0.3
                     t["note"] = (t.get("note", "") + " | TP1(swing high)触发：30%平仓+" + str(round((tp1/ep-1)*100,2)) + "%，SL移保本").strip()
                 # SL 距离 >8% → 降仓标记（风险控制，账本侧）
@@ -1366,7 +1367,7 @@ def realtime_monitor():
             if t["status"] == "CLOSED" and not t.get("_trade_logged_sell"):
                 t["_trade_logged_sell"] = True
                 _append_trade_log({
-                    "ts": time.strftime("%Y-%m-%d %H:%M:%S"), "code": t["code"], "name": t.get("name", ""),
+                    "ts": cn_now("%Y-%m-%d %H:%M:%S"), "code": t["code"], "name": t.get("name", ""),
                     "action": "SELL", "signal_combo": t.get("signal_combo", t.get("source", "")),
                     "signal_date": t.get("signal_date", ""), "entry_price": t.get("filled_price") or t.get("entry_price"),
                     "tp_price": t.get("tp4", t.get("tp_price")), "sl_price": t.get("sl1", t.get("sl_price")),
