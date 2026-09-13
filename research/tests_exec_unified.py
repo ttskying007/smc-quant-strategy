@@ -182,5 +182,56 @@ _snap7f = {"px": 10.3, "high": 10.4, "low": 10.1, "today": "20260913", "bars_sin
 _r7f = EX.try_exit(_pos7, _snap7f)  # 无 max_hold
 ok("P1-1c: EVENT 回退 CFG.MAX_HOLD(12)触发", _r7f.get("exit") and _r7f["reason"] == "TIME_STOP", str(_r7f))
 
+print("== 8. 第七轮审计 P1-2: SL_GAP 开盘保守成交 + SL 状态版本化 ==")
+# P1-2a: 跳空低开穿越止损 → SL_GAP 按开盘价成交（对齐 simulate 129-133 语义）
+# 持仓 ep=10, sl=9.5; 今开 9.0 (跳空低开已穿越 9.5) → 应按 9.0×(1-滑点) 成交, 非 9.5
+_snap8 = {"px": 9.05, "open": 9.0, "high": 9.1, "low": 8.95, "today": "20260913", "bars_since_fill": 3}
+_r8a = EX.try_exit(_pos7, _snap8)
+ok("P1-2a: 跳空低开→SL_GAP 按开盘价成交", _r8a.get("exit") and _r8a["reason"] == "SL_GAP", str(_r8a))
+ok("P1-2a: 成交价=open×(1-滑点) 非 active_sl", abs(_r8a["price"] - 9.0 * (1 - EX.SLIPPAGE)) < 0.01, str(_r8a.get("price")))
+ok("P1-2a: SL 状态字段返回(active_sl/sl_version/sl_reason)", _r8a.get("sl_state", {}).get("active_sl") == 9.5 and _r8a["sl_state"]["sl_reason"] == "SL_GAP_OPEN_BELOW_STOP", str(_r8a.get("sl_state")))
+# P1-2b: 盘中触及(非跳空) → 仍按 active_sl 成交, sl_reason=SL_TOUCH_INTRADAY
+_snap8b = {"px": 9.4, "open": 9.8, "high": 9.85, "low": 9.4, "today": "20260913", "bars_since_fill": 3}
+_r8b = EX.try_exit(_pos7, _snap8b)
+ok("P1-2b: 盘中触SL(开9.8>9.5)按active_sl成交", _r8b.get("exit") and _r8b["reason"] == "SL_HIT" and abs(_r8b["price"] - 9.5 * (1 - EX.SLIPPAGE)) < 0.01, str(_r8b))
+ok("P1-2b: sl_reason=SL_TOUCH_INTRADAY", _r8b.get("sl_state", {}).get("sl_reason") == "SL_TOUCH_INTRADAY", str(_r8b.get("sl_state")))
+# P1-2c: 无 open 字段的旧调用方 → 维持原语义(active_sl 成交, 不判跳空; 向后兼容)
+_snap8c = {"px": 9.4, "high": 9.85, "low": 9.4, "today": "20260913", "bars_since_fill": 3}
+_r8c = EX.try_exit(_pos7, _snap8c)
+ok("P1-2c: 无open快照退化(不判SL_GAP, 按active_sl)", _r8c.get("exit") and _r8c["reason"] == "SL_HIT", str(_r8c))
+# P1-2d: 与 simulate SL_GAP 逐值对账 —— 同一情景两种引擎成交价一致
+# simulate: bar open=9.0 < stop=9.5 → SL_GAP 按 9.0; try_exit: open=9.0 → 9.0×(1-滑点)
+_d9 = [{"t": "20260911", "o": 10.0, "h": 10.0, "l": 10.0, "c": 10.0, "v": 1000000},
+       {"t": "20260913", "o": 9.0, "h": 9.1, "l": 8.95, "c": 9.05, "v": 1000000}]
+_r_sim = EX.simulate(_d9, 0, 10.0, 9.5, tp1=10.6, tp2=10.9, partial_tp1=0.3, stop_to_be=True, max_hold=15)
+ok("P1-2d: simulate SL_GAP exit_price=9.0(开盘)", _r_sim["reason"] == "SL_GAP" and abs(_r_sim["exit_price"] - 9.0) < 0.01, str(_r_sim))
+ok("P1-2d: try_exit 与 simulate 跳空成交价差<滑点内(等价)", abs(_r8a["price"] - _r_sim["exit_price"]) <= 9.0 * EX.SLIPPAGE + 0.001, f"try={_r8a['price']} sim={_r_sim['exit_price']}")
+
+print("== 9. 第七轮审计 P0-2(fill): 限价盘中触发 + fill_rule 语义 ==")
+# P0-2f: 盘中回踩触及 limit 后回升 → 限价成交(旧: 只看当前 px 漏成交)
+_ord9 = {"code": "000157", "entry_mode": "limit_or_open", "reference_price": 6.455,
+         "planned_sl": 6.1, "planned_tp": 7.2, "valid_from": "20260914"}
+# 盘中低点 6.40 触及 limit 6.455, 当前价回升到 6.60 → 仍应成交
+_snap9 = {"px": 6.60, "low": 6.40, "open": 6.58, "prev": 6.50, "vol": 10000, "today": "20260914"}
+_r9a = EX.try_fill(_ord9, _snap9)
+ok("P0-2f: 盘中触及limit后回升仍成交(limit_or_open)", _r9a.get("filled") and _r9a["price_source"] == "retrace", str(_r9a))
+ok("P0-2f: fill_rule 含 low<=ref(账本合同语义)", "low<=ref" in _r9a.get("fill_rule", ""), str(_r9a.get("fill_rule")))
+# P0-2g: 盘中未触及(limit 6.455, low 6.50)且开盘 6.58 高于 limit → limit_or_open 走开盘兜底
+_snap9b = {"px": 6.60, "low": 6.50, "open": 6.58, "prev": 6.50, "vol": 10000, "today": "20260914"}
+_r9b = EX.try_fill(_ord9, _snap9b)
+ok("P0-2g: 未触价→开盘兜底成交(open_fallback)", _r9b.get("filled") and _r9b["price_source"] == "open", str(_r9b))
+# P0-2h: limit_retrace 未触及 → WAIT_RETRACE 保持 PENDING(严格限价, 无兜底)
+_ord9c = dict(_ord9); _ord9c["entry_mode"] = "limit_retrace"
+_r9c = EX.try_fill(_ord9c, _snap9b)
+ok("P0-2h: limit_retrace 未触价不成交(WAIT_RETRACE)", (not _r9c.get("filled")) and _r9c.get("why") == "WAIT_RETRACE", str(_r9c))
+# P0-2i: 无 low 的旧调用方 → 当前价语义(6.60 > 6.455 不触, 开盘兜底) 兼容
+_snap9d = {"px": 6.60, "open": 6.58, "prev": 6.50, "vol": 10000, "today": "20260914"}
+_r9d = EX.try_fill(_ord9, _snap9d)
+ok("P0-2i: 无low快照退化当前价(开盘兜底)", _r9d.get("filled") and _r9d["price_source"] == "open", str(_r9d))
+# P0-2j: legacy retrace 别名同步 low 触发语义(旧账单兼容)
+_ord9e = dict(_ord9); _ord9e["entry_mode"] = "retrace"
+_r9e = EX.try_fill(_ord9e, _snap9)
+ok("P0-2j: legacy retrace 盘中触发成交(low<=ref)", _r9e.get("filled") and "low<=ref" in _r9e.get("fill_rule", ""), str(_r9e))
+
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

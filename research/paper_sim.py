@@ -1079,7 +1079,9 @@ def realtime_monitor():
                     _max_hold_4core = _mh
                 _pos4core = {"code": t["code"], "filled_price": ep, "sl": sl1,
                              "tp1": tp1, "tp2": tp2, "tp1_hit": bool(t.get("tp1_hit")),
-                             "filled_at": t.get("filled_at", ""), "max_hold": _max_hold_4core}
+                             "filled_at": t.get("filled_at", ""), "max_hold": _max_hold_4core,
+                             # FIX(2026-09-13, 第七轮审计 P1-2): SL 状态版本随持仓传递
+                             "sl_version": int(t.get("sl_version") or 0)}
                 _snap4core = dict(_info or {})
                 _snap4core["today"] = time.strftime("%Y%m%d")
                 _snap4core["bars_since_fill"] = _bars_sf
@@ -1088,6 +1090,14 @@ def realtime_monitor():
                     t["status"] = "CLOSED"
                     t["exit_reason"] = _xr["reason"]
                     t["exit_price"] = _xr.get("price")
+                    # FIX(2026-09-13, 第七轮审计 P1-2): SL 状态持久化（成交时落账本,
+                    # sl_version/sl_reason/sl_updated_at 与 try_exit 返回一致, 供对账）
+                    _slst = _xr.get("sl_state")
+                    if _slst:
+                        t["active_sl_at_exit"] = _slst.get("active_sl")
+                        t["sl_version"] = _slst.get("sl_version")
+                        t["sl_reason"] = _slst.get("sl_reason")
+                        t["sl_updated_at"] = _slst.get("sl_updated_at")
                     if _xr["reason"] in ("TP2_RUNNER",):
                         t["tp2_hit"] = True
                         t["realized_pnl"] = (t.get("realized_pnl", 0) or 0) + 0.7 * (tp2 / ep - 1) * 100 - FEE * 0.7
@@ -1103,6 +1113,11 @@ def realtime_monitor():
                     t["tp1_hit"] = True
                     if _xr.get("new_state") and _xr["new_state"].get("sl") is not None:
                         t["sl1"] = _xr["new_state"]["sl"]
+                    # FIX(2026-09-13, 第七轮审计 P1-2): SL 状态版本化 —— 移保本是一次
+                    # 显式 SL 变更, 落 sl_version/sl_reason/sl_updated_at 供逐笔对账
+                    t["sl_version"] = int(t.get("sl_version") or 0) + 1
+                    t["sl_reason"] = "TP1_MOVE_TO_BE"
+                    t["sl_updated_at"] = time.strftime("%Y%m%d")
                     t["realized_pnl"] = 0.3 * (tp1 / ep - 1) * 100 - FEE * 0.3
                     t["note"] = (t.get("note", "") + " | TP1(swing high)触发：30%平仓+" + str(round((tp1/ep-1)*100,2)) + "%，SL移保本").strip()
                 # SL 距离 >8% → 降仓标记（风险控制，账本侧）

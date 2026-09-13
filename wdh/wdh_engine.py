@@ -38,9 +38,16 @@ except Exception:
 
 if __name__ == "__main__":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-HERMES = r"E:\test\smc_project\hermes"
+# FIX(2026-09-13, 第七轮审计 P1-5): 硬编码 → config.py 派生（research/config.py 是
+# 项目路径单一权威; config 不可用时回退原 Windows 部署路径）
+try:
+    import config as _CFG
+    HERMES = _CFG.HERMES_DIR
+    OUT = _CFG.WDH_DIR
+except Exception:
+    HERMES = r"E:\test\smc_project\hermes"
+    OUT = r"E:\test\smc_project\wdh"
 KLINE = os.path.join(HERMES, "kline_cache_tencent")
-OUT = r"E:\test\smc_project\wdh"
 os.makedirs(OUT, exist_ok=True)
 
 # SMC detection parameters (2026-08-20 audit result: P5/S1.0/confirmed-BOS reduced samples without

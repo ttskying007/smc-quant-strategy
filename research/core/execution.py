@@ -232,20 +232,26 @@ def try_fill(order, market_snapshot):
     today = str(snap.get("today") or "")
     if vf and today and today < vf:
         return {"filled": False, "why": "NOT_YET_VALID"}
+    # FIX(2026-09-13, 第七轮审计 P0-2): 限价触发用盘中低点(快照有 low 时)。
+    # 账本 fill_rule 合同即 "low<=limit 成交"（回测同语义）—— 只看当前 px 会在
+    # "盘中回踩触及 limit 后回升"时漏成交。无 low 的旧调用方退化为当前价(兼容)。
+    _lo_f = snap.get("low") or 0
+    _touch = (lambda r: (min(float(px), float(_lo_f)) if _lo_f else float(px)) <= r)
+
     mode = order.get("entry_mode") or "next_open"
     if mode == "limit_retrace":
         # 第三轮深审 A5: 严格限价回踩单 —— 未触价保持 PENDING, 无任何 open fallback。
         # 生产默认。若需要开盘兜底, 显式使用 limit_or_open 或 next_open。
-        if px <= float(order.get("reference_price") or 0):
+        if _touch(float(order.get("reference_price") or 0)):
             fill_px = float(order["reference_price"]) * (1 + SLIPPAGE)
-            _rule, _src = "LIMIT_RETRACE: px<=ref", "retrace"
+            _rule, _src = "LIMIT_RETRACE: low<=ref", "retrace"
         else:
             return {"filled": False, "why": "WAIT_RETRACE", "order_type": "LIMIT"}
     elif mode == "limit_or_open":
         # A5: 显式兜底单(研究/特殊用途): 触价优先, 否则开盘市价。
-        if px <= float(order.get("reference_price") or 0):
+        if _touch(float(order.get("reference_price") or 0)):
             fill_px = float(order["reference_price"]) * (1 + SLIPPAGE)
-            _rule, _src = "LIMIT_OR_OPEN: px<=ref", "retrace"
+            _rule, _src = "LIMIT_OR_OPEN: low<=ref", "retrace"
         elif opn and opn > 0:
             fill_px = opn * (1 + SLIPPAGE)
             _rule, _src = "LIMIT_OR_OPEN: open_fallback", "open"
@@ -253,9 +259,10 @@ def try_fill(order, market_snapshot):
             return {"filled": False, "why": "WAIT_RETRACE", "order_type": "LIMIT_OR_OPEN"}
     elif mode == "retrace":
         # 兼容旧名(= limit_or_open 语义), 已废弃: 新代码用 limit_retrace / limit_or_open
-        if px <= float(order.get("reference_price") or 0):
+        # FIX(2026-09-13, 第七轮审计 P0-2): 旧账单兼容路径同步 low 触发语义
+        if _touch(float(order.get("reference_price") or 0)):
             fill_px = float(order["reference_price"]) * (1 + SLIPPAGE)
-            _rule, _src = "LIMIT_RETRACE: px<=ref", "retrace"
+            _rule, _src = "LIMIT_RETRACE: low<=ref", "retrace"
         elif opn and opn > 0:
             fill_px = opn * (1 + SLIPPAGE)
             _rule, _src = "LIMIT_RETRACE: open_fallback", "open"
@@ -307,10 +314,23 @@ def try_exit(position, market_snapshot):
     tp2 = float(position.get("tp2") or position.get("tp") or 0)
     tp1_hit = bool(position.get("tp1_hit"))
     # ① active SL（TP1 后保本）—— 与 simulate 一致（SL 用盘中低点）
+    # FIX(2026-09-13, 第七轮审计 P1-2): SL_GAP 等价 —— simulate 对跳空低开穿越止损
+    # 按开盘价保守成交(129-133行)；try_exit 原按 active_sl 成交, 跳空日实际卖不到
+    # active_sl → 乐观失真。此处对齐: open < active_sl → 按 open×(1-滑点) 成交。
+    # 同时持久化 SL 状态审计字段(sl_version/sl_reason/sl_updated_at)供账本对账。
     active_sl = sl if not tp1_hit else max(ep, sl)
-    if active_sl and px_low <= active_sl:
-        return {"exit": True, "reason": "BE" if (tp1_hit and abs(active_sl - ep) < 1e-6) else "SL_HIT",
-                "price": round(active_sl * (1 - SLIPPAGE), 3)}
+    if active_sl:
+        _opn = snap.get("open") or 0
+        if _opn and _opn > 0 and _opn < active_sl:
+            # 跳空低开已穿越止损 → 开盘价成交（保守, 与 simulate SL_GAP 同语义）
+            return {"exit": True, "reason": "SL_GAP", "price": round(_opn * (1 - SLIPPAGE), 3),
+                    "sl_state": {"active_sl": active_sl, "sl_version": int(position.get("sl_version") or 0) + 1,
+                                 "sl_reason": "SL_GAP_OPEN_BELOW_STOP", "sl_updated_at": today}}
+        if px_low <= active_sl:
+            return {"exit": True, "reason": "BE" if (tp1_hit and abs(active_sl - ep) < 1e-6) else "SL_HIT",
+                    "price": round(active_sl * (1 - SLIPPAGE), 3),
+                    "sl_state": {"active_sl": active_sl, "sl_version": int(position.get("sl_version") or 0) + 1,
+                                 "sl_reason": "SL_TOUCH_INTRADAY", "sl_updated_at": today}}
     # ② TP1 部分平（未触过；用盘中高点）
     if not tp1_hit and tp1 and px_high >= tp1:
         return {"exit": False, "partial": "TP1", "new_state": {"tp1_hit": True, "sl": ep}}
