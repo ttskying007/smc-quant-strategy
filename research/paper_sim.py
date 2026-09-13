@@ -991,17 +991,20 @@ def realtime_monitor():
                 # FIX(2026-09-08, 审计12): PENDING 过期机制 —— valid_from 后 PENDING_EXPIRE_DAYS
                 # 个交易日内未成交（停牌/涨停/未回落）→ EXPIRED，避免长期 pending 阻塞同代码后续信号
                 # （known/seen_orders 按.signal_date 去重，EXPIRED 后同代码新信号可正常进入）
+                # FIX(2026-09-13, 第七轮审计 P1 清单#3): TTL 改真实交易日计数
+                # （原 ×2 自然日近似在春节/国庆长假会把 3 交易日误当 6-8 自然日用不满,
+                #  周末密集期又提前到期; 统一委托 core.trading_calendar）
                 try:
                     _vf2 = t.get("valid_from", "")
                     if _vf2:
-                        from datetime import date as _d2, timedelta as _td2
-                        _vd = _d2(int(_vf2[:4]), int(_vf2[4:6]), int(_vf2[6:8]))
-                        _cutoff = _vd + _td2(days=int(getattr(CFG, "PENDING_EXPIRE_DAYS", 3)) * 2)
-                        _today_d = _d2(int(_snap["today"][:4]), int(_snap["today"][4:6]), int(_snap["today"][6:8]))
-                        if _today_d > _cutoff and t.get("status") == "PENDING_ORDER":
+                        from core.trading_calendar import td_between, add_td_days
+                        _expd = add_td_days(_vf2, int(getattr(CFG, "PENDING_EXPIRE_DAYS", 3)))
+                        _n_td = td_between(_vf2, _snap["today"])
+                        if _expd and _n_td > int(getattr(CFG, "PENDING_EXPIRE_DAYS", 3)) \
+                                and t.get("status") == "PENDING_ORDER":
                             t["status"] = "EXPIRED"
                             t["expire_reason"] = _fr.get("why") or "TIMEOUT"
-                            t["note"] = (t.get("note", "") + f" | PENDING过期(valid_from+{getattr(CFG, 'PENDING_EXPIRE_DAYS', 3)}交易日未成交: {_fr.get('why')})").strip()
+                            t["note"] = (t.get("note", "") + f" | PENDING过期(valid_from起{_n_td}个交易日>PENDING_EXPIRE_DAYS={getattr(CFG, 'PENDING_EXPIRE_DAYS', 3)}未成交: {_fr.get('why')})").strip()
                 except Exception:
                     pass
             # 未成交原因（停牌/涨停/未到日/待回落）由核心统一返回，本处不重复判定
