@@ -83,6 +83,14 @@ def main():
             traceback.print_exc()
         return
     _pause_monitor()
+    # FIX(2026-09-13, 第八轮审计 6.5): 生产路径存在性检查 —— SMC_DATA_ROOT/
+    # SMC_FRONTEND_ROOT 环境变量解析后绝对路径打印 + 缺失非零退出(fail-closed,
+    # 不带病继续)。审计: "启动时打印解析后的绝对路径并检查存在性; 生产路径
+    # 缺失时必须非零退出"。
+    if not CFG.validate_paths():
+        print("[paths] 生产路径校验失败 → 终止(不暂停在恢复监控后执行任何交易动作)", flush=True)
+        _resume_monitor()
+        sys.exit(2)
     try:
         _run_main_steps()
     except Exception as e:

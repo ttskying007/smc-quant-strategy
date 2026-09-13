@@ -3,11 +3,17 @@
 生产关键脚本（daily_combo_run / current_scanner / continuation_scanner /
 paper_sim / sim_scheduler / finalize_dashboard）应引用本模块；
 历史研究脚本（combo_vN_run / iter_*，已移入 archive/）保留各自硬编码并标注 legacy。
+
+FIX(2026-09-13, 第八轮审计 6.5): 路径环境变量化 —— SMC_DATA_ROOT(项目根)与
+SMC_FRONTEND_ROOT(第二镜像前端目录)环境变量优先, 缺省回落本机路径(向后兼容)。
+生产入口应调用 validate_paths() 做存在性检查(缺失非零退出), 研究脚本可不调。
 """
 import os
+import sys as _sys
 
-# ---- 项目根 ----
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # E:\test\smc_project
+# ---- 项目根（第八轮 6.5: SMC_DATA_ROOT 环境变量优先; 缺省 repo 推导, 兼容原行为）----
+_env_root = os.environ.get("SMC_DATA_ROOT")
+PROJECT_ROOT = _env_root if _env_root else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # E:\test\smc_project
 RESEARCH_DIR = os.path.join(PROJECT_ROOT, "research")
 HERMES_DIR = os.path.join(PROJECT_ROOT, "hermes")
 WDH_DIR = os.path.join(PROJECT_ROOT, "wdh")
@@ -28,8 +34,28 @@ SCANNER_RESULT = os.path.join(RESEARCH_DIR, "current_scanner_result.json")
 REGISTRY = os.path.join(MONITOR_DIR, "production_registry.json")
 MONITOR_PID = os.path.join(RESEARCH_DIR, "monitor.pid")
 
-# ---- 镜像目录（前端同步）----
-MIRROR_DIRS = [os.path.join(HERMES_DIR, "smc_monitor"), r"E:\root\.hermes\smc_monitor"]
+# ---- 镜像目录（前端同步; 第八轮 6.5: SMC_FRONTEND_ROOT 环境变量优先）----
+_env_fe = os.environ.get("SMC_FRONTEND_ROOT")
+MIRROR_DIRS = [os.path.join(HERMES_DIR, "smc_monitor"),
+               _env_fe if _env_fe else r"E:\root\.hermes\smc_monitor"]
+
+
+def validate_paths(required=("KT_CACHE", "ANNOUNCE_DB", "MONITOR_DIR")):
+    """R19(第八轮 6.5): 生产路径存在性检查 —— 缺失打印全部问题并返回 False,
+    调用方(daily_combo_run 等)据此非零退出; 研究脚本不强制调用。
+    同时打印解析后的绝对路径(审计: '启动时打印解析后的绝对路径并检查存在性')。"""
+    import sys
+    ok = True
+    print(f"[paths] SMC_DATA_ROOT={'set' if _env_root else 'unset(默认repo推导)'} "
+          f"PROJECT_ROOT={PROJECT_ROOT}", flush=True)
+    for name in required:
+        p = globals().get(name)
+        if not p or not os.path.exists(p):
+            print(f"[paths] FAIL: {name} = {p} 不存在", flush=True)
+            ok = False
+        else:
+            print(f"[paths] OK: {name} = {p}", flush=True)
+    return ok
 
 # ---- 解释器（生产 3.12；研究 3.13 见 README）----
 PY_PRODUCTION = r"C:\Users\Administrator\AppData\Roaming\uv\python\cpython-3.12.13-windows-x86_64-none\python.exe"

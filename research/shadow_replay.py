@@ -116,8 +116,9 @@ with open(STATUS, "w", encoding="utf-8") as fh:
 print(f"shadow: {len(shadow_trades)} 笔 avg={a:+.2f}% PF={p:.2f} MDD={mdd*100:.2f}% kill={kill}", flush=True)
 
 # 5. 前端同步
+# FIX(2026-09-13, 第八轮 6.5): 镜像目录引用 CFG.MIRROR_DIRS(SMC_FRONTEND_ROOT 环境变量优先) —— 原硬编码 E:\root\.hermes
 import shutil
-for d in (os.path.join(CFG.HERMES_DIR, "smc_monitor"), r"E:\root\.hermes\smc_monitor"):
+for d in CFG.MIRROR_DIRS:
     os.makedirs(d, exist_ok=True)
     shutil.copyfile(OUT, os.path.join(d, "shadow_ledger.json"))
     shutil.copyfile(STATUS, os.path.join(d, "shadow_status.json"))

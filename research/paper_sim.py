@@ -246,7 +246,8 @@ def _market_proxy(code, d8=None):
     # 结果只依赖 d8, 不依赖 code; (code,d8) 查询统一退化为 d8。
     if d8 in _MKT_PROXY_CACHE:
         return _MKT_PROXY_CACHE[d8]
-    kt = r"E:\test\smc_project\hermes\kline_cache_tencent"
+    # FIX(2026-09-13, 第八轮 6.5): 引用 CFG.KT_CACHE(SMC_DATA_ROOT 环境变量优先) —— 原硬编码绝对路径
+    kt = CFG.KT_CACHE
     snap = os.path.join(kt, ".mkt_sample.json")
     if _MKT_SAMPLE is None:
         # 优先读固定快照（跨进程/跨日稳定），无则采样一次并落盘
