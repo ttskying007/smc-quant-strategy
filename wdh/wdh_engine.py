@@ -356,6 +356,14 @@ def build_seeds(symbol, daily, gates=None):
         t_idx = None
         entry = None
         entry_limit_fill = False
+        # FIX(2026-09-13, 第八轮审计 5.2): POI 失效语义 —— 原实现 366-370 在未触碰时
+        # 若 bb["c"]<zl(收盘已跌破 zone 下沿)设 touched=True, 把"已跌破的 bar"当成
+        # "第一次触碰"再等反弹 reclaim —— 多头设计语义应为:
+        #   先触及 zone → 再确认收回 = 合法
+        #   先收盘跌破 invalidation(zl) → 永久失效(不等 reclaim)
+        # 修复: 未触碰时收盘 < zl → INVALIDATED_BEFORE_TOUCH, 直接断链;
+        # 跳空穿过 zone 到 zl 下方(整根 bar 在 zone 之下: h < zl)同样永久失效。
+        invalidated_before_touch = False
         for k in range(rsp + 1, min(len(daily) - 1, rsp + 1 + 12)):
             bb = daily[k]
             if bb["l"] <= zl and bb["c"] <= zh:
@@ -363,11 +371,15 @@ def build_seeds(symbol, daily, gates=None):
                     break
                 touched, t_idx = True, k
                 continue
-            if bb["c"] < zl:
-                if touched:
+            if not touched:
+                if bb["h"] < zl:
+                    # 整根 bar 在 zone 下方(跳空穿过) → 永久失效
+                    invalidated_before_touch = True
                     break
-                touched, t_idx = True, k
-                continue
+                if bb["c"] < zl:
+                    # 收盘跌破 zone 下沿(未触碰过) → 永久失效, 不当作触碰
+                    invalidated_before_touch = True
+                    break
             if bb["l"] <= zh and bb["h"] >= zl:
                 touched = True
                 t_idx = t_idx if t_idx is not None else k
@@ -407,6 +419,11 @@ def build_seeds(symbol, daily, gates=None):
                     if entry_idx < len(daily):
                         entry = (entry_idx, k, t_idx)
                 break
+        if invalidated_before_touch:
+            # FIX(2026-09-13, 第八轮审计 5.2): 先跌破/跳空穿过 → 永久失效断链,
+            # 与"触碰窗口内未回踩"等其它断链分开计数(漏斗可观测)。
+            STAGE_STATS["invalidated_before_touch"] = STAGE_STATS.get("invalidated_before_touch", 0) + 1
+            continue
         if entry is None:
             continue
         entry_idx, reclaim_idx, touch_idx = entry

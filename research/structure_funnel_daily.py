@@ -55,9 +55,18 @@ for fp in files:
             continue
         funnel["bars_scanned"] += 1
         kinds = {e["event_type"] for e in m.events}
-        reached = ["LIQUIDITY", "SWEEP", "RECLAIM", "DISPLACEMENT", "SHIFT", "POI", "RETEST"]
+        # FIX(2026-09-13, 第八轮审计 5.3): 尾层事件 RETEST → RETEST_HOLD(触碰+守位)。
+        # 漏斗 L7 双兼容: 历史 kinds 可能含旧 RETEST(兼容), 新链只发 RETEST_HOLD。
+        reached = ["LIQUIDITY", "SWEEP", "RECLAIM", "DISPLACEMENT", "SHIFT", "POI",
+                   "RETEST_HOLD"]
+        _k7 = kinds & {"RETEST", "RETEST_HOLD"}
         deepest = 0
         for li, ev in enumerate(reached):
+            if li == 6:
+                if _k7:
+                    funnel["L7_retest_hold"] += 1
+                    deepest = 7
+                continue
             if ev in kinds:
                 funnel[f"L{li+1}_{ev.lower()}"] += 1
                 deepest = li + 1

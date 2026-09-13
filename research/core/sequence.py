@@ -206,7 +206,9 @@ def run_sequence(daily, i, direction="LONG", timeframe="D1", symbol=""):
 # A3: 因果绑定 —— sweep 绑定 target_pool; reclaim 收复 sweep 引用的前高;
 #     全事件 parent_event_id 链, 任何一环断可诊断。
 # ============================================================
-EVENT_SEQ_V2 = ("LIQUIDITY", "SWEEP", "RECLAIM", "DISPLACEMENT", "SHIFT", "POI", "RETEST")
+# FIX(2026-09-13, 第八轮审计 5.3): 尾事件 RETEST → RETEST_HOLD(触碰+收盘守位确认)。
+# 旧 RETEST(仅触碰)不再是 setup 就绪事件 —— setup 要求 HOLD 确认后才 READY。
+EVENT_SEQ_V2 = ("LIQUIDITY", "SWEEP", "RECLAIM", "DISPLACEMENT", "SHIFT", "POI", "RETEST_HOLD")
 
 
 class SequenceMachineV2:
@@ -230,7 +232,8 @@ class SequenceMachineV2:
         return ev["id"]
 
     # D4①: 简化链合法序列(无 RECLAIM) —— Family DB 双样本证明其统计等价
-    EVENT_SEQ_V2_SIMPLIFIED = ("LIQUIDITY", "SWEEP", "DISPLACEMENT", "SHIFT", "POI", "RETEST")
+    # FIX(2026-09-13, 第八轮审计 5.3): 同 EVENT_SEQ_V2 尾事件改 RETEST_HOLD
+    EVENT_SEQ_V2_SIMPLIFIED = ("LIQUIDITY", "SWEEP", "DISPLACEMENT", "SHIFT", "POI", "RETEST_HOLD")
 
     def setup(self):
         """完整链或简化链(D4①)则返回 setup dict, 否则 None(断链可从 events/rejected 诊断)。"""
@@ -240,7 +243,8 @@ class SequenceMachineV2:
                 kinds = [e["event_type"] for e in self.events]
                 sweep_ev = [e for e in self.events if e["event_type"] == "SWEEP"][-1]
                 poi_ev = [e for e in self.events if e["event_type"] == "POI"][-1]
-                retest_ev = [e for e in self.events if e["event_type"] == "RETEST"][-1]
+                # FIX(2026-09-13, 第八轮审计 5.3): 尾事件 RETEST_HOLD(带守位确认)
+                retest_ev = [e for e in self.events if e["event_type"] == "RETEST_HOLD"][-1]
                 return {"state": "ENTRY_READY", "sequence": "→".join(kinds),
                         "swept_pool": sweep_ev.get("target_pool"),
                         "poi": poi_ev.get("poi"),
@@ -360,14 +364,27 @@ def run_sequence_v2(daily, i, symbol="", timeframe="D1", lookback=40,
             break
     if poi_i is None:
         return m
-    # 7) 重测(未破失效位)
+    # 7) 重测(未破失效位) —— FIX(2026-09-13, 第八轮审计 5.3): RETEST 必须带 HOLD 确认。
+    # 原实现"low 落入 POI 区间即 emit RETEST 并返回" —— 触碰≠守位, setup() 把触碰
+    # 直接当"准备入场", 策略强度高于实际确认。事件类型表已有 RETEST_HOLD(设计状态机
+    # RETESTING→READY 的 hold 触发器), 此处补齐语义:
+    #   low 触及 POI 且同 bar 收盘 >= poi.low(守位) → RETEST_HOLD(READY 可入场)
+    #   low 触及但收盘 < poi.low(未破失效位 0.97×low, 只是弱守) → 继续等下一 bar 确认
+    #   收盘 < poi.low×0.97(失效位) → INVALIDATED_BEFORE_RETEST 断链
     for k in range(poi_i + 1, min(len(daily), poi_i + 1 + retest_bars)):
         b = daily[k]
         if b["c"] < poi["low"] * 0.97:
             m.rejected.append({"why": "INVALIDATED_BEFORE_RETEST", "at": b["t"]})
             return m
         if poi["low"] <= b["l"] <= poi["high"] * 1.02:
-            m._emit("RETEST", b["t"], b["l"], 50, _id_poi)
-            return m
+            if b["c"] >= poi["low"]:
+                # 触碰 + 收盘守位 → RETEST_HOLD(独立 HOLD 事件, 5.3)
+                m._emit("RETEST_HOLD", b["t"], b["l"], 50, _id_poi)
+                m.state = "READY"
+                return m
+            # 触碰但收盘失守 zone 下沿(未到失效位) → 记触碰继续等确认, 不 emit 旧 RETEST
+            m.rejected.append({"why": "RETEST_TOUCH_NO_HOLD", "at": b["t"],
+                               "note": "触碰POI但收盘未守位, 等待下一bar确认(5.3)"})
+            continue
     m.rejected.append({"why": "NO_RETEST_IN_WINDOW"})
     return m
