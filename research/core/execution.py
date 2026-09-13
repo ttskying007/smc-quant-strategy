@@ -11,8 +11,14 @@ import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config as CFG
 
-FEE = CFG.FEE_PCT
-SLIPPAGE = CFG.SLIPPAGE
+# R28(第八轮审计 P1-6): 成本口径单源化 —— FEE/SLIPPAGE 数值与描述统一由
+# core.cost_model 提供(纯等价重构, 数值零变化): FEE=双边总费用一次扣,
+# SLIPPAGE=单边滑点(买+卖−)。黄金测试 tests_audit_r8q 锁平价 round-trip
+# 为负成本。cost_model_version 供结果记录。
+from core.cost_model import fee_pct_total, slippage_side, COST_MODEL_VERSION
+
+FEE = fee_pct_total()          # = CFG.FEE_PCT(单源, 等价)
+SLIPPAGE = slippage_side()     # = CFG.SLIPPAGE(单源, 等价)
 MAX_HOLD_DEFAULT = CFG.MAX_HOLD if hasattr(CFG, "MAX_HOLD") else 12
 
 
