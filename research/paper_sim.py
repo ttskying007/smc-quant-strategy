@@ -1124,6 +1124,32 @@ def realtime_monitor():
         # FIX(2026-08-22): skip 0/None prices — Sina returns 0.00 off-hours/failure;
         # treating 0 as "break SL" caused mass -100% SL_HIT on all positions.
         if cur_px is None or cur_px <= 0:
+            # FIX(2026-09-13, 第八轮审计 P1-10): 行情不可用时仍推进订单生命周期 ——
+            # 原直接 continue 使行情连续失败时 TTL 永不执行(审计: "价格为空就 continue,
+            # 因此行情连续失败时不执行过期逻辑")。规则: PENDING 单仍按交易日历计 TTL
+            # (挂单过期与行情无关——valid_from 后 N 交易日未成交即撤, 无论是否有价),
+            # 标注 PRICE_UNAVAILABLE; 持仓(FILLED)不能无价强平 → 保持 continue(仅记日志)。
+            if t.get("status") == "PENDING_ORDER":
+                try:
+                    _vf3 = t.get("valid_from", "")
+                    if _vf3:
+                        from core.trading_calendar import td_between, add_td_days
+                        _n_td3 = td_between(_vf3, cn_today())
+                        _need3 = int(getattr(CFG, "PENDING_EXPIRE_DAYS", 3))
+                        if _n_td3 > _need3:
+                            t["status"] = "EXPIRED"
+                            t["expire_reason"] = "TIMEOUT"
+                            t["note"] = (t.get("note", "") +
+                                         f" | R25 TTL(行情不可用推进): valid_from起{_n_td3}交易日>"
+                                         f"{_need3}未成交(PRICE_UNAVAILABLE)").strip()
+                            _append_realtime_log({
+                                "ts": cn_now("%Y-%m-%d %H:%M:%S"), "code": t["code"],
+                                "name": t.get("name", ""), "price": None,
+                                "status": "EXPIRED",
+                                "note": "PENDING TTL 到期(行情不可用, 生命周期仍推进)",
+                            })
+                except Exception:
+                    pass  # 日历不可用 → 保持 PENDING(不误过期, fail-closed)
             continue
         # FIX(2026-08-22): record price snapshot for analysis/review
         _append_realtime_log({
