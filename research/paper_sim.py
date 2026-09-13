@@ -1372,6 +1372,9 @@ def realtime_monitor():
                     _max_hold_4core = _mh
                 _pos4core = {"code": t["code"], "filled_price": ep, "sl": sl1,
                              "tp1": tp1, "tp2": tp2, "tp1_hit": bool(t.get("tp1_hit")),
+                             # R29(第八轮 P1-3 差异②): tp3 透传 —— try_exit TP3 runner
+                             # 与 simulate(L174)同条件对齐(be_active 且 tp3>tp2 直达)。
+                             "tp3": t.get("tp3"),
                              "filled_at": t.get("filled_at", ""), "max_hold": _max_hold_4core,
                              # FIX(2026-09-13, 第七轮审计 P1-2): SL 状态版本随持仓传递
                              "sl_version": int(t.get("sl_version") or 0)}

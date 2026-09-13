@@ -392,15 +392,25 @@ def try_exit(position, market_snapshot):
         return {"exit": True, "reason": "TP2_RUNNER", "price": round(px_high * (1 - SLIPPAGE), 3)}
     if (not tp1_hit) and (not tp1) and tp2 and px_high >= tp2:
         return {"exit": True, "reason": "TP2_RUNNER", "price": round(px_high * (1 - SLIPPAGE), 3)}
-    # ④ 时间止损（未触 TP1 且超 max_hold）—— 最后判定
+    # R29(第八轮审计 P1-3 差异②): TP3 runner 与 simulate 对齐(L174-175 同条件)
+    # —— be_active(tp1_hit)且 tp2 未触发时 tp3 直达(tp3>tp2 越级)全平。
+    # 生产 EVENT 单 tp3 字段此前不进退出链(展示字段), 现由 paper_sim 透传。
+    _tp3 = float(position.get("tp3") or 0)
+    if tp1_hit and _tp3 and px_high >= _tp3 and (not tp2 or _tp3 > tp2):
+        return {"exit": True, "reason": "TP3_RUNNER", "price": round(px_high * (1 - SLIPPAGE), 3)}
+    # ④ 时间止损 —— 最后判定
     # FIX(2026-09-13, 第七轮审计 P1-1): position 级 max_hold 优先（CONT 延续腿持有期 10bar
     # 等按腿配置），缺省回退 CFG.MAX_HOLD —— 延续腿不再走自然日分支, 统一由本核心按
     # 交易日 bar 计数(bars_since_fill)判定。
+    # R29(第八轮审计 P1-3 差异③): 原 `not tp1_hit` 前置使 TP1 部分平后剩余仓
+    # 永远不触发 TIME_STOP(死等 TP2/SL, 可拖至远超 max_hold) —— simulate 的
+    # TIME_STOP 对 remaining>0 一视同仁(无论 BE)。对齐: TP1 后剩余仓同样按
+    # max_hold 计时(剩余仓离场价含保本底)。
     bars = snap.get("bars_since_fill")
     _max_hold = position.get("max_hold")
     if _max_hold is None and getattr(CFG, "MAX_HOLD", None) is None:
         # 无任何配置时保守默认（不应发生: config 始终提供）
         _max_hold = 12
-    if (not tp1_hit) and bars is not None and int(bars) >= int(_max_hold or getattr(CFG, "MAX_HOLD", 12)):
+    if bars is not None and int(bars) >= int(_max_hold or getattr(CFG, "MAX_HOLD", 12)):
         return {"exit": True, "reason": "TIME_STOP", "price": round(px * (1 - SLIPPAGE), 3)}
     return {"exit": False, "why": "HOLD"}
