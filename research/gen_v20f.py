@@ -201,6 +201,11 @@ for date, code, title in cur.fetchall():
     # （tp1 30%部分+保本/tp2/tp3 runner/15根持有，与原内联循环语义等价：TP2 先于 TP3 判定，
     #  SL 按 stop=be?ep:sl1 逐 bar，跳空穿越按开盘价 —— simulate 的 SL_GAP 同保守语义）
     from core.execution import simulate as _sim
+    # ⚠ 持有期分叉标注(R23, 第八轮审计 P1-8): max_hold=15 是本冻结基线
+    # (n=1639±1)的回测口径; 生产统一退出用 CFG.MAX_HOLD=12 —— 回测/生产
+    # 持有期存在已知分叉(15 vs 12), 影响 TIME_STOP 占比与收益分布, 本 CSV
+    # 数字不得直接作为生产事件腿证据(审计 P1-8 判定保持)。统一=研究级
+    # 重基线决策(与 P1-7 ADX 分叉同批处理), 不属于接线范围。
     _r = _sim(bs, entry_idx, ep, sl1, tp1=tp1, tp2=tp2, tp3=tp3,
               partial_tp1=0.3, stop_to_be=True, max_hold=15, code=code[:6])
     net = _r.get("net_pnl_pct", 0.0)

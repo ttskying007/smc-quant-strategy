@@ -458,7 +458,16 @@ def _next_td(dates, d8):
         if idx + 1 < len(dates):
             return dates[idx + 1]
         # d8 是当前数据最后交易日（今日刚披露、明日K线尚未生成）→ 按日历推下一交易日
+        # FIX(2026-09-13, 第八轮审计 P1-11): 优先 core.trading_calendar(节假日对齐),
+        # 原纯周末循环在法定节假日(春节/国庆)会把假日误判为 T+1。
         if d8 == dates[-1]:
+            try:
+                from core.trading_calendar import next_td
+                _nt = next_td(d8)
+                if _nt:
+                    return _nt
+            except Exception:
+                pass
             try:
                 d = date(int(d8[:4]), int(d8[4:6]), int(d8[6:8]))
                 for _ in range(8):  # 最多推进 8 天必然遇到工作日
@@ -469,7 +478,21 @@ def _next_td(dates, d8):
                 pass
         return d8
     # signal_date 不在 K 线中（公告日非交易日）→ 取之后第一个交易日
-    return next((x for x in dates if x > d8), d8)
+    # FIX(2026-09-13, 第八轮审计 P1-11): 无未来 K 线可用时(新上市/数据未更新),
+    # 原回退返回 d8 自身(可能是周末/节假日公告日) → 改为优先 core.
+    # trading_calendar.next_td(数据源对齐节假日, 全市场 4662 只聚合),
+    # 日历不可用再退周末规则 —— 消除"公告日非交易日被当成 T+1"的节假日错判。
+    _future = next((x for x in dates if x > d8), None)
+    if _future:
+        return _future
+    try:
+        from core.trading_calendar import next_td
+        _nt = next_td(d8)
+        if _nt:
+            return _nt
+    except Exception:
+        pass
+    return d8
 
 
 def _parse_insider_magnitude(title):
