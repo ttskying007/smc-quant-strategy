@@ -15,6 +15,7 @@ from core.reason_enums import (EXIT_REASONS, NOT_FILLED_WHY, NOT_EXIT_WHY, ORDER
                                ENTRY_MODES, LEGACY_ENTRY_MODES, REJECT_STAGES, SL_REASONS,
                                SIM_REASONS, PAPER_EXITS, SE_STATUS, SE_EXIT_REASONS,
                                ENTRY_FILL_MODES, PF_REASONS, LEDGER_LEGACY_EXITS, DAY_STATUS,
+                               EXPIRE_REASONS,
                                is_known_exit_reason, is_known_not_filled_why)
 
 PASS = FAIL = 0
@@ -33,7 +34,7 @@ SCAN = {"core/execution.py", "paper_sim.py", "core/setup_exit.py", "core/portfol
         "core/entry.py", "core/reason_enums.py"}
 ALLOWED = (EXIT_REASONS | NOT_FILLED_WHY | NOT_EXIT_WHY | ORDER_STATUS | ENTRY_MODES
            | LEGACY_ENTRY_MODES | SL_REASONS | SIM_REASONS | PAPER_EXITS | SE_STATUS
-           | SE_EXIT_REASONS | ENTRY_FILL_MODES | PF_REASONS | DAY_STATUS
+           | SE_EXIT_REASONS | ENTRY_FILL_MODES | PF_REASONS | DAY_STATUS | EXPIRE_REASONS
            | {"HOLD_EXIT", "unknown", "TIMEOUT", "INIT", "SL", "TP", "TIME"})
 for fn in SCAN:
     fp = os.path.join(HERE, fn)
@@ -104,7 +105,8 @@ ok("ENTRY_MODES 三显式模式", ENTRY_MODES == {"limit_retrace", "limit_or_ope
 ok("LEGACY 仅 retrace 别名", LEGACY_ENTRY_MODES == {"retrace"})
 ok("ORDER_STATUS 四态", ORDER_STATUS == {"PENDING_ORDER", "FILLED", "EXPIRED", "CLOSED"})
 ok("SL_REASONS 四种(R2+R7实测)", SL_REASONS == {"INIT", "TP1_MOVE_TO_BE", "SL_TOUCH_INTRADAY", "SL_GAP_OPEN_BELOW_STOP"})
-ok("reject 四类+STAGE_前缀", REJECT_STAGES == {"EVENT_FILTER", "DUP_EXISTING", "DATA_MISSING", "ADX_LT20"})
+ok("reject 五类+STAGE_前缀(R8+BAD_SL_GE_ENTRY)", REJECT_STAGES == {"EVENT_FILTER", "DUP_EXISTING", "DATA_MISSING", "ADX_LT20", "BAD_SL_GE_ENTRY"})
+ok("EXPIRE_REASONS(R8 守卫+TIMEOUT)", EXPIRE_REASONS == {"BAD_GEOMETRY_FILL_GE_SL", "TIMEOUT"})
 ok("DAY_STATUS 四态(R14)", DAY_STATUS == {"OK", "WEEKEND", "HOLIDAY_OR_NO_DATA", "NO_SIGNAL"})
 ok("ENTRY_FILL_MODES 四种(含 MARKET_OPEN)", ENTRY_FILL_MODES == {"STRICT_LIMIT", "LIMIT_OR_OPEN", "INVALIDATED_BEFORE_FILL", "MARKET_OPEN"})
 ok("NOT_EXIT_WHY 含 T1_LOCKED 六种", NOT_EXIT_WHY == {"LIMIT_DOWN_SELL", "BAD_POSITION", "HOLD", "NO_PRICE", "SUSPENDED", "T1_LOCKED"})

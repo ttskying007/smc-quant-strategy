@@ -516,18 +516,21 @@ def _parse_insider_magnitude(title):
 # ---------- reject ledger (第七轮审计 §9.2 被拒候选前向收益追踪, R5 2026-09-13) ----------
 REJECT_LEDGER_FILE = os.path.join(ROOT, "reject_ledger.json")
 
-def _tri_decompose(raw, hard, soft, soft_delta, skipped_stage, skipped_adx, nodata, dup, orders):
+def _tri_decompose(raw, hard, soft, soft_delta, skipped_stage, skipped_adx, nodata, dup, orders,
+                   bad_sl=0):
     """审计§4.3 三分解: 无新股归因 = 源头供给 / 质量拒绝 / 容量拒绝(含数据缺失)。
-    纯函数, tests_reject_ledger 覆盖守恒: raw = quality + data_missing + dup + orders。"""
-    quality = hard + soft + soft_delta + skipped_stage + skipped_adx
+    纯函数, tests_reject_ledger 覆盖守恒: raw = quality + data_missing + dup + bad_sl + orders。
+    R8: bad_sl(sl>=entry 非法几何 fail-closed 拒单)计入 quality_reject
+    (合同失败属于可修复质量问题, 非市场容量约束)。"""
+    quality = hard + soft + soft_delta + skipped_stage + skipped_adx + bad_sl
     return {
         "source_supply": raw,
         "quality_reject": quality,
         "data_missing": nodata,
-        "execution_capacity": {"dup": dup, "portfolio_gate": 0,
-                               "note": "PortfolioGate 属 Phase E 未接入; 当前容量拒绝仅含同股同日重复挂单去重"},
+        "execution_capacity": {"dup": dup, "portfolio_gate": 0, "bad_sl": bad_sl,
+                               "note": "PortfolioGate 属 Phase E 未接入; 容量拒绝当前含同股同日重复挂单去重; bad_sl 为 sl>=entry 非法几何 fail-closed 拒单(R8)"},
         "orders_created": orders,
-        "conservation_note": "raw = quality_reject(分类+阶段+ADX) + data_missing + dup + orders",
+        "conservation_note": "raw = quality_reject(分类+阶段+ADX+bad_sl) + data_missing + dup + orders",
     }
 
 def _persist_rejects(records, root=None, cap=6000):
@@ -659,6 +662,18 @@ def daily_selection():
                 anchor_note = "回退:固定比例(结构不足)"
             is_buyback = "回购" in str(title)
             sig = "BUYBACK_STRONG" if is_buyback else "HOLDER_INCREASE"
+            # FIX(2026-09-13, R8 执行合同缺口): sl1 >= 挂单价 → fail-closed 拒单。
+            # 审计§6.2: "sl >= entry 必须 fail-closed"; 但 R8 fill-level 回放发现
+            # 生产账本 5/139 笔 sl1>=entry_price(DOWNTREND 反弹锚点在回踩价上方),
+            # 回测 simulate 对此几何 BAD_ENTRY skip, 纸面却成交(4 笔 CLOSED 净值 -8.26pp)
+            # —— 回测/纸面语义现行分裂实例。守卫消除分裂: 生产链同样拒单,
+            # 拒绝入 reject ledger(quality_reject 类, 非源头稀缺), 不静默。
+            if sl1 is not None and limit_px and sl1 >= limit_px:
+                _sel_stats["skipped_bad_sl"] = _sel_stats.get("skipped_bad_sl", 0) + 1
+                _reject_records.append({"code": code, "name": name, "date": d8,
+                                        "stage": "BAD_SL_GE_ENTRY",
+                                        "title": str(title)[:80]})
+                continue
             subs = sub_signals_event(bs, i, dd)
             avg_v = sum(bs[k]["v"] for k in range(i + 1 - 20, i + 1)) / 20 if i + 1 >= 20 else 0
             # FIX(2026-09-08, 审计 P0-2): v_ratio 用披露日(决策时点)可得量 bs[i]["v"]，
@@ -914,7 +929,7 @@ def daily_selection():
         _tri = _tri_decompose(_raw, _hard, _soft, _soft_delta,
                               _sel_stats.get("skipped_stage", 0), _sel_stats.get("skipped_adx", 0),
                               _sel_stats.get("skipped_nodata", 0), _sel_stats.get("skipped_dup", 0),
-                              len(new_orders))
+                              len(new_orders), bad_sl=_sel_stats.get("skipped_bad_sl", 0))
         funnel = {
             "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "days": recent_days,
@@ -1039,7 +1054,25 @@ def realtime_monitor():
                    "planned_tp": t.get("tp2") or t.get("tp_price"),
                    "valid_from": t.get("valid_from", "")}
             _fr = _core_fill(_fo, _snap)
-            if _fr.get("filled"):
+            # FIX(2026-09-13, R8 执行合同): 成交时几何守卫 —— fill 价 >= SL 即时撤单。
+            # 订单生成时 limit(×0.99) 可能 < sl1(DOWNTREND 反弹锚点在回踩价上方, 已有
+            # 5/139 历史实例), 触价成交必然亏损 SL; 开盘兜底价若 >= SL 同理非法。
+            # simulate 对此几何 BAD_ENTRY skip —— 纸面必须在成交点同语义 fail-closed,
+            # 消除回测/纸面分裂(R8 fill-level 回放发现)。
+            if _fr.get("filled") and float(_fr["price"] or 0) >= float(
+                    _fo.get("planned_sl") or 0) > 0:
+                t["status"] = "EXPIRED"
+                t["expire_reason"] = "BAD_GEOMETRY_FILL_GE_SL"
+                t["not_filled_reason"] = "BAD_GEOMETRY_FILL_GE_SL"
+                t["note"] = (t.get("note", "") + f" | R8合同守卫: fill价{_fr['price']}>=" +
+                             f"SL{_fo.get('planned_sl')} → 撤单(回测BAD_ENTRY同语义)").strip()
+                _append_realtime_log({
+                    "ts": time.strftime("%Y-%m-%d %H:%M:%S"), "code": t["code"],
+                    "name": t.get("name", ""), "price": _fr["price"], "status": "EXPIRED",
+                    "note": "BAD_GEOMETRY_FILL_GE_SL(R8 守卫)",
+                })
+                print(f"[R8守卫] {t['code']} fill价{_fr['price']}>=SL{_fo.get('planned_sl')} → 撤单(与回测BAD_ENTRY同语义)", flush=True)
+            elif _fr.get("filled"):
                 t["status"] = "FILLED"
                 t["filled_price"] = _fr["price"]
                 t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")

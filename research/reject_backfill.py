@@ -19,7 +19,8 @@ import io, json, os, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import paper_sim  # noqa (bars_of/stage_and_deep/adx14_of/load_ledger/ROOT)
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+# 教训#7(R8): stdout wrap 只在 __main__ 做 —— 本模块会被 reject_fill_replay import,
+# 模块级 wrap 会在调用方(已 wrap)再包一层, GC 关闭首个 wrapper → "I/O operation on closed file"
 
 from core.events import classify_title
 from core.trading_calendar import td_set
@@ -150,4 +151,5 @@ def main():
 
 
 if __name__ == "__main__":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.exit(main())

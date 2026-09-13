@@ -1,0 +1,67 @@
+{
+  "generated_at": "2026-09-13 13:07:27",
+  "provenance": "fill_level_replay(研究级;不改生产过滤器)",
+  "ttl_td": 3,
+  "per_stage": {
+    "ADX_LT20": {
+      "n_candidates": 172,
+      "n_evaluable": 172,
+      "n_filled": 171,
+      "n_not_filled": 1,
+      "n_unavailable": 0,
+      "fill_rate": 0.9942,
+      "not_filled_why": {
+        "SKIP_LIMIT_UP": 1
+      },
+      "exit_reasons": {
+        "SL_HIT": 44,
+        "BE": 45,
+        "TP2_RUNNER": 39,
+        "SL_GAP": 16,
+        "TIME_STOP": 27
+      },
+      "skip_reasons": {},
+      "avg_net_pct": 2.45,
+      "win_rate": 0.655,
+      "pf": 3.0,
+      "sl_rate": 0.614,
+      "tp_rate": 0.2281,
+      "time_rate": 0.1579,
+      "avg_mfe": 7.911,
+      "avg_mae": -1.99,
+      "min_n_gate": true,
+      "vs_control_pp": -1.0608,
+      "verdict": "fill级+2.45% vs 通过层3.5108%(-1.06pp, 带宽内)→必要条件满足, 待生产账本独立确认"
+    }
+  },
+  "control_passed_cohort": {
+    "n_candidates": 402,
+    "n_evaluable": 402,
+    "n_filled": 326,
+    "n_not_filled": 76,
+    "n_unavailable": 0,
+    "fill_rate": 0.8109,
+    "not_filled_why": {
+      "BAD_ENTRY": 75,
+      "SKIP_LIMIT_UP": 1
+    },
+    "exit_reasons": {
+      "SL_HIT": 69,
+      "TIME_STOP": 107,
+      "BE": 68,
+      "SL_GAP": 40,
+      "TP2_RUNNER": 42
+    },
+    "skip_reasons": {},
+    "avg_net_pct": 3.5108,
+    "win_rate": 0.6196,
+    "pf": 3.505,
+    "sl_rate": 0.5429,
+    "tp_rate": 0.1288,
+    "time_rate": 0.3282,
+    "avg_mfe": 10.511,
+    "avg_mae": -2.825,
+    "min_n_gate": true
+  },
+  "discipline": "预注册纪律: fill-level 为正仅是放宽 ADX_LT20 的必要条件之一; 还需生产 reject_ledger 前瞻积累 n>=20 独立同向 + 组合容量约束复核; 在此之前 ADX>=20 门保持不变(frozen)"
+}

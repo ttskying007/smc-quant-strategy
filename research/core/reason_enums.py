@@ -75,6 +75,10 @@ WHY_T1_LOCKED = "T1_LOCKED"              # T+1 当日买入不可卖
 NOT_EXIT_WHY = frozenset({WHY_LIMIT_DOWN_SELL, WHY_BAD_POSITION, WHY_HOLD,
                           WHY_NO_PRICE, WHY_SUSPENDED, WHY_T1_LOCKED})
 
+# ---- PENDING 撤单原因(expire_reason, R8) ----
+EXP_BAD_GEOMETRY_FILL_GE_SL = "BAD_GEOMETRY_FILL_GE_SL"  # 成交时 fill价>=SL → 撤单(回测 BAD_ENTRY 同语义)
+EXPIRE_REASONS = frozenset({EXP_BAD_GEOMETRY_FILL_GE_SL, "TIMEOUT"})
+
 # ================= 4. 账本 status / entry_mode / fill mode / day_status =================
 ST_PENDING_ORDER = "PENDING_ORDER"
 ST_FILLED = "FILLED"
@@ -101,7 +105,9 @@ REJ_DUP_EXISTING = "DUP_EXISTING"
 REJ_DATA_MISSING = "DATA_MISSING"
 REJ_STAGE_PREFIX = "STAGE_"
 REJ_ADX_LT20 = "ADX_LT20"
-REJECT_STAGES = frozenset({REJ_EVENT_FILTER, REJ_DUP_EXISTING, REJ_DATA_MISSING, REJ_ADX_LT20})
+REJ_BAD_SL_GE_ENTRY = "BAD_SL_GE_ENTRY"          # R8: sl1>=挂单价 非法几何 fail-closed 拒单
+REJECT_STAGES = frozenset({REJ_EVENT_FILTER, REJ_DUP_EXISTING, REJ_DATA_MISSING,
+                           REJ_ADX_LT20, REJ_BAD_SL_GE_ENTRY})
 
 # portfolio.py DailyPortfolioEngine 简化 reason(组合回测器内部) + 挂单 TTL
 PF_SL, PF_TP, PF_TIME = "SL", "TP", "TIME"
