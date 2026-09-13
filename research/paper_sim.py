@@ -82,7 +82,15 @@ def realtime_prices(codes):
     供涨跌停/停牌判断；旧调用方取 .get(code) 仍得到价格（兼容）。"""
     syms = []
     for c in codes:
-        ex = "sh" if c.startswith("6") else "sz"
+        # FIX(2026-09-13, 第八轮审计 P1-12): 交易所前缀映射 —— 原"非6即sz"把北交所
+        # (4/8/9开头, Sina 前缀 bj)错误映射为 sz。当前 K 线缓存无北交所股票(数据源
+        # 不覆盖, 见 bars_of), 实际影响 0 只; 修复为防御性正确实现。
+        if c.startswith("6"):
+            ex = "sh"
+        elif c.startswith(("4", "8", "9")) and len(c) == 6:
+            ex = "bj"
+        else:
+            ex = "sz"
         syms.append(ex + c)
     out = {}
     for i in range(0, len(syms), 50):
@@ -321,6 +329,10 @@ def adx14_of(bs, i):
 
 
 def bars_of(code):
+    # FIX(2026-09-13, 第八轮审计 P1-12): 腾讯缓存命名 SH/SZ 双前缀 —— 北交所
+    # (4/8/9开头)不在该缓存(数据源边界), 显式返回空而非误读 SZ 文件名。
+    if code.startswith(("4", "8", "9")) and len(code) == 6:
+        return []
     ex = "SH" if code.startswith("6") else "SZ"
     p = os.path.join(KT, f"{code}_{ex}_daily_800.json")
     if not os.path.exists(p):
@@ -517,20 +529,23 @@ def _parse_insider_magnitude(title):
 REJECT_LEDGER_FILE = os.path.join(ROOT, "reject_ledger.json")
 
 def _tri_decompose(raw, hard, soft, soft_delta, skipped_stage, skipped_adx, nodata, dup, orders,
-                   bad_sl=0):
+                   bad_sl=0, capacity=0):
     """审计§4.3 三分解: 无新股归因 = 源头供给 / 质量拒绝 / 容量拒绝(含数据缺失)。
-    纯函数, tests_reject_ledger 覆盖守恒: raw = quality + data_missing + dup + bad_sl + orders。
+    纯函数, tests_reject_ledger 覆盖守恒: raw = quality + data_missing + dup + bad_sl
+    + capacity + orders。
     R8: bad_sl(sl>=entry 非法几何 fail-closed 拒单)计入 quality_reject
-    (合同失败属于可修复质量问题, 非市场容量约束)。"""
+    (合同失败属于可修复质量问题, 非市场容量约束)。
+    R15(第八轮审计 P1-9): capacity=PortfolioGate 组合拒绝(总暴露/单日/持仓上限/kill
+    switch), 与策略质量拒绝分开 —— "组合 gate 拒绝不能与策略拒绝混淆"。"""
     quality = hard + soft + soft_delta + skipped_stage + skipped_adx + bad_sl
     return {
         "source_supply": raw,
         "quality_reject": quality,
         "data_missing": nodata,
-        "execution_capacity": {"dup": dup, "portfolio_gate": 0, "bad_sl": bad_sl,
-                               "note": "PortfolioGate 属 Phase E 未接入; 容量拒绝当前含同股同日重复挂单去重; bad_sl 为 sl>=entry 非法几何 fail-closed 拒单(R8)"},
+        "execution_capacity": {"dup": dup, "portfolio_gate": capacity, "bad_sl": bad_sl,
+                               "note": "portfolio_gate=组合容量拒绝(R15 接线: 总暴露≤0.8/单日≤5/持仓≤10/kill switch); dup=同股同日重复挂单去重; bad_sl=sl>=entry 非法几何 fail-closed 拒单(R8)"},
         "orders_created": orders,
-        "conservation_note": "raw = quality_reject(分类+阶段+ADX+bad_sl) + data_missing + dup + orders",
+        "conservation_note": "raw = quality_reject(分类+阶段+ADX+bad_sl) + data_missing + dup + portfolio_gate + orders",
     }
 
 def _persist_rejects(records, root=None, cap=6000):
@@ -788,6 +803,36 @@ def daily_selection():
                               "cont": bool(getattr(CFG, "ENABLE_CONT_LEG", False)),
                               "smc": bool(getattr(CFG, "ENABLE_SMC_LEG", False))},
             })
+            # FIX(2026-09-13, 第八轮审计 P1-9): PortfolioGate 订单创建前接线(最小实现) ——
+            # 总暴露(已成交+待成交+本单) ≤0.8 / 单票 ≤0.25 / 单日新开 ≤5 / kill switch。
+            # gate 拒绝写 capacity_reject(与策略拒绝分开, 审计 §P1-9), 不进正式订单。
+            try:
+                from core.portfolio import portfolio_exposure_check, throttle_open, kill_switch as _ks
+                _live = [t2 for t2 in led if t2.get("status") in ("PENDING_ORDER", "FILLED")
+                         and t2 is not led[-1]]
+                _pos_all = [{"code": t2["code"],
+                             "position_pct": float(t2.get("position_pct") or 0.01)} for t2 in _live]
+                _pos_all.append({"code": code, "position_pct": _position_pct})
+                _ok_e, _why_e, _tot = portfolio_exposure_check(_pos_all)
+                _day_opens = [t2.get("created_at") == time.strftime("%Y-%m-%d")
+                              for t2 in _live] + [True]
+                _ok_t, _why_t = throttle_open(_day_opens, {}, max_positions=10,
+                                              max_sector=3, max_daily_opens=5)
+                _pnl_recent = [float(t2.get("pnl_pct") or 0) / 100
+                               for t2 in _live if t2.get("pnl_pct") is not None][-20:]
+                _ks_on, _ks_why = _ks(_pnl_recent, window="daily"), None
+                _ks_trig = _ks_on[0] if isinstance(_ks_on, tuple) else _ks_on
+                if not _ok_e or not _ok_t or _ks_trig:
+                    _reason = _why_e if not _ok_e else (_why_t if not _ok_t else "KILL_SWITCH")
+                    led.pop()  # 撤回该订单
+                    _sel_stats["capacity_reject"] = _sel_stats.get("capacity_reject", 0) + 1
+                    _reject_records.append({"code": code, "name": name, "date": dd,
+                                            "stage": "CAPACITY_REJECT", "title": title[:80],
+                                            "why": _reason, "total_exposure": round(_tot, 4)})
+                    continue
+            except Exception as _ge:
+                # gate 自身异常 → fail-open 仅限本次(记录); 生产资格由 manifest 层把守
+                _sel_stats["gate_error"] = _sel_stats.get("gate_error", 0) + 1
             new_orders.append((code, name, dd, limit_px))
     conn.close()
     # continuation candidates from scanner result (T+1 open entry, hold 10)
@@ -965,7 +1010,8 @@ def daily_selection():
         _tri = _tri_decompose(_raw, _hard, _soft, _soft_delta,
                               _sel_stats.get("skipped_stage", 0), _sel_stats.get("skipped_adx", 0),
                               _sel_stats.get("skipped_nodata", 0), _sel_stats.get("skipped_dup", 0),
-                              len(new_orders), bad_sl=_sel_stats.get("skipped_bad_sl", 0))
+                              len(new_orders), bad_sl=_sel_stats.get("skipped_bad_sl", 0),
+                              capacity=_sel_stats.get("capacity_reject", 0))
         funnel = {
             "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "days": recent_days,

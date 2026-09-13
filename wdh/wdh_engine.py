@@ -490,6 +490,11 @@ def build_seeds(symbol, daily, gates=None):
             "r20": r20 if r20 is not None else "",
             # V1 迭代2: 语义化位移分（0-100）及分桶 —— 供分桶 A/B 检验
             "disp_score": disp_score, "disp_bucket": disp_bucket,
+            # FIX(2026-09-13, 第八轮审计 5.1): H 层语义显式标注 —— 本引擎的 H 确认
+            # 是"日线投影模型"(POI 触碰→收盘过前高/POI 上沿→守位), 不是文档定义的
+            # H2 local SSL sweep / H3 sweep-high / H4 retest/hold 独立 60m 事件。
+            # 报告与 registry 必须以 H_PROJECTED_DAILY 区分, 不得宣称完整 H 层验证。
+            "h_layer_model": "H_PROJECTED_DAILY",
         })
         STAGE_STATS["seeds"] += 1
     return seeds

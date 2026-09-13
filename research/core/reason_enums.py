@@ -106,8 +106,9 @@ REJ_DATA_MISSING = "DATA_MISSING"
 REJ_STAGE_PREFIX = "STAGE_"
 REJ_ADX_LT20 = "ADX_LT20"
 REJ_BAD_SL_GE_ENTRY = "BAD_SL_GE_ENTRY"          # R8: sl1>=挂单价 非法几何 fail-closed 拒单
+REJ_CAPACITY_REJECT = "CAPACITY_REJECT"          # R15(第八轮审计 P1-9): 组合容量/kill switch 拒单(与策略拒绝分开)
 REJECT_STAGES = frozenset({REJ_EVENT_FILTER, REJ_DUP_EXISTING, REJ_DATA_MISSING,
-                           REJ_ADX_LT20, REJ_BAD_SL_GE_ENTRY})
+                           REJ_ADX_LT20, REJ_BAD_SL_GE_ENTRY, REJ_CAPACITY_REJECT})
 
 # portfolio.py DailyPortfolioEngine 简化 reason(组合回测器内部) + 挂单 TTL
 PF_SL, PF_TP, PF_TIME = "SL", "TP", "TIME"
