@@ -96,5 +96,20 @@ else:
     ok("SSL 池 price==min_low 且 idx 同源(EQ合并兼容)", len(hit) >= 1,
        f"pools={[(p['kind'], p['price'], p['idx']) for p in ssl_all]} min={min_low}")
 
+
+print("== 9. R12(第八轮审计 5.4): PDH/PDL 池不再被空过滤 ==")
+from core.liquidity import liquidity_pools as _lp
+_bs = [{"t": f"202606{i+1:02d}", "o": 10.0, "h": 10.5, "l": 9.5, "c": 10.0, "v": 100} for i in range(30)]
+_bs[-1]["h"] = 11.0  # 前日高 PDH 锚
+_bs[-1]["l"] = 9.0   # 前日低 PDL 锚
+_pools = _lp(_bs, len(_bs))  # i=30(决策日), 前日=29
+_kinds = {q["kind"] for q in _pools}
+ok("PDH/PDL 进入流动性池(此前恒被拒)", "PDH" in _kinds, _kinds)
+_pd = [q for q in _pools if q["kind"] == "PDH"]
+if _pd:
+    ok("PDH 价格=前日高", abs(_pd[0]["price"] - 11.0) < 1e-9, _pd[0])
+    ok("PDH idx=前日(i-1)", _pd[0]["idx"] == len(_bs) - 1, _pd[0])
+ok("无 idx>i-1 的池(当日数据不进池)", all(q["idx"] <= len(_bs) - 1 for q in _pools))
+
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

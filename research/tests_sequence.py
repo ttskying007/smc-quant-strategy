@@ -76,5 +76,18 @@ ok("重建状态机运行", m4.state in STATES + ("FILLED", "CLOSED"), m4.state)
 ok("历史可追溯", len(m4.history) >= 0)
 ok("无前视窗口(事件ts<=i)", all(e["timestamp"] <= bs[-1]["t"] for e in m4.events))
 
+
+print("== 6. R12(第八轮审计 5.5): 时间倒序事件拒绝 ==")
+from core.sequence import SequenceMachine
+_m = SequenceMachine("600000")
+_ok1, _ = _m.feed({"event_type": "LIQUIDITY_FORMED", "timestamp": "202609021000"})
+_ok2, _ = _m.feed({"event_type": "SSL_SWEEP", "timestamp": "202609021100"})
+_ok3, _s3 = _m.feed({"event_type": "RECLAIM", "timestamp": "202609020900"})
+ok("顺序前两事件接受", _ok1 and _ok2)
+ok("倒序 RECLAIM(09:00<11:00) 拒绝", (not _ok3) and _s3 != "READY")
+ok("拒绝原因=TIME_REGRESSION", any(r.get("why") == "TIME_REGRESSION" for r in _m.rejected))
+_ok4, _ = _m.feed({"event_type": "RECLAIM", "timestamp": "202609021200"})
+ok("恢复正常时序 RECLAIM 接受", _ok4)
+
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

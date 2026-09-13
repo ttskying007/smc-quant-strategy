@@ -218,6 +218,15 @@ def _run_main_steps():
                "execution_complete": _execution_complete,
                "frontend_complete": _frontend_complete,
                "production_eligible": _production_eligible,
+               # FIX(2026-09-13, 第八轮审计 P0-3): manifest 哈希生命周期 —— 原顺序
+               # "写 run_status → manifest 哈希该文件 → 再回写 manifest_ok/production_eligible
+               # 到同一文件"使 manifest 记录的 hash 与磁盘最终文件不一致, 下次
+               # validate_artifacts() 必然不匹配(审计 §3 P0-3)。
+               # 修复: run_status 首写即含 manifest_ok=False 初值; manifest finalize
+               # 成功后**不再回写本文件**(状态经 manifest 本体+run_manifest.json 传播);
+               # finalize 失败路径只写 manifest_error(此时本 run 已判 INVALID, 不再有
+               # "哈希有效的 manifest"可被破坏)。artifact 进入冻结生命周期。
+               "manifest_ok": False,
                "fallback_used": bool(_failed) or not _production_eligible,
                "note": ("任一域未完整，需兜底补跑" if not _production_eligible else "数据/信号/执行/前端四层全部完整")},
               open(os.path.join(RESEARCH, "run_status.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
@@ -261,16 +270,19 @@ def _run_main_steps():
         except Exception:
             pass
     # FIX(2026-09-08, 复审 P0-1 fail-closed): 生产资格必须含 manifest/artifact 验证通过。
-    # manifest 缺失/无效 → 即便四层数据完整也不得 production_eligible=true。
+    # FIX(2026-09-13, 第八轮审计 P0-3): 成功路径不再回写 run_status.json —— manifest
+    # 已对该文件哈希, 回写=自毁哈希。最终判定经 manifest 本体(status/artifacts)与
+    # run_manifest.json 传播; 下游读 manifest_ok 以 run_manifest.json 为准。
+    # (失败路径上方已写 manifest_error, 该 run 已 INVALID, 不存在可破坏的有效哈希。)
     _production_eligible = _production_eligible and _manifest_ok
-    try:
-        _rs_p = os.path.join(RESEARCH, "run_status.json")
-        _rs = json.load(open(_rs_p, encoding="utf-8")) if os.path.exists(_rs_p) else {}
-        _rs["manifest_ok"] = _manifest_ok
-        _rs["production_eligible"] = _production_eligible
-        json.dump(_rs, open(_rs_p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+    if not _manifest_ok:
+        try:
+            _rs_p = os.path.join(RESEARCH, "run_status.json")
+            _rs = json.load(open(_rs_p, encoding="utf-8")) if os.path.exists(_rs_p) else {}
+            _rs["production_eligible"] = False
+            json.dump(_rs, open(_rs_p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+        except Exception:
+            pass
     print(f"DONE: batch={rc0} refresh={rc} scan={rc2} sim={rc3} dashboard={rc4} manifest_ok={_manifest_ok}", flush=True)
 
 if __name__ == "__main__":

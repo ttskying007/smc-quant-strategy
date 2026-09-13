@@ -566,6 +566,18 @@ def _persist_rejects(records, root=None, cap=6000):
 def daily_selection():
     """Scan new insider events -> create PENDING_ORDER entries.
     entry price = disclosure day close (limit order: buy only at or below)."""
+    # FIX(2026-09-13, 第八轮审计 P0-4): ENABLE_EVENT_LEG 开关接线 —— 原开关在
+    # config 定义但事件循环无条件执行, 关闭 EVENT 腿仍会产生 EVENT 订单(审计 §1.2)。
+    # 接线后: 开关关闭 → 跳过事件选股, 输出统计并 return(零新订单)。
+    if not getattr(CFG, "ENABLE_EVENT_LEG", True):
+        _st = {"event_leg_disabled": True, "orders_created": 0,
+               "note": "ENABLE_EVENT_LEG=False: 事件腿选股跳过(可审计/可回滚)"}
+        print("[P0-4] ENABLE_EVENT_LEG=False → 事件腿选股跳过", flush=True)
+        try:
+            _atomic_write_json(os.path.join(CFG.OUTPUT_ROOT, "event_leg_status.json"), _st)
+        except Exception:
+            pass
+        return _st
     import sqlite3
     # FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径
     conn = sqlite3.connect(CFG.ANNOUNCE_DB)
@@ -770,42 +782,62 @@ def daily_selection():
                 "eligible_at": _next_td(dates, d8),
                 "fill_rule": "回踩挂单: low<=limit×0.99 成交, 否则 T+1 开盘兜底(实时open)",
                 "not_filled_reason": None,
+                # FIX(2026-09-13, 第八轮审计 P0-4): 开关快照 —— 每笔订单记录当时的
+                # 三腿开关状态(可审计: 事后能回答"该单产生时哪个腿是开着的")。
+                "leg_flags": {"event": bool(getattr(CFG, "ENABLE_EVENT_LEG", True)),
+                              "cont": bool(getattr(CFG, "ENABLE_CONT_LEG", False)),
+                              "smc": bool(getattr(CFG, "ENABLE_SMC_LEG", False))},
             })
             new_orders.append((code, name, dd, limit_px))
     conn.close()
     # continuation candidates from scanner result (T+1 open entry, hold 10)
-    try:
-        scan = json.load(open(os.path.join(ROOT, "current_scanner_result.json"), encoding="utf-8"))
-        cont_cands = scan.get("continuation_candidates") or []
-        for c in cont_cands:
-            code = str(c.get("symbol", "")).split(".")[0]
-            sig_d = str(c.get("signal_date", ""))
-            if (code, sig_d) in known or (code, sig_d) in seen_orders:
-                continue
-            seen_orders.add((code, sig_d))
-            ep = c.get("reference_price") or c.get("entry_price") or 0
-            support = c.get("support", 0)
-            tp = ep * 1.15 if ep else 0
-            sl = support * 0.99 if support else (ep * 0.90 if ep else 0)
-            bs2 = bars_of(code)
-            subs2 = []
-            dates2 = []
-            if bs2 and ep:
-                # FIX(2026-09-08, 审计 P0-3): 子信号基于 signal 日(决策时点)计算，
-                # 不再依赖已删除的 entry_date（历史 entry 日）。
-                sig_d8 = sig_d.replace("-", "")
-                dates2 = [b["t"] for b in bs2]
-                ei2 = dates2.index(sig_d8) if sig_d8 in dates2 else -1
-                if ei2 >= 60:
-                    subs2 = sub_signals_cont(bs2, ei2, sig_d)
-            led.append({
-                "code": code, "name": code, "signal_combo": "CONTINUATION_MARKUP",
-                # FIX(2026-09-05, 审计 G04): 延续腿不再当日 FILLED —— 信号 bar 用 ≤signal 数据过滤，
-                # 次日开盘挂单(valid_from)由 monitor 以实时 open 成交，禁止"知今日涨9%按今开买"
-                # FIX(2026-09-08, 审计 P0-3): entry_price 用 signal 收盘参考价，成交价由 monitor 实时 open 撮合
-                "signal_date": sig_d, "trigger": "MARKUP结构支撑+VWAP10%+低波动：次日开盘买入，固定10日",
-                "valid_from": c.get("valid_from") or (_next_td(dates2, sig_d8) if (bs2 and ep) else ""),
+    # FIX(2026-09-13, 第八轮审计 P0-4): ENABLE_CONT_LEG 接线 —— 与 EVENT/SMC 同语义,
+    # 开关关闭跳过延续腿选股(零新订单, 统计落盘 event_leg_status.json 同文件)。
+    if not getattr(CFG, "ENABLE_CONT_LEG", True):
+        print("[P0-4] ENABLE_CONT_LEG=False → 延续腿选股跳过", flush=True)
+        try:
+            _st2 = {"cont_leg_disabled": True, "orders_created": 0}
+            _atomic_write_json(os.path.join(CFG.OUTPUT_ROOT, "event_leg_status.json"), _st2)
+        except Exception:
+            pass
+    else:
+        try:
+            scan = json.load(open(os.path.join(ROOT, "current_scanner_result.json"), encoding="utf-8"))
+            cont_cands = scan.get("continuation_candidates") or []
+            for c in cont_cands:
+                code = str(c.get("symbol", "")).split(".")[0]
+                sig_d = str(c.get("signal_date", ""))
+                if (code, sig_d) in known or (code, sig_d) in seen_orders:
+                    continue
+                seen_orders.add((code, sig_d))
+                ep = c.get("reference_price") or c.get("entry_price") or 0
+                support = c.get("support", 0)
+                tp = ep * 1.15 if ep else 0
+                sl = support * 0.99 if support else (ep * 0.90 if ep else 0)
+                bs2 = bars_of(code)
+                subs2 = []
+                dates2 = []
+                if bs2 and ep:
+                    # FIX(2026-09-08, 审计 P0-3): 子信号基于 signal 日(决策时点)计算，
+                    # 不再依赖已删除的 entry_date（历史 entry 日）。
+                    sig_d8 = sig_d.replace("-", "")
+                    dates2 = [b["t"] for b in bs2]
+                    ei2 = dates2.index(sig_d8) if sig_d8 in dates2 else -1
+                    if ei2 >= 60:
+                        subs2 = sub_signals_cont(bs2, ei2, sig_d)
+                led.append({
+                    "code": code, "name": code, "signal_combo": "CONTINUATION_MARKUP",
+                    # FIX(2026-09-05, 审计 G04): 延续腿不再当日 FILLED —— 信号 bar 用 ≤signal 数据过滤，
+                    # 次日开盘挂单(valid_from)由 monitor 以实时 open 成交，禁止"知今日涨9%按今开买"
+                    # FIX(2026-09-08, 审计 P0-3): entry_price 用 signal 收盘参考价，成交价由 monitor 实时 open 撮合
+                    "signal_date": sig_d, "trigger": "MARKUP结构支撑+VWAP10%+低波动：次日开盘买入，固定10日",
+                    "valid_from": c.get("valid_from") or (_next_td(dates2, sig_d8) if (bs2 and ep) else ""),
                 "entry_price": round(ep, 3) if ep else 0, "tp_price": round(tp, 3), "sl_price": round(sl, 3),
+                # FIX(2026-09-13, 第八轮审计 P1-4): CONT 目标价接线 —— 原订单只写
+                # tp_price(展示字段), try_exit 只读 tp1/tp2 → 15% 目标在生产退出链
+                # 不可执行(只能 SL/TIME_STOP 出场)。tp2=tp_price 使单目标可触发;
+                # tp1 保持 None(单目标语义, 不部分平仓/不移保本)。
+                "tp2": round(tp, 3),
                 "status": "PENDING_ORDER", "paper": True, "source": "CONT",
                 "created_at": time.strftime("%Y-%m-%d"), "pick_date": time.strftime("%Y-%m-%d"),
                 "sub_signals": subs2, "entry_mode": "next_open",
@@ -816,10 +848,14 @@ def daily_selection():
                 "order_type": "MARKET_T1_OPEN", "submitted_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "eligible_at": c.get("valid_from") or (_next_td(dates2, sig_d8) if (bs2 and ep) else ""),
                 "fill_rule": "T+1开盘市价(实时open, 带滑点)", "not_filled_reason": None,
+                # FIX(2026-09-13, 第八轮审计 P0-4): 开关快照(同 EVENT 订单)
+                "leg_flags": {"event": bool(getattr(CFG, "ENABLE_EVENT_LEG", True)),
+                              "cont": bool(getattr(CFG, "ENABLE_CONT_LEG", True)),
+                              "smc": bool(getattr(CFG, "ENABLE_SMC_LEG", False))},
             })
             new_orders.append((code, code, sig_d, ep))
-    except Exception:
-        pass
+        except Exception:
+            pass
     # FIX(2026-09-05, 审计 G03): SMC 腿接入生产选股 —— 读取 smc_candidates → PENDING(next_open)
     # FIX(2026-09-05, 复审 P0-3): SMC 无稳定 OOS edge → 由 config.ENABLE_SMC_LEG 门控（默认禁用，
     # 仅作 HTF_BIAS 研究特征，不独立开仓）

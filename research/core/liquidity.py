@@ -29,7 +29,7 @@ def liquidity_pools(daily, i, lookback=120):
     seen_px = []
 
     def add_pool(kind, side, price, idx):
-        if price is None or price <= 0 or idx >= i - 1:
+        if price is None or price <= 0 or idx > i - 1:
             return
         # 等高低合并: 已有池距离 < 2tol → 合并为 EQ
         for p in pools:
@@ -60,6 +60,9 @@ def liquidity_pools(daily, i, lookback=120):
     for j in swing_lows:
         add_pool("SWING", "SSL", daily[j]["l"], j)
     # 外部参考: 前日高低(PDH/PDL)
+    # FIX(2026-09-13, 第八轮审计 5.4): 原 add_pool 门槛 `idx >= i-1` 拒绝恰好以
+    # idx=i-1 传入的 PDH/PDL —— 池永远为空(审计 8.4 复现), 文档定义的 External
+    # Liquidity 从未进入 SMC 流动性池/评分/sweep 链。改为 idx > i-1(仅排除当日)。
     if i >= 1:
         add_pool("PDH", "BSL", daily[i - 1]["h"], i - 1)
         add_pool("PDL", "SSL", daily[i - 1]["l"], i - 1)

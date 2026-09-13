@@ -107,7 +107,13 @@ class SequenceMachine:
             self.rejected.append({"event": event, "why": f"OUT_OF_ORDER({self.state}→{trigger})"})
             return False, self.state
         new_state = allowed[trigger]
+        # FIX(2026-09-13, 第八轮审计 5.5): 时间倒序事件拒绝 —— _dt 返回负数
+        # 说明 event.timestamp 早于上一已接受事件, 违反"乱序事件不推进"契约。
+        # 修复前: RECLAIM(09:00) 在 SSL_SWEEP(11:00) 之后仍被接受(审计 8.3 复现)。
         dt_days = self._dt(event.get("timestamp"))
+        if dt_days is not None and dt_days < 0:
+            self.rejected.append({"event": event, "why": "TIME_REGRESSION"})
+            return False, self.state
         self.history.append({"ts": event.get("timestamp"), "state_before": self.state,
                              "state_after": new_state, "trigger": trigger,
                              "dt_days_from_prev": dt_days,

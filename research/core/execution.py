@@ -335,7 +335,13 @@ def try_exit(position, market_snapshot):
     if not tp1_hit and tp1 and px_high >= tp1:
         return {"exit": False, "partial": "TP1", "new_state": {"tp1_hit": True, "sl": ep}}
     # ③ TP2 全平（用盘中高点）
+    # FIX(2026-09-13, 第八轮审计 P1-4): 单目标语义 —— CONT 类订单 tp1=None(无部分
+    # 平仓/不移保本), 目标价写入 tp2。原条件 `tp1_hit and tp2` 使单目标订单永远
+    # 到不了 TP2 分支(15% 目标只经 TIME_STOP 出场, 审计 §4 P1-4)。
+    # 修正: 无 tp1 的订单(tp1<=0)持有 tp2 时直接按 tp2 全平(TP2_RUNNER 同 reason 族)。
     if tp1_hit and tp2 and px_high >= tp2:
+        return {"exit": True, "reason": "TP2_RUNNER", "price": round(px_high * (1 - SLIPPAGE), 3)}
+    if (not tp1_hit) and (not tp1) and tp2 and px_high >= tp2:
         return {"exit": True, "reason": "TP2_RUNNER", "price": round(px_high * (1 - SLIPPAGE), 3)}
     # ④ 时间止损（未触 TP1 且超 max_hold）—— 最后判定
     # FIX(2026-09-13, 第七轮审计 P1-1): position 级 max_hold 优先（CONT 延续腿持有期 10bar
