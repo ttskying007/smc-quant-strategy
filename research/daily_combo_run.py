@@ -142,7 +142,10 @@ def _run_main_steps():
             os.makedirs(d, exist_ok=True)
             shutil.copyfile(os.path.join(RESEARCH, f), os.path.join(d, f))
     # FIX(2026-09-06, Shadow 生产化): 每日 Shadow 运行 —— 事件腿受控 shadow + 对账 + kill switch
-    rc5 = run("shadow_sim.py", timeout=600)
+    # FIX(2026-09-13, 第八轮审计 6.3): shadow_sim.py 改名 shadow_replay.py ——
+    # 该脚本是历史 CSV 回放压力指标(审计: 不等同于实时 SHADOW), 文件名与
+    # status.replay_mode=true 落地诚实定位; 真实实时 shadow 由 --monitor 前向运行。
+    rc5 = run("shadow_replay.py", timeout=600)
     step_status["shadow"] = rc5
     if rc5 == 0:
         try:

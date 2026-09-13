@@ -1,5 +1,14 @@
 # -*- coding: utf-8 -*-
-"""受控 Shadow（P1 门禁通过后）—— 事件腿真实信号 → shadow 账本
+"""shadow_replay.py —— 历史 CSV 回放压力指标（第八轮审计 6.3 改名自 shadow_sim.py）。
+
+**诚实定位（审计 §6.3 判定）**: 本脚本是"历史回放压力指标", 不是实时 shadow
+ledger —— 输入是已带 net_pnl_pct 的历史成交(combo_v20f_trades.csv), 不证明
+实时 paper→shadow 的顺序/成交/容量/延迟正确。真正的实时 shadow 由
+paper_sim --monitor 从当日信号前向运行(事件流账本), 本脚本仅为其历史回放型
+补强。文件名 shadow_sim→shadow_replay 落地审计阶段 3 #4(避免把回放数据
+称为实时 shadow); 输出文件保持 shadow_ledger.json/shadow_status.json 命名
+不变(前端兼容), 但 status 内含 replay_mode=true 标注。
+
 参数（保守，P1 验收建议）：容量50 / 单日5开 / 3x成本(FEE0.6) / MDD kill switch 10%
 输出：shadow_ledger.json + shadow_status.json（含 kill switch 判定）+ 前端同步
 
@@ -7,7 +16,6 @@ FIX(2026-09-08, P8-7): 修正回溯选取偏差 —— 原实现从历史CSV重�
 (112笔2023+388笔2024, 全部为弱年份, 完全忽略2025-2026 OOS正信号),
 导致 Shadow 数字被早期弱年份污染。现改为"滚动前瞻": 以最近数据窗口为评估域,
 按日均摊选取近段信号并保留流动性约束, 使 Shadow 反映近端策略表现而非历史重放。
-（真实每日 Shadow 由 paper_sim --monitor 从当日信号前向运行, 本脚本为其历史回放型补强。）
 """
 import io, json, os, sys, time
 from collections import defaultdict
@@ -86,6 +94,10 @@ p, a, n = pf([t["net_pnl_pct"] for t in shadow_trades])
 kill = mdd >= SHADOW_CFG["kill_mdd"]
 status = {
     "run_id": SHADOW_CFG["run_id"],
+    # R16(第八轮审计 6.3): 回放模式显式标注 —— 前端/报告消费方可区分
+    # "历史回放压力指标"与"实时 shadow ledger"(后者由 --monitor 前向运行)。
+    "replay_mode": True,
+    "mode_note": "历史CSV回放压力指标(shadow_replay), 非实时shadow ledger",
     "config": SHADOW_CFG,
     "trades": len(shadow_trades),
     "avg_pct": round(a, 2), "pf": round(p, 2),
@@ -97,7 +109,7 @@ status = {
 }
 
 with open(OUT, "w", encoding="utf-8") as fh:
-    json.dump({"ledger_type": "shadow", "config": SHADOW_CFG, "trades": shadow_trades}, fh, ensure_ascii=False, indent=1)
+    json.dump({"ledger_type": "shadow_replay", "config": SHADOW_CFG, "trades": shadow_trades}, fh, ensure_ascii=False, indent=1)
 with open(STATUS, "w", encoding="utf-8") as fh:
     json.dump(status, fh, ensure_ascii=False, indent=1)
 

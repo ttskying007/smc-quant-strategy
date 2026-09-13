@@ -220,12 +220,17 @@ def weekly_trend_of(bs, i):
 _MKT_SAMPLE = None
 _MKT_PROXY_CACHE = {}
 
-def _market_proxy(code):
+def _market_proxy(code, d8=None):
     """计算给定股票 signal 日期的市场状态（200 只采样 20 日平均涨跌，决策时点可得）。
     FIX(2026-09-04, 审计 P2):
       ① 采样快照落盘 hermes/kline_cache_tencent/.mkt_sample.json —— 避免每个新交易日重读 200 个 JSON；
       ② 标注幸存者偏差：采样来源是"当前缓存中存在 K 线"的股票（退市/长期停牌股无数据被排除），
-         因此 proxy 存在正向幸存者偏差，仅作相对强弱参考，不做绝对市场判断。"""
+         因此 proxy 存在正向幸存者偏差，仅作相对强弱参考，不做绝对市场判断。
+    FIX(2026-09-13, 第八轮审计 5.6): 显式 signal 日期参数 —— 原实现 d8=dates[-1]
+    (该股最新数据日), 历史事件被"当前最新市场状态"重新赋权, 时间口径错误
+    (审计 §5.6: "同一股票的历史事件可能被当前最新市场状态重新赋权")。
+    调用方应传事件 signal 日; 缺省 None 时保持旧行为(最新日, 兼容监控路径
+    的当日 mark-to-market 场景)。"""
     global _MKT_SAMPLE, _MKT_PROXY_CACHE
     bs = bars_of(code)
     if not bs:
@@ -233,7 +238,12 @@ def _market_proxy(code):
     dates = [b["t"] for b in bs]
     if not dates:
         return None
-    d8 = dates[-1]  # 当前数据日
+    # R16(第八轮 5.6): 显式 signal 日优先; 缺省回退最新日(监控 mark-to-market 场景)
+    d8 = d8 or dates[-1]
+    if d8 not in dates:
+        return None  # signal 日不在该股 K 线中(如长期停牌) → 无环境分数, 不用错日替代
+    # R16(第八轮 5.6): 缓存键= d8(市场日) —— 采样是全市场 200 只同一日的截面,
+    # 结果只依赖 d8, 不依赖 code; (code,d8) 查询统一退化为 d8。
     if d8 in _MKT_PROXY_CACHE:
         return _MKT_PROXY_CACHE[d8]
     kt = r"E:\test\smc_project\hermes\kline_cache_tencent"
@@ -734,7 +744,9 @@ def daily_selection():
                 rank_score += 1
             # FIX(2026-08-22) 审计: 强市过滤 —— 改为仓位系数（G11 软化）：
             # proxy>2% 不跳过，而是降仓（position × clip(1-(proxy-0.02)/0.04, 0.3, 1)）
-            _pr = _market_proxy(code)
+            # FIX(2026-09-13, 第八轮审计 5.6): proxy 按事件 signal 日(dd)取值 ——
+            # 原缺省用该股最新数据日, 历史事件被当前市场状态错误赋权。
+            _pr = _market_proxy(code, d8)
             _risk_coef = 1.0
             if _pr is not None and _pr > 0.02:
                 _risk_coef = max(0.3, 1.0 - (_pr - 0.02) / 0.04)
@@ -1251,6 +1263,8 @@ def realtime_monitor():
                 if t.get("source") == "CONT":
                     _mh = int(t.get("hold") or 10)
                     try:
+                        # mark-to-market 场景: 评估"当前"持有期 → 用最新日(5.6 的
+                        # signal 日口径仅适用于历史事件回看, 此处是当日决策)
                         _pr_hold = _market_proxy(t["code"])
                         if _pr_hold is not None:
                             _mh = adaptive_hold(_mh, _pr_hold)
