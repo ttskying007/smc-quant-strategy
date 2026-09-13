@@ -512,6 +512,54 @@ def _parse_insider_magnitude(title):
     if pct:
         hint.append(f"占比{pct:.2f}%")
     return amount, shares, pct, " ".join(hint)
+
+# ---------- reject ledger (第七轮审计 §9.2 被拒候选前向收益追踪, R5 2026-09-13) ----------
+REJECT_LEDGER_FILE = os.path.join(ROOT, "reject_ledger.json")
+
+def _tri_decompose(raw, hard, soft, soft_delta, skipped_stage, skipped_adx, nodata, dup, orders):
+    """审计§4.3 三分解: 无新股归因 = 源头供给 / 质量拒绝 / 容量拒绝(含数据缺失)。
+    纯函数, tests_reject_ledger 覆盖守恒: raw = quality + data_missing + dup + orders。"""
+    quality = hard + soft + soft_delta + skipped_stage + skipped_adx
+    return {
+        "source_supply": raw,
+        "quality_reject": quality,
+        "data_missing": nodata,
+        "execution_capacity": {"dup": dup, "portfolio_gate": 0,
+                               "note": "PortfolioGate 属 Phase E 未接入; 当前容量拒绝仅含同股同日重复挂单去重"},
+        "orders_created": orders,
+        "conservation_note": "raw = quality_reject(分类+阶段+ADX) + data_missing + dup + orders",
+    }
+
+def _persist_rejects(records, root=None, cap=6000):
+    """拒绝账本持久化: 按(code,date,stage)去重追加(阶段变迁允许新增记录), cap 保最近;
+    原子写, 失败不阻断生产链。DUP_EXISTING 类已被主账本跟踪, 评估器跳过。"""
+    try:
+        fp = REJECT_LEDGER_FILE if root is None else os.path.join(root, "reject_ledger.json")
+        try:
+            prev = json.load(open(fp, encoding="utf-8"))
+            if not isinstance(prev, list):
+                prev = []
+        except Exception:
+            prev = []
+        seen = {(r.get("code"), str(r.get("date", "")).replace("-", ""), r.get("stage")) for r in prev}
+        ts = time.strftime("%Y-%m-%d %H:%M:%S")
+        for r in records:
+            k = (r.get("code"), str(r.get("date", "")).replace("-", ""), r.get("stage"))
+            if k in seen:
+                continue
+            seen.add(k)
+            _r = dict(r)
+            _r["date"] = k[1]
+            _r["ts"] = ts
+            prev.append(_r)
+        if len(prev) > cap:
+            prev = prev[-cap:]
+        _atomic_write_json(fp, prev)
+        return len(prev)
+    except Exception as _e:
+        print(f"拒绝账本写入失败(不阻断): {_e}", flush=True)
+        return -1
+
 def daily_selection():
     """Scan new insider events -> create PENDING_ORDER entries.
     entry price = disclosure day close (limit order: buy only at or below)."""
@@ -533,6 +581,7 @@ def daily_selection():
     # 分类: DATA_MISSING(无K线/无此日期) 与 STRATEGY_REJECT(阶段/ADX/去重) 分开计数。
     _reject_stage = {}  # {(code, dd): stage_name}
     _data_missing = 0   # 数据缺失单独计数（不计入策略拒绝）
+    _reject_records = []  # R5(§9.2): 持久化拒绝记录(前向收益评估输入)
     for dd in recent_days:
         # FIX(2026-09-05, 审计 G25): 改为全量拉取增持/回购候选，Python 端用 core.events.classify_title
         # 统一过滤（否定词全集：终止/完毕/解除/…/减持/完成/进度/前十名，scanner 与 selection 同一套）
@@ -543,6 +592,7 @@ def daily_selection():
                 _is_ev, _kind, _pol, _amt2, _pct2 = classify_title(title)
                 if not _is_ev or _pol < 0:
                     _sel_stats["skipped_noise"] = _sel_stats.get("skipped_noise", 0) + 1
+                    _reject_records.append({"code": code, "name": name, "date": dd, "stage": "EVENT_FILTER", "title": title[:80]})
                     continue
             except Exception:
                 pass
@@ -551,6 +601,7 @@ def daily_selection():
             if (code, dd) in known or (code, dd) in seen_orders:
                 _sel_stats["skipped_dup"] += 1
                 _reject_stage[(code, dd)] = "DUP_EXISTING"
+                _reject_records.append({"code": code, "name": name, "date": dd, "stage": "DUP_EXISTING", "title": title[:80]})
                 continue
             seen_orders.add((code, dd))
             bs = bars_of(code)
@@ -559,6 +610,7 @@ def daily_selection():
                 _data_missing += 1
                 _reject_stage[(code, dd)] = "DATA_MISSING"
                 _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": "无K线数据"})
+                _reject_records.append({"code": code, "name": name, "date": dd, "stage": "DATA_MISSING", "title": title[:80]})
                 continue
             dates = [b["t"] for b in bs]
             if d8 not in dates:
@@ -566,6 +618,7 @@ def daily_selection():
                 _data_missing += 1
                 _reject_stage[(code, dd)] = "DATA_MISSING"
                 _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": "K线无此日期"})
+                _reject_records.append({"code": code, "name": name, "date": dd, "stage": "DATA_MISSING", "title": title[:80]})
                 continue
             i = dates.index(d8)
             # FIX(2026-08-22 audit): apply backtest-consistent quality filter
@@ -575,12 +628,14 @@ def daily_selection():
                 _sel_stats["skipped_stage"] += 1
                 _reject_stage[(code, dd)] = f"STAGE_{st}"
                 _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": f"阶段={st}(非ACCUM/DOWNTREND)"})
+                _reject_records.append({"code": code, "name": name, "date": dd, "stage": f"STAGE_{st}", "adx": adx14_of(bs, i), "title": title[:80]})
                 continue
             adx = adx14_of(bs, i)
             if adx is None or adx < 20:
                 _sel_stats["skipped_adx"] += 1
                 _reject_stage[(code, dd)] = "ADX_LT20"
                 _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": f"ADX={adx}<20"})
+                _reject_records.append({"code": code, "name": name, "date": dd, "stage": "ADX_LT20", "adx": adx, "title": title[:80]})
                 continue
             close_px = bs[i]["c"]
             if close_px <= 0:
@@ -854,12 +909,19 @@ def daily_selection():
                 elif _l == "EVENT":
                     _ev_cnt += 1
         _c2.close()
+        # R5(第七轮审计 §4.3/§9.2): 拒绝账本持久化 + 漏斗三分解
+        _persist_rejects(_reject_records)
+        _tri = _tri_decompose(_raw, _hard, _soft, _soft_delta,
+                              _sel_stats.get("skipped_stage", 0), _sel_stats.get("skipped_adx", 0),
+                              _sel_stats.get("skipped_nodata", 0), _sel_stats.get("skipped_dup", 0),
+                              len(new_orders))
         funnel = {
             "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "days": recent_days,
             "raw_announcements": _raw,
             "contains_buyback_or_increase": _raw,
             "classified_positive": _ev_cnt,
+            "tri_decompose": _tri,
             "reject_by_reason": {
                 "event_filter_hard": _hard,
                 "event_filter_soft": _soft,
