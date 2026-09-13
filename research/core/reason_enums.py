@@ -63,9 +63,10 @@ WHY_LIMIT_UP = "LIMIT_UP"            # 买方涨停不可买
 WHY_NOT_YET_VALID = "NOT_YET_VALID"  # 早于 valid_from
 WHY_WAIT_RETRACE = "WAIT_RETRACE"    # 限价未触(low>ref)
 WHY_NO_OPEN = "NO_OPEN"              # limit_or_open 兜底但无开盘价
+WHY_MISSED_OPEN = "MISSED_OPEN"      # R24(第八轮 P1-2): 开盘窗口(09:30-10:15)已过, 不回溯用 open 成交
 NOT_FILLED_WHY = frozenset({
     WHY_NO_PRICE, WHY_SUSPENDED, WHY_LIMIT_UP,
-    WHY_NOT_YET_VALID, WHY_WAIT_RETRACE, WHY_NO_OPEN,
+    WHY_NOT_YET_VALID, WHY_WAIT_RETRACE, WHY_NO_OPEN, WHY_MISSED_OPEN,
 })
 
 WHY_LIMIT_DOWN_SELL = "LIMIT_DOWN_SELL"  # 跌停无法卖出

@@ -223,6 +223,23 @@ def plan_order(signal, asof_date=None):
     }
 
 
+def _missed_open_window(snap):
+    """R24(第八轮审计 P1-2): 开盘窗口判定 helper。
+    snap 无 now/quote_ts → False(向后兼容, 不判定);
+    有且在上海时区 09:30-10:15 之外 → True(已错过开盘窗口, 不得用 open 成交)。
+    解析失败 → False(fail-open 仅限解析层; 窗口守卫本身是增强语义)。"""
+    _now = (snap or {}).get("now") or (snap or {}).get("quote_ts")
+    if not _now:
+        return False
+    try:
+        from datetime import datetime as _dtm
+        _t = _dtm.strptime(str(_now)[:19], "%Y-%m-%d %H:%M:%S")
+        _hm = _t.hour * 100 + _t.minute
+        return not (930 <= _hm <= 1015)
+    except Exception:
+        return False
+
+
 def try_fill(order, market_snapshot):
     """挂单 + 市场快照 → FillResult。
     market_snapshot: {px, prev, open, vol}（Sina 实时口径）。
@@ -261,6 +278,11 @@ def try_fill(order, market_snapshot):
             fill_px = float(order["reference_price"]) * (1 + SLIPPAGE)
             _rule, _src = "LIMIT_OR_OPEN: low<=ref", "retrace"
         elif opn and opn > 0:
+            # FIX(2026-09-13, 第八轮审计 P1-2): open_fallback 同受开盘窗口守卫 ——
+            # 迟到启动(窗口后)不得回溯用当日 open 补成交 → WAIT_RETRACE 继续挂单。
+            if _missed_open_window(snap):
+                return {"filled": False, "why": "MISSED_OPEN",
+                        "note": "开盘窗口(09:30-10:15)已过, open_fallback 不可回溯"}
             fill_px = opn * (1 + SLIPPAGE)
             _rule, _src = "LIMIT_OR_OPEN: open_fallback", "open"
         else:
@@ -272,6 +294,11 @@ def try_fill(order, market_snapshot):
             fill_px = float(order["reference_price"]) * (1 + SLIPPAGE)
             _rule, _src = "LIMIT_RETRACE: low<=ref", "retrace"
         elif opn and opn > 0:
+            # R24(第八轮 P1-2): legacy retrace 的 open_fallback 同窗口守卫
+            if _missed_open_window(snap):
+                return {"filled": False, "why": "MISSED_OPEN",
+                        "note": "开盘窗口(09:30-10:15)已过, legacy open_fallback 不可回溯",
+                        "order_type": "LEGACY_RETRACE"}
             fill_px = opn * (1 + SLIPPAGE)
             _rule, _src = "LIMIT_RETRACE: open_fallback", "open"
         else:
@@ -279,6 +306,14 @@ def try_fill(order, market_snapshot):
     else:  # next_open
         if not (opn and opn > 0):
             return {"filled": False, "why": "NO_OPEN"}
+        # FIX(2026-09-13, 第八轮审计 P1-2): 开盘撮合窗口守卫 —— 原实现只要
+        # snapshot 有 open 就用开盘价成交, 监控 10:00 启动仍可把 09:30 open
+        # 当可成交价(不可实现的回溯成交)。仅当日开盘窗口(上海 09:30-10:15,
+        # 含集合竞价缓冲)内允许 open 成交; 窗口过后 → MISSED_OPEN 不回溯。
+        # 兼容: snap 无 now/quote_ts(旧调用方/测试夹具) → 不判定(向后兼容)。
+        if _missed_open_window(snap):
+            return {"filled": False, "why": "MISSED_OPEN",
+                    "note": "开盘窗口(09:30-10:15)已过 → 不回溯用 open 成交"}
         fill_px = opn * (1 + SLIPPAGE)
         _rule, _src = "MARKET_T1_OPEN", "open"
     return {"filled": True, "price": round(fill_px, 3),

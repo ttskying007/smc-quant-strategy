@@ -1139,6 +1139,10 @@ def realtime_monitor():
             from core.execution import try_fill as _core_fill
             _snap = dict(_info or {})
             _snap["today"] = cn_today()
+            # FIX(2026-09-13, 第八轮审计 P1-2): 快照带报价时点 —— try_fill 的
+            # next_open 开盘窗口守卫(09:30-10:15)消费 now; 迟到启动的监控不再
+            # 回溯用历史 open 成交。
+            _snap["now"] = cn_now("%Y-%m-%d %H:%M:%S")
             # FIX(2026-09-13, 第七轮审计 P0-1): 旧 entry_mode="retrace"(废弃别名)统一映射为
             # limit_or_open(其真实语义: 触价优先+开盘兜底)——与 daily_selection 写入的显式
             # entry_mode="limit_or_open" 一致, 消除"字段字面 vs 撮合语义"不一致。
