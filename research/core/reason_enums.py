@@ -77,7 +77,8 @@ NOT_EXIT_WHY = frozenset({WHY_LIMIT_DOWN_SELL, WHY_BAD_POSITION, WHY_HOLD,
 
 # ---- PENDING 撤单原因(expire_reason, R8) ----
 EXP_BAD_GEOMETRY_FILL_GE_SL = "BAD_GEOMETRY_FILL_GE_SL"  # 成交时 fill价>=SL → 撤单(回测 BAD_ENTRY 同语义)
-EXPIRE_REASONS = frozenset({EXP_BAD_GEOMETRY_FILL_GE_SL, "TIMEOUT"})
+EXP_CAPACITY_REJECT_FILL = "CAPACITY_REJECT_FILL"       # R18(第八轮 P1-9): 成交前 gate 二次校验拒绝(组合状态已变)
+EXPIRE_REASONS = frozenset({EXP_BAD_GEOMETRY_FILL_GE_SL, EXP_CAPACITY_REJECT_FILL, "TIMEOUT"})
 
 # ================= 4. 账本 status / entry_mode / fill mode / day_status =================
 ST_PENDING_ORDER = "PENDING_ORDER"

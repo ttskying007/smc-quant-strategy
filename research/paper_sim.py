@@ -1167,13 +1167,54 @@ def realtime_monitor():
                 })
                 print(f"[R8守卫] {t['code']} fill价{_fr['price']}>=SL{_fo.get('planned_sl')} → 撤单(与回测BAD_ENTRY同语义)", flush=True)
             elif _fr.get("filled"):
-                t["status"] = "FILLED"
-                t["filled_price"] = _fr["price"]
-                t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
-                # FIX(2026-09-08, 复审 P1-1): 成交记录撮合规则与价格来源
-                t["fill_rule"] = _fr.get("fill_rule") or t.get("fill_rule") or "core.execution:try_fill"
-                t["fill_price_source"] = _fr.get("price_source", "core")
-                n_fill += 1
+                # FIX(2026-09-13, 第八轮审计 P1-9): 成交前二次校验 —— 订单创建时的
+                # gate 结果在成交时点可能已失效(同日其它订单先成交推高总暴露/持仓
+                # 数, 审计 §P1-9 "订单创建前和成交前都调用")。此处对"含本单成交后"
+                # 的组合状态再过 gate; 拒绝 → 本单撤销(EXPIRED, CAPACITY_REJECT_FILL
+                # 入 not_filled_reason, 与创建前拒绝分开可审计)。
+                _gate_ok = True
+                _gate_why = ""
+                try:
+                    from core.portfolio import portfolio_exposure_check, throttle_open
+                    _others = [t2 for t2 in led if t2.get("status") in ("PENDING_ORDER", "FILLED")
+                              and t2 is not t]
+                    # 模拟成交后: 本单转 FILLED, 其余 PENDING 保持(潜在暴露), 已 FILLED 计入
+                    _pos_after = [{"code": t2["code"],
+                                   "position_pct": float(t2.get("position_pct") or 0.01)}
+                                  for t2 in _others]
+                    _pos_after.append({"code": t["code"],
+                                       "position_pct": float(t.get("position_pct") or 0.01)})
+                    _g_ok_e, _g_why_e, _ = portfolio_exposure_check(_pos_after)
+                    _today = time.strftime("%Y-%m-%d")
+                    _day_opens = [t2.get("filled_at", "").startswith(_today) for t2 in _others
+                                  if t2.get("status") == "FILLED"] + [True]
+                    _g_ok_t, _g_why_t = throttle_open(_day_opens, {}, max_positions=10,
+                                                     max_sector=3, max_daily_opens=5)
+                    if not _g_ok_e:
+                        _gate_ok, _gate_why = False, _g_why_e
+                    elif not _g_ok_t:
+                        _gate_ok, _gate_why = False, _g_why_t
+                except Exception:
+                    _gate_ok = True  # gate 自身异常不阻断成交(创建前已过一次; 记录)
+                if not _gate_ok:
+                    t["status"] = "EXPIRED"
+                    t["expire_reason"] = "CAPACITY_REJECT_FILL"
+                    t["not_filled_reason"] = "CAPACITY_REJECT_FILL"
+                    t["note"] = (t.get("note", "") + f" | R18成交前gate: {_gate_why} → 撤单").strip()
+                    _append_realtime_log({
+                        "ts": time.strftime("%Y-%m-%d %H:%M:%S"), "code": t["code"],
+                        "name": t.get("name", ""), "price": _fr["price"], "status": "EXPIRED",
+                        "note": f"CAPACITY_REJECT_FILL({_gate_why})",
+                    })
+                    print(f"[R18成交前gate] {t['code']} {_gate_why} → 撤单(创建前gate通过但成交时点组合状态已变)", flush=True)
+                else:
+                    t["status"] = "FILLED"
+                    t["filled_price"] = _fr["price"]
+                    t["filled_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                    # FIX(2026-09-08, 复审 P1-1): 成交记录撮合规则与价格来源
+                    t["fill_rule"] = _fr.get("fill_rule") or t.get("fill_rule") or "core.execution:try_fill"
+                    t["fill_price_source"] = _fr.get("price_source", "core")
+                    n_fill += 1
             else:
                 # FIX(2026-09-08, 复审 P1-1): 未成交原因显式记录（停牌/涨停/未到日/待回落）
                 t["not_filled_reason"] = _fr.get("why") or "unknown"
