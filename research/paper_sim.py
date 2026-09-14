@@ -121,8 +121,14 @@ def realtime_prices(codes):
                         _low = float(vals[5]) if len(vals) > 5 and vals[5] else 0.0
                         # FIX(2026-08-22): skip 0.00 prices (Sina off-hours / failure) — don't return 0
                         if _px > 0:
+                            # FIX(2026-09-14, R34): 报价日期 vals[30]("YYYY-MM-DD") ——
+                            # 快照新鲜度守卫的判据: 盘中当日快照 date==cn_today();
+                            # 盘后/休市 Sina 返回上一交易日日期。R27 事故根因即
+                            # "无日期判据只能依赖滞后日历" —— 此字段使撮合前可用
+                            # 真数据验证新鲜度(替代 is_td(今天) 的结构性误判)。
+                            _dt_str = vals[30] if len(vals) > 30 and vals[30] else ""
                             out[sym[2:]] = {"px": _px, "prev": _prev, "vol": _vol, "open": _open,
-                                            "high": _high, "low": _low}
+                                            "high": _high, "low": _low, "date": _dt_str}
                     except Exception:
                         pass
         except Exception:
@@ -1193,17 +1199,30 @@ def realtime_monitor():
     才可能过期) —— 保守方向: 晚撤不早撤, 挂单最多多活一个时段, 不会
     用旧快照提前处置。"""
     # 交易时段守卫: 上海时区 HH:MM 判定
+    # FIX(2026-09-14, R34): 原用 is_td(cn_today()) 判定当日是否交易日 ——
+    # trading_calendar 由日线缓存聚合(只覆盖到上一交易日 20260911), 盘中
+    # 查"今天"永远不在日历 → **每个交易日的盘中都被判 OFF_SESSION**(09-14
+    # 实弹: 09:30-15:00 全天 OFF_SESSION, 131 条日志零撮合; 000157 开盘窗口
+    # 空转, FILLED 持仓的盘中 TP/SL 判定同样被跳过)。结构性误判而非数据竞态。
+    # 修正判据: 周末规则(周六/周日必然休市) + **快照日期新鲜度**(realtime_prices
+    # 解析 Sina vals[30] 报价日期; 盘中当日快照 date==cn_today(), 盘后/休市
+    # Sina 返回旧日期 → 用真数据判旧快照, 不用永远滞后的日历)。日历退化为
+    # 周末守卫(节假日由快照日期兜底: 节假日 Sina 无当日快照)。
+    # 失效模式: 快照不可达(网络断) → date 字段缺失 → 保守 OFF_SESSION(暂停
+    # 撮合, 等待恢复) —— 旧 R27 的"解析失败继续跑"在 R34 语义下不再安全:
+    # 无日期的快照无法证明新鲜度, fail-closed。
     try:
         from core.time_cn import shanghai_now
         _h, _m = shanghai_now().hour, shanghai_now().minute
         _hm = _h * 100 + _m
         _in_session = (930 <= _hm <= 1130) or (1300 <= _hm <= 1500)
-        # 非交易日直接视为非时段(周末/节假日休市, Sina 返回旧快照)
-        from core.trading_calendar import is_td
-        if not is_td(cn_today()):
+        # 周末必然休市(周六/周日; 法定节假日由下方快照日期守卫兜底)
+        _wd = shanghai_now().weekday()
+        if _wd >= 5:
             _in_session = False
     except Exception:
-        _in_session = True  # 时区/日历不可用 → 保持旧行为(守卫是增强, 不因解析失败停摆)
+        _in_session = False  # R34: 时区不可用 → fail-closed 暂停(旧语义"继续跑"
+        #  会用无日期快照回溯撮合, R26 事故同型)
     if not _in_session:
         _append_realtime_log({
             "ts": cn_now("%Y-%m-%d %H:%M:%S"), "code": "-", "name": "时段守卫",
@@ -1219,6 +1238,21 @@ def realtime_monitor():
         return 0, 0
     codes = sorted({t["code"] for t in targets})
     px = realtime_prices(codes)
+    # R34: 快照日期新鲜度守卫 —— 撮合前验证快照携带当日日期。盘中正常时
+    # Sina vals[30]="YYYY-MM-DD"==cn_today(); 休市/节假日/盘后返回旧日期;
+    # 网络失败 date 缺失 → 全部按非当日处理, 拒绝撮合(旧快照回溯防线)。
+    _today = cn_today()
+    _fresh = {c: str((v or {}).get("date") or "").replace("-", "") == _today
+              for c, v in px.items()}
+    _stale_all = px and all(not _fresh[c] for c in px)  # 有快照但全旧 → 休市/盘后
+    if _stale_all:
+        _append_realtime_log({
+            "ts": cn_now("%Y-%m-%d %H:%M:%S"), "code": "-", "name": "快照新鲜度",
+            "price": None, "status": "OFF_SESSION",
+            "note": f"快照日期非当日(最新={next(iter(px.values()), {}).get('date', '?')}) "
+                    f"→ 休市/盘后旧快照, 跳过撮合(R34 防回溯)",
+        })
+        return 0, 0
     n_fill = 0
     n_close = 0
     for t in targets:
@@ -1263,6 +1297,27 @@ def realtime_monitor():
             "mark_pnl_pct": round((cur_px / (t.get("filled_price") or t.get("entry_price") or 1) - 1) * 100, 2)
             if (t.get("filled_price") or t.get("entry_price")) else None,
         })
+        # R34: 个股级快照新鲜度守卫 —— "全旧"检查只拦休市/盘后; 个别股数据源
+        # 滞后/故障返回旧日期时, 该股快照不得进入撮合(旧价格回溯成交风险与
+        # R26 事故同型, 只是范围缩小到个股)。旧日期 → 跳过该股撮合(不撤单
+        # 不成交, 下一轮新快照恢复)。PENDING TTL 推进与价格不可用分支一致
+        # (挂单生命周期与行情新鲜度无关)。
+        if isinstance(_info, dict) and not _fresh.get(t["code"], False):
+            if t.get("status") == "PENDING_ORDER":
+                try:
+                    _vf4 = t.get("valid_from", "")
+                    if _vf4:
+                        from core.trading_calendar import td_between as _tdb
+                        _n4 = _tdb(_vf4, cn_today())
+                        if _n4 > int(getattr(CFG, "PENDING_EXPIRE_DAYS", 3)):
+                            t["status"] = "EXPIRED"
+                            t["expire_reason"] = "TIMEOUT"
+                            t["note"] = (t.get("note", "") +
+                                         f" | R34 个股旧快照TTL推进: valid_from起{_n4}交易日"
+                                         f">{getattr(CFG, 'PENDING_EXPIRE_DAYS', 3)}未成交").strip()
+                except Exception:
+                    pass
+            continue
         if t["status"] == "PENDING_ORDER":
             # FIX(2026-09-08, 审计 P0-4): 撮合判定统一委托 core.execution.try_fill
             # （停牌/涨跌停(板块)/valid_from/入场模式 一套语义，回测与纸面共用；本处只管写账本）

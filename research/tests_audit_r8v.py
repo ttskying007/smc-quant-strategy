@@ -56,7 +56,15 @@ for p in sorted(os.listdir(KT)):
     if d > latest:
         latest = d
 _total = sum(dates_cnt.values())
-ok("市场最新日 20260911(数据覆盖至上周五)", latest == "20260911", latest)
+# R34(2026-09-14): 实弹断言从"锁死时点"改为"语义断言" —— 09-14 盘中部分
+# 股缓存已更新到 20260914(当日覆盖率 82%), 锁死"最新日==20260911"随数据
+# 前进而必然失效(测试在数据演进下自我过期)。语义: ①最新日为近期有效交易日
+# (格式合法且不超前于今天); ②覆盖率 ≥98% 仍须成立(freshness gate 依赖
+# 高覆盖的市场共识日); ③陈旧股 >0(gate 有作用对象)。
+# 原 R33 实弹证据(20260911 / 99% / 25 股陈旧)保留在 docstring 档案。
+from core.time_cn import cn_today
+ok("市场最新日为近期有效交易日(格式/不超前)",
+   len(str(latest)) == 8 and str(latest).isdigit() and str(latest) <= cn_today(), latest)
 ok("最新日覆盖率 ≥98%", dates_cnt.get(latest, 0) * 100 // max(1, _total) >= 98,
    f"{dates_cnt.get(latest,0)*100//max(1,_total)}%")
 _std = sum(c for d, c in dates_cnt.items() if d != latest)

@@ -24,7 +24,10 @@ def ok(name, cond, detail=""):
 print("== 1. 基础日历属性 ==")
 TC._load()
 ok("日历规模 700-900 (聚合有效, 非纯周末)", 700 <= len(TC._CAL) <= 900, f"n={len(TC._CAL)}")
-ok("最新=20260911 (缓存末日)", TC._LATEST == "20260911", TC._LATEST)
+ok("最新=缓存末日(R34: 语义断言, 原锁 20260911 随 09-14 盘中缓存推进过期)",
+   TC._LATEST is not None and len(TC._LATEST) == 8 and
+   TC._LATEST <= __import__("datetime").date.today().strftime("%Y%m%d"),
+   TC._LATEST)
 # 周末必非交易日(抽 2026 全年周六)
 _sat = [d for d in TC._CAL if d[:6] == "202609" and __import__("datetime").date(2026, 9, int(d[6:8])).weekday() == 5]
 ok("2026-09 无周六交易日", len(_sat) == 0, str(_sat[:3]))

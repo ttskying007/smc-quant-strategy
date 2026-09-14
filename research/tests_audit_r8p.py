@@ -28,11 +28,17 @@ print("== 1. 时段守卫源码接线 ==")
 src = open(os.path.join(HERE, "paper_sim.py"), encoding="utf-8").read()
 ok("realtime_monitor 时段守卫在", "R27 交易时段守卫" in src)
 ok("双时段判定(上午/下午)", "(930 <= _hm <= 1130) or (1300 <= _hm <= 1500)" in src)
-ok("非交易日视为非时段", "is_td(cn_today())" in src)
+ok("非交易日守卫在(R34: 周末规则+快照日期, is_td 移除)",
+   "_wd >= 5" in src and "_fresh" in src,
+   "R34 后: is_td(今天) 结构性误判已移除, 判据=周末规则+快照新鲜度")
 ok("OFF_SESSION 日志记录", "OFF_SESSION" in src)
 ok("非时段返回 0,0(不撮合不平仓)", "return 0, 0" in src.split("def realtime_monitor")[1][:2500])
 ok("TTL 暂停的诚实注释在", "晚撤不早撤" in src)
-ok("解析失败 fail-open(守卫是增强)", "_in_session = True  # 时区/日历不可用" in src)
+# R34(2026-09-14): 失效模式翻转 —— 原 R27 fail-open("时区不可用继续跑")
+# 在 R27 结构性误判事故后不再安全: 无日期判据的快照无法证明新鲜度,
+# 继续跑会用旧快照回溯撮合(R26 事故同型) → fail-closed 暂停。
+ok("解析失败 fail-closed(R34 翻转, 旧 fail-open 语义废弃)",
+   "_in_session = False  # R34" in src)
 
 print("== 2. 守卫行为(真实时间=01:xx 非时段) ==")
 if not os.path.exists(os.path.join(HERE, "paper_ledger.json")):
