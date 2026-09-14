@@ -99,32 +99,37 @@ def refresh_key_stocks():
 import concurrent.futures
 
 def scan_one(p, latest):
+    diag = {"files": 0, "too_short": 0, "stale": 0, "fresh": 0,
+            "seed_total": 0, "not_latest_entry": 0, "r20_reject": 0,
+            "stage_reject": 0, "fvg_reject": 0, "candidates": 0}
     if not p.endswith("_daily_800.json"):
-        return None, None
+        return None, None, diag
+    diag["files"] = 1
     daily = bars(os.path.join(KT, p))
     if len(daily) < 400:
-        return None, None
+        diag["too_short"] = 1
+        return None, None, diag
     # freshness gate: last bar must equal market latest trading date (no stale signals)
     if daily[-1]["t"] != latest:
-        return None, None
+        diag["stale"] = 1
+        return None, None, diag
+    diag["fresh"] = 1
     sym = p.replace("_daily_800.json", "").replace("_", ".", 1)
     seeds = we.build_seeds(sym, daily)
+    diag["seed_total"] = len(seeds)
     last = daily[-1]["t"]
     out = []
     for sd in seeds:
-        # FIX(2026-09-05, 审计 G12): 追赶池 —— 允许 entry_idx ∈ [len-3, len-1] 且现价未超入场价×1.02
-        # （原严格 ==len-1，流水线超时/限流即候选永久丢失 → 长期零候选）
+        # 当前扫描只允许最新收盘 bar 形成的新信号。历史 entry_idx 追赶会把
+        # seed 中的旧 entry_price 带入下一次开盘，形成不可实现的“迟到成交”。
+        # 迟到信号应进入研究回填，而不是生产候选。
         entry_idx = int(sd["entry_idx"])
-        if entry_idx < len(daily) - 3 or entry_idx >= len(daily):
+        if entry_idx != len(daily) - 1:
+            diag["not_latest_entry"] += 1
             continue
-        _catchup = entry_idx != len(daily) - 1
-        if _catchup:
-            _last_close = daily[-1]["c"]
-            _ep = float(sd.get("entry_price") or 0)
-            if not (_ep > 0 and _last_close <= _ep * 1.02):
-                continue  # 现价已超入场价+2% → 放弃追赶
         r20 = sd.get("r20")
         if r20 == "" or r20 is None or not (0 <= float(r20) < 0.15):
+            diag["r20_reject"] += 1
             continue
         # v17 SMC leg filters: behavior stage UPTREND/MARKUP + bearish FVG
         if entry_idx < 61:
@@ -134,9 +139,11 @@ def scan_one(p, latest):
         import paper_sim as _ps
         _stage, _deep = _ps.stage_and_deep(daily, entry_idx)
         if _stage not in ("UPTREND", "MARKUP"):
+            diag["stage_reject"] += 1
             continue
         has_fvg = any(daily[k]["l"] > daily[k - 2]["h"] for k in range(max(3, entry_idx - 12), entry_idx))
         if not has_fvg:
+            diag["fvg_reject"] += 1
             continue
         fvg_cnt = sum(1 for k in range(max(3, entry_idx - 12), entry_idx) if daily[k]["l"] > daily[k - 2]["h"])
         out.append({"symbol": sym, "event_date": sd["event_date"], "entry_date": sd["entry_date"],
@@ -147,9 +154,10 @@ def scan_one(p, latest):
                     "zone_low": sd["zone_low"], "zone_high": sd["zone_high"],
                     "entry_price": sd["entry_price"], "target": sd["target"],
                     "w_permission": sd["w_permission"], "r20": r20, "last": last,
-                    "stage": _stage, "bull_fvg": True, "fvg_cnt": fvg_cnt,
-                    "catchup": _catchup})
-    return (out if out else None), last
+                     "stage": _stage, "bull_fvg": True, "fvg_cnt": fvg_cnt,
+                     "catchup": False})
+    diag["candidates"] = len(out)
+    return (out if out else None), last, diag
 
 if __name__ == "__main__":
     import argparse
@@ -166,12 +174,17 @@ if __name__ == "__main__":
     files = [f for f in os.listdir(KT) if f.endswith("_daily_800.json")]
     smc_cands = []
     fresh_count = 0
+    smc_diag = {"files": 0, "too_short": 0, "stale": 0, "fresh": 0,
+                "seed_total": 0, "not_latest_entry": 0, "r20_reject": 0,
+                "stage_reject": 0, "fvg_reject": 0, "candidates": 0}
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
-        for cands, last in ex.map(lambda p: scan_one(p, latest), files):
+        for cands, last, diag in ex.map(lambda p: scan_one(p, latest), files):
             if cands:
                 smc_cands.extend(cands)
             if last == latest:
                 fresh_count += 1
+            for key in smc_diag:
+                smc_diag[key] += diag.get(key, 0)
     print(f"scanned {len(files)} files, fresh={fresh_count} (数据最新), stale skipped (不产生信号)")
     print(f"\n=== A) SMC 三周期信号候选（entry 即将触发）: {len(smc_cands)} ===")
     for c in smc_cands[:15]:
@@ -209,6 +222,10 @@ if __name__ == "__main__":
         "stale_count": len(files) - fresh_count,
         "coverage_pct": round(100 * fresh_count / len(files), 1) if files else 0,
         "smc_candidates": smc_cands,
+        "smc_diagnostics": smc_diag,
+        "timeframe_contract": {"higher": "W1", "direction": "D1", "entry": "D4",
+                               "h_layer_model": "H_PROJECTED_DAILY",
+                               "note": "真实60分钟数据当前未接入WDH种子；不要将结果标记为W-D-60m。"},
         "note": "research-only, no BUY; freshness gate: only latest-data signals; stale=数据未更新到最新（继续后台刷新中）"
     }
     with open(os.path.join(OUT, "current_scanner_result.json"), "w", encoding="utf-8") as fh:

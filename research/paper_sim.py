@@ -619,9 +619,16 @@ def daily_selection():
     _skipped_detail = []  # FIX(2026-08-26): 跳过明细（代码/名称/原因）
     # FIX(2026-09-08, 复审 P1-4): 每股每日只记一个最终拒绝阶段（互斥/守恒证明）。
     # 分类: DATA_MISSING(无K线/无此日期) 与 STRATEGY_REJECT(阶段/ADX/去重) 分开计数。
-    _reject_stage = {}  # {(code, dd): stage_name}
+    _reject_stage = {}  # {(code, dd): final funnel stage}
+    _positive_keys = set()
+    _event_order_count = 0
     _data_missing = 0   # 数据缺失单独计数（不计入策略拒绝）
     _reject_records = []  # R5(§9.2): 持久化拒绝记录(前向收益评估输入)
+
+    def _mark_funnel(key, stage):
+        """Keep one terminal state per positive event for a conservation audit."""
+        _reject_stage.setdefault(key, stage)
+
     for dd in recent_days:
         # FIX(2026-09-05, 审计 G25): 改为全量拉取增持/回购候选，Python 端用 core.events.classify_title
         # 统一过滤（否定词全集：终止/完毕/解除/…/减持/完成/进度/前十名，scanner 与 selection 同一套）
@@ -634,13 +641,22 @@ def daily_selection():
                     _sel_stats["skipped_noise"] = _sel_stats.get("skipped_noise", 0) + 1
                     _reject_records.append({"code": code, "name": name, "date": dd, "stage": "EVENT_FILTER", "title": title[:80]})
                     continue
-            except Exception:
-                pass
+            except Exception as _classify_error:
+                # Classification failure is an input-quality failure, not a
+                # reason to treat an unknown title as a tradable event.
+                _sel_stats["classify_error"] = _sel_stats.get("classify_error", 0) + 1
+                _reject_records.append({"code": code, "name": name, "date": dd,
+                                        "stage": "EVENT_CLASSIFY_ERROR",
+                                        "error": str(_classify_error),
+                                        "title": title[:80]})
+                continue
             _sel_stats["scanned"] += 1
             d8 = str(dd).replace("-", "")
+            _key = (str(code), str(dd))
+            _positive_keys.add(_key)
             if (code, dd) in known or (code, dd) in seen_orders:
                 _sel_stats["skipped_dup"] += 1
-                _reject_stage[(code, dd)] = "DUP_EXISTING"
+                _mark_funnel(_key, "DUP_EXISTING")
                 _reject_records.append({"code": code, "name": name, "date": dd, "stage": "DUP_EXISTING", "title": title[:80]})
                 continue
             seen_orders.add((code, dd))
@@ -648,7 +664,7 @@ def daily_selection():
             if not bs:
                 _sel_stats["skipped_nodata"] += 1
                 _data_missing += 1
-                _reject_stage[(code, dd)] = "DATA_MISSING"
+                _mark_funnel(_key, "DATA_MISSING")
                 _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": "无K线数据"})
                 _reject_records.append({"code": code, "name": name, "date": dd, "stage": "DATA_MISSING", "title": title[:80]})
                 continue
@@ -656,7 +672,7 @@ def daily_selection():
             if d8 not in dates:
                 _sel_stats["skipped_nodata"] += 1
                 _data_missing += 1
-                _reject_stage[(code, dd)] = "DATA_MISSING"
+                _mark_funnel(_key, "DATA_MISSING")
                 _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": "K线无此日期"})
                 _reject_records.append({"code": code, "name": name, "date": dd, "stage": "DATA_MISSING", "title": title[:80]})
                 continue
@@ -666,19 +682,22 @@ def daily_selection():
             st, deep = stage_and_deep(bs, i)
             if st not in ("ACCUM", "DOWNTREND"):
                 _sel_stats["skipped_stage"] += 1
-                _reject_stage[(code, dd)] = f"STAGE_{st}"
+                _mark_funnel(_key, f"STAGE_{st}")
                 _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": f"阶段={st}(非ACCUM/DOWNTREND)"})
                 _reject_records.append({"code": code, "name": name, "date": dd, "stage": f"STAGE_{st}", "adx": adx14_of(bs, i), "title": title[:80]})
                 continue
             adx = adx14_of(bs, i)
             if adx is None or adx < 20:
                 _sel_stats["skipped_adx"] += 1
-                _reject_stage[(code, dd)] = "ADX_LT20"
+                _mark_funnel(_key, "ADX_LT20")
                 _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": f"ADX={adx}<20"})
                 _reject_records.append({"code": code, "name": name, "date": dd, "stage": "ADX_LT20", "adx": adx, "title": title[:80]})
                 continue
             close_px = bs[i]["c"]
             if close_px <= 0:
+                _mark_funnel(_key, "BAD_CLOSE")
+                _reject_records.append({"code": code, "name": name, "date": dd,
+                                        "stage": "BAD_CLOSE", "title": title[:80]})
                 continue
             # FIX(2026-08-22): event leg uses T+1 open price (market order, matching backtest)
             # FIX(2026-09-08, 审计 P0-2): 不再要求 T+1 K 线已存在。
@@ -705,8 +724,12 @@ def daily_selection():
             # 回测 simulate 对此几何 BAD_ENTRY skip, 纸面却成交(4 笔 CLOSED 净值 -8.26pp)
             # —— 回测/纸面语义现行分裂实例。守卫消除分裂: 生产链同样拒单,
             # 拒绝入 reject ledger(quality_reject 类, 非源头稀缺), 不静默。
-            if sl1 is not None and limit_px and sl1 >= limit_px:
+            # limit_px must be defined before this geometry gate.  The old order
+            # raised UnboundLocalError exactly when a valid event reached it.
+            limit_px = round(close_px * 0.99, 3)
+            if sl1 is not None and sl1 >= limit_px:
                 _sel_stats["skipped_bad_sl"] = _sel_stats.get("skipped_bad_sl", 0) + 1
+                _mark_funnel(_key, "BAD_SL_GE_ENTRY")
                 _reject_records.append({"code": code, "name": name, "date": d8,
                                         "stage": "BAD_SL_GE_ENTRY",
                                         "title": str(title)[:80]})
@@ -763,7 +786,6 @@ def daily_selection():
                 _sel_stats["regime_weighted"] = _sel_stats.get("regime_weighted", 0) + 1
             # FIX(2026-08-22): 回踩挂单（披露日收盘×0.99，回落成交；否则 T+1 开盘兜底）—— 研究 +0.47pp
             # limit = disclosure close × 0.99; if T+1 low <= limit → fill at limit; else fill at T+1 open
-            limit_px = round(close_px * 0.99, 3)
             # FIX(2026-09-08, 审计 P0-2): t1_open 已删除 —— monitor 以 valid_from 日实时 open 撮合，
             # 不再用 T+1 历史开盘价回退（历史价不可当实盘成交参考）。
             # FIX(2026-09-05, 审计 F17): 解析增持金额/占比，作为事件强度字段 + rank 加分
@@ -785,7 +807,9 @@ def daily_selection():
                 # FIX(2026-09-05, 审计 G05/G09): valid_from = signal_date 之后第一个交易日，
                 # monitor 只在该日开盘后以实时快照 open 成交（不再用 t1_open 历史价回退）
                 "valid_from": _next_td(dates, d8),
-                "entry_price": limit_px, "tp_price": round(tp4, 3), "sl_price": round(sl1, 3),
+                # tp_price is the executable runner target. tp4 remains a
+                # research/display level but is not consumed by core.execution.
+                "entry_price": limit_px, "tp_price": round(tp2, 3), "sl_price": round(sl1, 3),
                 "tp1": round(tp1, 3), "tp2": round(tp2, 3), "tp3": round(tp3, 3), "tp4": round(tp4, 3),
                 "sl1": round(sl1, 3), "sl2": round(sl2, 3), "anchor_note": anchor_note,
                 "status": "PENDING_ORDER", "paper": True, "source": "EVENT",
@@ -838,6 +862,7 @@ def daily_selection():
                     _reason = _why_e if not _ok_e else (_why_t if not _ok_t else "KILL_SWITCH")
                     led.pop()  # 撤回该订单
                     _sel_stats["capacity_reject"] = _sel_stats.get("capacity_reject", 0) + 1
+                    _mark_funnel(_key, "CAPACITY_REJECT")
                     _reject_records.append({"code": code, "name": name, "date": dd,
                                             "stage": "CAPACITY_REJECT", "title": title[:80],
                                             "why": _reason, "total_exposure": round(_tot, 4)})
@@ -845,7 +870,9 @@ def daily_selection():
             except Exception as _ge:
                 # gate 自身异常 → fail-open 仅限本次(记录); 生产资格由 manifest 层把守
                 _sel_stats["gate_error"] = _sel_stats.get("gate_error", 0) + 1
+            _mark_funnel(_key, "PASSED_TO_ORDER")
             new_orders.append((code, name, dd, limit_px))
+            _event_order_count += 1
     conn.close()
     # continuation candidates from scanner result (T+1 open entry, hold 10)
     # FIX(2026-09-13, 第八轮审计 P0-4): ENABLE_CONT_LEG 接线 —— 与 EVENT/SMC 同语义,
@@ -1020,16 +1047,22 @@ def daily_selection():
         # R5(第七轮审计 §4.3/§9.2): 拒绝账本持久化 + 漏斗三分解
         _persist_rejects(_reject_records)
         _tri = _tri_decompose(_raw, _hard, _soft, _soft_delta,
-                              _sel_stats.get("skipped_stage", 0), _sel_stats.get("skipped_adx", 0),
-                              _sel_stats.get("skipped_nodata", 0), _sel_stats.get("skipped_dup", 0),
-                              len(new_orders), bad_sl=_sel_stats.get("skipped_bad_sl", 0),
-                              capacity=_sel_stats.get("capacity_reject", 0))
+                               _sel_stats.get("skipped_stage", 0), _sel_stats.get("skipped_adx", 0),
+                               _sel_stats.get("skipped_nodata", 0), _sel_stats.get("skipped_dup", 0),
+                               _event_order_count, bad_sl=_sel_stats.get("skipped_bad_sl", 0),
+                               capacity=_sel_stats.get("capacity_reject", 0))
+        _terminal_counts = {}
+        for _stage_name in _reject_stage.values():
+            _terminal_counts[_stage_name] = _terminal_counts.get(_stage_name, 0) + 1
+        _positive_total = len(_positive_keys)
+        _terminal_total = sum(_terminal_counts.values())
+        _strategy_reject = _positive_total - _terminal_counts.get("DATA_MISSING", 0) - _event_order_count
         funnel = {
             "generated_at": cn_now("%Y-%m-%d %H:%M:%S"),
             "days": recent_days,
             "raw_announcements": _raw,
             "contains_buyback_or_increase": _raw,
-            "classified_positive": _ev_cnt,
+            "classified_positive": _positive_total,
             "tri_decompose": _tri,
             "reject_by_reason": {
                 "event_filter_hard": _hard,
@@ -1040,18 +1073,21 @@ def daily_selection():
                 "nodata": _sel_stats.get("skipped_nodata", 0),
                 "dup": _sel_stats.get("skipped_dup", 0),
             },
-            "orders_created": len(new_orders),
+            "orders_created": _event_order_count,
+            "all_orders_created": len(new_orders),
+            "terminal_stage_counts": _terminal_counts,
             "note": "漏斗逐层：公告总数→含增持/回购→分类为正事件→去重→有K线→阶段→ADX→挂单。"
                     "soft_with_delta 为研究候选（进展类含金额/比例增量），默认流仍拒绝。",
             # FIX(2026-09-08, 复审 P1-4): 守恒证明 —— 每股每日恰一个最终阶段；
             # 阶段计数总和 = universe_total（每股每日去重后）；DATA_MISSING 单列不计入策略拒绝。
             "conservation": {
-                "universe_total": _ev_cnt,
-                "data_missing": _data_missing,
-                "strategy_reject": len(_reject_stage) - _data_missing,
-                "passed_to_order": len(new_orders),
-                "mutex_check": len(_reject_stage) + len(new_orders) == _ev_cnt,
-                "note": "universe_total = data_missing + strategy_reject + orders（每股每日唯一阶段，互斥）",
+                "universe_total": _positive_total,
+                "data_missing": _terminal_counts.get("DATA_MISSING", 0),
+                "strategy_reject": _strategy_reject,
+                "passed_to_order": _event_order_count,
+                "terminal_state_count": _terminal_total,
+                "mutex_check": _terminal_total == _positive_total,
+                "note": "positive event keys = data_missing + strategy_reject + event_orders（每股每日唯一终态）",
             },
         }
         json.dump(funnel, open(os.path.join(ROOT, "selection_funnel.json"), "w", encoding="utf-8"),
@@ -1311,7 +1347,7 @@ def realtime_monitor():
                     "entry_price": t.get("filled_price") or t.get("entry_price"),  # 兼容旧读方: 实成交价
                     "filled_price": t.get("filled_price"),                     # F10: 实成交价(显式)
                     "fill_rule": t.get("fill_rule"), "price_source": t.get("fill_price_source"),
-                    "tp_price": t.get("tp4", t.get("tp_price")), "sl_price": t.get("sl1", t.get("sl_price")),
+                    "tp_price": t.get("tp2", t.get("tp_price")), "sl_price": t.get("sl1", t.get("sl_price")),
                     "trigger": t.get("trigger", "T+1开盘/回踩"), "pnl_pct": None,
                 })
         elif t["status"] == "FILLED":
@@ -1396,10 +1432,13 @@ def realtime_monitor():
                         t["sl_updated_at"] = _slst.get("sl_updated_at")
                     if _xr["reason"] in ("TP2_RUNNER",):
                         t["tp2_hit"] = True
-                        t["realized_pnl"] = (t.get("realized_pnl", 0) or 0) + 0.7 * (tp2 / ep - 1) * 100 - FEE * 0.7
+                        _rem = 0.7 if t.get("tp1_hit") else 1.0
+                        _exit_px = float(_xr.get("price") or tp2)
+                        t["realized_pnl"] = (t.get("realized_pnl", 0) or 0) + _rem * (_exit_px / ep - 1) * 100 - FEE * _rem
                         t["pnl_pct"] = round(t.get("realized_pnl", 0), 4)
                         # FIX(2026-09-08): 原 % 格式串含裸 '%平' 字符 → ValueError；改 f-string
-                        t["note"] = (t.get("note", "") + f" | TP2(FVG/BSL)触发：剩余70%平仓+{(tp2/ep-1)*100:.2f}%（100%已平）").strip()
+                        t["note"] = (t.get("note", "") +
+                                      f" | TP2(FVG/BSL)触发：剩余{_rem:.0%}平仓+{(_exit_px/ep-1)*100:.2f}%（100%已平）").strip()
                     else:
                         _rem = 0.7 if t.get("tp1_hit") else 1.0
                         t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + _rem * (_xr["price"] / ep - 1) * 100 - FEE * _rem, 4)
@@ -1414,8 +1453,9 @@ def realtime_monitor():
                     t["sl_version"] = int(t.get("sl_version") or 0) + 1
                     t["sl_reason"] = "TP1_MOVE_TO_BE"
                     t["sl_updated_at"] = cn_today()
-                    t["realized_pnl"] = 0.3 * (tp1 / ep - 1) * 100 - FEE * 0.3
-                    t["note"] = (t.get("note", "") + " | TP1(swing high)触发：30%平仓+" + str(round((tp1/ep-1)*100,2)) + "%，SL移保本").strip()
+                    _tp1_exit_px = float(_xr.get("price") or (tp1 * (1 - SLIPPAGE)))
+                    t["realized_pnl"] = 0.3 * (_tp1_exit_px / ep - 1) * 100 - FEE * 0.3
+                    t["note"] = (t.get("note", "") + " | TP1(swing high)触发：30%平仓+" + str(round((_tp1_exit_px/ep-1)*100,2)) + "%，SL移保本").strip()
                 # SL 距离 >8% → 降仓标记（风险控制，账本侧）
                 if not t.get("_sl_far_flagged") and (ep - sl1) / ep > 0.08:
                     t["_sl_far_flagged"] = True
@@ -1429,7 +1469,7 @@ def realtime_monitor():
                     "ts": cn_now("%Y-%m-%d %H:%M:%S"), "code": t["code"], "name": t.get("name", ""),
                     "action": "SELL", "signal_combo": t.get("signal_combo", t.get("source", "")),
                     "signal_date": t.get("signal_date", ""), "entry_price": t.get("filled_price") or t.get("entry_price"),
-                    "tp_price": t.get("tp4", t.get("tp_price")), "sl_price": t.get("sl1", t.get("sl_price")),
+                    "tp_price": t.get("tp2", t.get("tp_price")), "sl_price": t.get("sl1", t.get("sl_price")),
                     "trigger_type": t.get("exit_reason", ""), "pnl_pct": t.get("pnl_pct"),
                 })
     save_ledger(led)

@@ -22,6 +22,15 @@ SLIPPAGE = slippage_side()     # = CFG.SLIPPAGE(单源, 等价)
 MAX_HOLD_DEFAULT = CFG.MAX_HOLD if hasattr(CFG, "MAX_HOLD") else 12
 
 
+def _gross_return_pct(entry_price, exit_price):
+    """Return percentage after both sides of slippage, before the flat fee."""
+    if entry_price <= 0 or exit_price <= 0:
+        return 0.0
+    bought = entry_price * (1 + SLIPPAGE)
+    sold = exit_price * (1 - SLIPPAGE)
+    return (sold / bought - 1) * 100
+
+
 def limit_pct_for(code):
     """FIX(2026-09-05, 审计 G18): 涨跌停幅度按板块/代码规则。
     主板(60x/000/001/002) 10% | 创业板(300/301) 20% | 科创板(688) 20% |
@@ -142,23 +151,23 @@ def simulate(daily, entry_idx, ep, sl, tp1=None, tp2=None, max_hold=None,
         # 跳空低开穿越止损 → 按开盘价（保守）
         if op < stop:
             exit_price, reason = op, "SL_GAP"
-            realized += remaining * (op / ep - 1) * 100
+            realized += remaining * _gross_return_pct(ep, op)
             remaining = 0
             break
         if lo <= stop and hi >= (tp1 or tp2 or 0) and not be_active and partial_tp1 > 0:
             # 同K线 SL/TP 冲突 → SL 优先（保守，F16）
             exit_price, reason = stop, "SL_HIT"
-            realized += remaining * (stop / ep - 1) * 100
+            realized += remaining * _gross_return_pct(ep, stop)
             remaining = 0
             break
         if lo <= stop:
             exit_price, reason = stop, ("BE" if be_active else "SL_HIT")
-            realized += remaining * (stop / ep - 1) * 100
+            realized += remaining * _gross_return_pct(ep, stop)
             remaining = 0
             break
         # TP1 部分止盈（若启用）——触发后进入 runner 追踪（无论是否移保本）
         if not be_active and partial_tp1 > 0 and tp1 and hi >= tp1:
-            realized += partial_tp1 * (tp1 / ep - 1) * 100
+            realized += partial_tp1 * _gross_return_pct(ep, tp1)
             remaining = 1.0 - partial_tp1
             be_active = True
             exit_price = tp1
@@ -167,27 +176,27 @@ def simulate(daily, entry_idx, ep, sl, tp1=None, tp2=None, max_hold=None,
             continue
         # TP2 runner（若启用）
         if be_active and tp2 and hi >= tp2:
-            realized += remaining * (tp2 / ep - 1) * 100
+            realized += remaining * _gross_return_pct(ep, tp2)
             remaining = 0
             exit_price, reason = tp2, "TP2_RUNNER"
             break
         # FIX(2026-09-08, 第七轮): TP3 runner（gen_v20f 事件腿语义并入；
         # 与 TP2 互斥 —— TP2 已 break，此处仅当 tp2 未触发而 tp3 直达时（tp2<tp3 且盘中越级））
         if be_active and tp3 and hi >= tp3 and (not tp2 or tp3 > tp2):
-            realized += remaining * (tp3 / ep - 1) * 100
+            realized += remaining * _gross_return_pct(ep, tp3)
             remaining = 0
             exit_price, reason = tp3, "TP3_RUNNER"
             break
         # 单一结构 TP（调用方显式传 tp2）
         if not tp1 and tp2 and hi >= tp2:
             exit_price, reason = tp2, "TP_STRUCTURAL"
-            realized += remaining * (tp2 / ep - 1) * 100
+            realized += remaining * _gross_return_pct(ep, tp2)
             remaining = 0
             break
         exit_price = cl
     if remaining > 0:
         last = daily[min(len(daily), entry_idx + max_hold) - 1]["c"]
-        realized += remaining * (last / ep - 1) * 100
+        realized += remaining * _gross_return_pct(ep, last)
         reason = "TIME_STOP"
         exit_price = last
     gross = realized  # 已含分批
@@ -380,24 +389,25 @@ def try_exit(position, market_snapshot):
                     "price": round(active_sl * (1 - SLIPPAGE), 3),
                     "sl_state": {"active_sl": active_sl, "sl_version": int(position.get("sl_version") or 0) + 1,
                                  "sl_reason": "SL_TOUCH_INTRADAY", "sl_updated_at": today}}
-    # ② TP1 部分平（未触过；用盘中高点）
+    # ② TP1 部分平（未触过；盘中高点只负责判断是否触价，成交按目标价）
     if not tp1_hit and tp1 and px_high >= tp1:
-        return {"exit": False, "partial": "TP1", "new_state": {"tp1_hit": True, "sl": ep}}
-    # ③ TP2 全平（用盘中高点）
+        return {"exit": False, "partial": "TP1", "price": round(tp1 * (1 - SLIPPAGE), 3),
+                "new_state": {"tp1_hit": True, "sl": ep}}
+    # ③ TP2 全平（盘中高点只负责判断是否触价，成交按目标价）
     # FIX(2026-09-13, 第八轮审计 P1-4): 单目标语义 —— CONT 类订单 tp1=None(无部分
     # 平仓/不移保本), 目标价写入 tp2。原条件 `tp1_hit and tp2` 使单目标订单永远
     # 到不了 TP2 分支(15% 目标只经 TIME_STOP 出场, 审计 §4 P1-4)。
     # 修正: 无 tp1 的订单(tp1<=0)持有 tp2 时直接按 tp2 全平(TP2_RUNNER 同 reason 族)。
     if tp1_hit and tp2 and px_high >= tp2:
-        return {"exit": True, "reason": "TP2_RUNNER", "price": round(px_high * (1 - SLIPPAGE), 3)}
+        return {"exit": True, "reason": "TP2_RUNNER", "price": round(tp2 * (1 - SLIPPAGE), 3)}
     if (not tp1_hit) and (not tp1) and tp2 and px_high >= tp2:
-        return {"exit": True, "reason": "TP2_RUNNER", "price": round(px_high * (1 - SLIPPAGE), 3)}
+        return {"exit": True, "reason": "TP2_RUNNER", "price": round(tp2 * (1 - SLIPPAGE), 3)}
     # R29(第八轮审计 P1-3 差异②): TP3 runner 与 simulate 对齐(L174-175 同条件)
     # —— be_active(tp1_hit)且 tp2 未触发时 tp3 直达(tp3>tp2 越级)全平。
     # 生产 EVENT 单 tp3 字段此前不进退出链(展示字段), 现由 paper_sim 透传。
     _tp3 = float(position.get("tp3") or 0)
     if tp1_hit and _tp3 and px_high >= _tp3 and (not tp2 or _tp3 > tp2):
-        return {"exit": True, "reason": "TP3_RUNNER", "price": round(px_high * (1 - SLIPPAGE), 3)}
+        return {"exit": True, "reason": "TP3_RUNNER", "price": round(_tp3 * (1 - SLIPPAGE), 3)}
     # ④ 时间止损 —— 最后判定
     # FIX(2026-09-13, 第七轮审计 P1-1): position 级 max_hold 优先（CONT 延续腿持有期 10bar
     # 等按腿配置），缺省回退 CFG.MAX_HOLD —— 延续腿不再走自然日分支, 统一由本核心按

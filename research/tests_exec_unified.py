@@ -55,6 +55,15 @@ ex3 = EX.try_exit({**pos, "tp1_hit": True, "sl": 10.0}, {"px": 9.99, "today": "2
 ok("③ BE(保本止损)标签", ex3["exit"] and ex3["reason"] == "BE", str(ex3))
 ex4 = EX.try_exit({**pos, "tp1_hit": True, "sl": 10.0}, {"px": 11.3, "today": "20260907"})
 ok("④ TP2 全平", ex4["exit"] and ex4["reason"] == "TP2_RUNNER", str(ex4))
+ok("④b TP2按目标价而非盘中最高价成交",
+   ex4["price"] == round(11.2 * (1 - EX.SLIPPAGE), 3), str(ex4))
+single_target = {"code": "000001", "filled_price": 10.0, "sl": 9.5,
+                 "tp2": 11.2, "tp1": None, "tp1_hit": False,
+                 "filled_at": "2026-09-04 09:35:00"}
+ex4b = EX.try_exit(single_target, {"px": 11.4, "high": 11.8, "today": "20260907"})
+ok("④c 单目标订单100%全平",
+   ex4b["exit"] and ex4b["reason"] == "TP2_RUNNER" and
+   ex4b["price"] == round(11.2 * (1 - EX.SLIPPAGE), 3), str(ex4b))
 ex5 = EX.try_exit(pos, {"px": 10.2, "today": "20260907", "bars_since_fill": 15})
 ok("⑤ 时间止损最后判定", ex5["exit"] and ex5["reason"] == "TIME_STOP", str(ex5))
 ex6 = EX.try_exit(pos, {"px": 9.4, "today": "20260904"})
