@@ -101,7 +101,20 @@ def next_trade_day(d8):
 # scan for continuation candidates at latest bar (entry next trade day)
 cands = []
 n = 0
+# FIX(2026-09-14, 第八轮审计 5.9): 全局 freshness gate —— 先扫一遍求市场
+# 最新交易日, 再扫描候选; 每股最新 bar 必须 == 市场最新日, 否则旧数据
+# 产生延续信号(审计: "continuation_scanner 没有要求每只股票最新 bar 等于
+# 市场最新日" → 旧数据信号)。freshness gate = 数据陈旧跳过, fail-closed
+# 不产生信号(与 current_scanner 生产模式同语义)。
 latest = ""
+for p in sorted(os.listdir(KT)):
+    if not p.endswith("_daily_800.json"):
+        continue
+    daily = bars(os.path.join(KT, p))
+    if len(daily) < 400:
+        continue
+    if daily[-1]["t"] > latest:
+        latest = daily[-1]["t"]
 for p in sorted(os.listdir(KT)):
     if not p.endswith("_daily_800.json"):
         continue
@@ -109,8 +122,9 @@ for p in sorted(os.listdir(KT)):
     daily = bars(os.path.join(KT, p))
     if len(daily) < 400:
         continue
-    if daily[-1]["t"] > latest:
-        latest = daily[-1]["t"]
+    # R33(第八轮 5.9): freshness gate —— 该股最新 bar 落后于市场最新日 → 跳过
+    if latest and daily[-1]["t"] != latest:
+        continue
     sym = p.replace("_daily_800.json", "").replace("_", ".", 1)
     # FIX(2026-09-08, 审计 P0-3): 消除延续腿前视/滞后混用。
     # 原实现 `i = len-2`(信号倒数第二根), `entry_idx = i+1 = 最后根`，
