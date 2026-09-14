@@ -593,8 +593,9 @@ def daily_selection():
     entry price = disclosure day close (limit order: buy only at or below)."""
     # FIX(2026-09-13, 第八轮审计 P0-4): ENABLE_EVENT_LEG 开关接线 —— 原开关在
     # config 定义但事件循环无条件执行, 关闭 EVENT 腿仍会产生 EVENT 订单(审计 §1.2)。
-    # 接线后: 开关关闭 → 跳过事件选股, 输出统计并 return(零新订单)。
-    if not getattr(CFG, "ENABLE_EVENT_LEG", True):
+    # 接线后: 开关关闭 → 跳过事件选股, 但不能阻断已启用的 CONT/SMC 腿。
+    _event_enabled = bool(getattr(CFG, "ENABLE_EVENT_LEG", True))
+    if not _event_enabled:
         _st = {"event_leg_disabled": True, "orders_created": 0,
                "note": "ENABLE_EVENT_LEG=False: 事件腿选股跳过(可审计/可回滚)"}
         print("[P0-4] ENABLE_EVENT_LEG=False → 事件腿选股跳过", flush=True)
@@ -602,13 +603,17 @@ def daily_selection():
             _atomic_write_json(os.path.join(CFG.OUTPUT_ROOT, "event_leg_status.json"), _st)
         except Exception:
             pass
-        return _st
+        if not (getattr(CFG, "ENABLE_CONT_LEG", False) or getattr(CFG, "ENABLE_SMC_LEG", False)):
+            return _st
     import sqlite3
     # FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径
     conn = sqlite3.connect(CFG.ANNOUNCE_DB)
     cur = conn.cursor()
-    cur.execute("SELECT DISTINCT date FROM announce ORDER BY date DESC LIMIT 5")
-    recent_days = [r[0] for r in cur.fetchall()]
+    if _event_enabled:
+        cur.execute("SELECT DISTINCT date FROM announce ORDER BY date DESC LIMIT 5")
+        recent_days = [r[0] for r in cur.fetchall()]
+    else:
+        recent_days = []
     led = load_ledger()
     known = {(t["code"], t.get("signal_date", "")) for t in led}
     # also block codes already PENDING/FILLED for same signal date
@@ -628,6 +633,36 @@ def daily_selection():
     def _mark_funnel(key, stage):
         """Keep one terminal state per positive event for a conservation audit."""
         _reject_stage.setdefault(key, stage)
+
+    def _portfolio_gate(order):
+        """One fail-closed gate shared by EVENT, CONT and SMC order creation."""
+        try:
+            from core.portfolio import portfolio_exposure_check, throttle_open, kill_switch as _ks
+            live = [t for t in led if t.get("status") in ("PENDING_ORDER", "FILLED")
+                    and t is not order]
+            positions = [{"code": t.get("code"),
+                          "position_pct": float(t.get("position_pct") or 0.01)}
+                         for t in live]
+            positions.append({"code": order.get("code"),
+                              "position_pct": float(order.get("position_pct") or 0.01)})
+            ok_exposure, why_exposure, total = portfolio_exposure_check(positions)
+            today = cn_now("%Y-%m-%d")
+            day_opens = [t.get("created_at") == today for t in live] + [True]
+            ok_throttle, why_throttle = throttle_open(day_opens, {}, max_positions=10,
+                                                       max_sector=3, max_daily_opens=5)
+            recent = [float(t.get("pnl_pct") or 0) / 100 for t in live
+                      if t.get("pnl_pct") is not None][-20:]
+            kill_result = _ks(recent, window="daily")
+            kill_on = kill_result[0] if isinstance(kill_result, tuple) else bool(kill_result)
+            if not ok_exposure:
+                return False, why_exposure, total
+            if not ok_throttle:
+                return False, why_throttle, total
+            if kill_on:
+                return False, "KILL_SWITCH", total
+            return True, "OK", total
+        except Exception as exc:
+            return False, f"PORTFOLIO_GATE_ERROR:{exc}", 0.0
 
     for dd in recent_days:
         # FIX(2026-09-05, 审计 G25): 改为全量拉取增持/回购候选，Python 端用 core.events.classify_title
@@ -842,34 +877,17 @@ def daily_selection():
             # FIX(2026-09-13, 第八轮审计 P1-9): PortfolioGate 订单创建前接线(最小实现) ——
             # 总暴露(已成交+待成交+本单) ≤0.8 / 单票 ≤0.25 / 单日新开 ≤5 / kill switch。
             # gate 拒绝写 capacity_reject(与策略拒绝分开, 审计 §P1-9), 不进正式订单。
-            try:
-                from core.portfolio import portfolio_exposure_check, throttle_open, kill_switch as _ks
-                _live = [t2 for t2 in led if t2.get("status") in ("PENDING_ORDER", "FILLED")
-                         and t2 is not led[-1]]
-                _pos_all = [{"code": t2["code"],
-                             "position_pct": float(t2.get("position_pct") or 0.01)} for t2 in _live]
-                _pos_all.append({"code": code, "position_pct": _position_pct})
-                _ok_e, _why_e, _tot = portfolio_exposure_check(_pos_all)
-                _day_opens = [t2.get("created_at") == cn_now("%Y-%m-%d")
-                              for t2 in _live] + [True]
-                _ok_t, _why_t = throttle_open(_day_opens, {}, max_positions=10,
-                                              max_sector=3, max_daily_opens=5)
-                _pnl_recent = [float(t2.get("pnl_pct") or 0) / 100
-                               for t2 in _live if t2.get("pnl_pct") is not None][-20:]
-                _ks_on, _ks_why = _ks(_pnl_recent, window="daily"), None
-                _ks_trig = _ks_on[0] if isinstance(_ks_on, tuple) else _ks_on
-                if not _ok_e or not _ok_t or _ks_trig:
-                    _reason = _why_e if not _ok_e else (_why_t if not _ok_t else "KILL_SWITCH")
-                    led.pop()  # 撤回该订单
-                    _sel_stats["capacity_reject"] = _sel_stats.get("capacity_reject", 0) + 1
-                    _mark_funnel(_key, "CAPACITY_REJECT")
-                    _reject_records.append({"code": code, "name": name, "date": dd,
-                                            "stage": "CAPACITY_REJECT", "title": title[:80],
-                                            "why": _reason, "total_exposure": round(_tot, 4)})
-                    continue
-            except Exception as _ge:
-                # gate 自身异常 → fail-open 仅限本次(记录); 生产资格由 manifest 层把守
-                _sel_stats["gate_error"] = _sel_stats.get("gate_error", 0) + 1
+            _gate_ok, _gate_why, _gate_total = _portfolio_gate(led[-1])
+            if not _gate_ok:
+                led.pop()  # 撤回该订单
+                _sel_stats["capacity_reject"] = _sel_stats.get("capacity_reject", 0) + 1
+                if str(_gate_why).startswith("PORTFOLIO_GATE_ERROR:"):
+                    _sel_stats["gate_error"] = _sel_stats.get("gate_error", 0) + 1
+                _mark_funnel(_key, "CAPACITY_REJECT")
+                _reject_records.append({"code": code, "name": name, "date": dd,
+                                        "stage": "CAPACITY_REJECT", "title": title[:80],
+                                        "why": _gate_why, "total_exposure": round(_gate_total, 4)})
+                continue
             _mark_funnel(_key, "PASSED_TO_ORDER")
             new_orders.append((code, name, dd, limit_px))
             _event_order_count += 1
@@ -909,7 +927,9 @@ def daily_selection():
                     ei2 = dates2.index(sig_d8) if sig_d8 in dates2 else -1
                     if ei2 >= 60:
                         subs2 = sub_signals_cont(bs2, ei2, sig_d)
-                led.append({
+                _cont_risk = (ep - sl) if ep and sl else 0
+                _cont_pos = min(0.01 / (_cont_risk / ep), 0.25) if _cont_risk > 0 else 0.01
+                _cont_order = {
                     "code": code, "name": code, "signal_combo": "CONTINUATION_MARKUP",
                     # FIX(2026-09-05, 审计 G04): 延续腿不再当日 FILLED —— 信号 bar 用 ≤signal 数据过滤，
                     # 次日开盘挂单(valid_from)由 monitor 以实时 open 成交，禁止"知今日涨9%按今开买"
@@ -933,10 +953,19 @@ def daily_selection():
                 "eligible_at": c.get("valid_from") or (_next_td(dates2, sig_d8) if (bs2 and ep) else ""),
                 "fill_rule": "T+1开盘市价(实时open, 带滑点)", "not_filled_reason": None,
                 # FIX(2026-09-13, 第八轮审计 P0-4): 开关快照(同 EVENT 订单)
+                "position_pct": round(_cont_pos, 4),
                 "leg_flags": {"event": bool(getattr(CFG, "ENABLE_EVENT_LEG", True)),
-                              "cont": bool(getattr(CFG, "ENABLE_CONT_LEG", True)),
-                              "smc": bool(getattr(CFG, "ENABLE_SMC_LEG", False))},
-            })
+                               "cont": bool(getattr(CFG, "ENABLE_CONT_LEG", True)),
+                               "smc": bool(getattr(CFG, "ENABLE_SMC_LEG", False))},
+                }
+                led.append(_cont_order)
+                _gate_ok, _gate_why, _gate_total = _portfolio_gate(_cont_order)
+                if not _gate_ok:
+                    led.pop()
+                    _sel_stats["capacity_reject"] = _sel_stats.get("capacity_reject", 0) + 1
+                    if str(_gate_why).startswith("PORTFOLIO_GATE_ERROR:"):
+                        _sel_stats["gate_error"] = _sel_stats.get("gate_error", 0) + 1
+                    continue
             new_orders.append((code, code, sig_d, ep))
         except Exception:
             pass
@@ -972,7 +1001,7 @@ def daily_selection():
                     continue
                 tp_smc = max(tgt, ep + 1.5 * risk) if tgt > ep else ep + 1.5 * risk
                 _pos = min(0.01 / (risk / ep), 0.25) if risk > 0 else 0.01
-                led.append({
+                _smc_order = {
                     "code": code, "name": code, "signal_combo": "SMC_W1D1D4", "source": "SMC",
                     "signal_date": sig_d or ev_d, "trigger": "SMC: 扫损+位移+POI回踩确认(8阶段) → 次日开盘",
                     "valid_from": _next_td(dates3, (sig_d or ev_d).replace("-", "")),
@@ -988,7 +1017,18 @@ def daily_selection():
                     "order_type": "MARKET_T1_OPEN", "submitted_at": cn_now("%Y-%m-%d %H:%M:%S"),
                     "eligible_at": _next_td(dates3, (sig_d or ev_d).replace("-", "")),
                     "fill_rule": "T+1开盘市价(实时open, 带滑点)", "not_filled_reason": None,
-                })
+                    "leg_flags": {"event": bool(getattr(CFG, "ENABLE_EVENT_LEG", True)),
+                                  "cont": bool(getattr(CFG, "ENABLE_CONT_LEG", False)),
+                                  "smc": bool(getattr(CFG, "ENABLE_SMC_LEG", False))},
+                }
+                led.append(_smc_order)
+                _gate_ok, _gate_why, _gate_total = _portfolio_gate(_smc_order)
+                if not _gate_ok:
+                    led.pop()
+                    _sel_stats["capacity_reject"] = _sel_stats.get("capacity_reject", 0) + 1
+                    if str(_gate_why).startswith("PORTFOLIO_GATE_ERROR:"):
+                        _sel_stats["gate_error"] = _sel_stats.get("gate_error", 0) + 1
+                    continue
                 new_orders.append((code, code, sig_d, ep))
                 _sel_stats["smc_selected"] = _sel_stats.get("smc_selected", 0) + 1
         except Exception as _e:

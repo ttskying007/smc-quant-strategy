@@ -10,7 +10,12 @@ Output: candidate list with signal details, all research-only (no BUY)."""
 import io, json, os, sys, subprocess, time
 from collections import defaultdict
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+if not getattr(sys.stdout, "_smc_utf8", False):
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stdout._smc_utf8 = True
+    except (AttributeError, ValueError):
+        pass
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config as CFG  # 审计 P1: 统一路径/解释器（FIX 2026-09-13 R4: 必须先于 WDH_DIR 使用）
 # FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径(WDH_DIR)
@@ -43,7 +48,8 @@ def bars(path):
 def market_latest():
     """Determine latest trading date from Sina realtime (authoritative).
     FIX(2026-09-04, P1): 旧实现请求了 Sina 却丢弃结果、硬编码兜底 20260819。
-    现在解析 hq_str 第 31 个字段（日期）作为权威最新交易日；失败再回退本地缓存。"""
+    现在解析 hq_str 第 31 个字段（日期）作为权威最新交易日；权威源失败时
+    返回空值，由生产入口 fail-closed，禁止本地旧缓存伪装成新鲜数据。"""
     import urllib.request
     UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://finance.sina.com.cn/"}
     try:
@@ -65,25 +71,8 @@ def market_latest():
                 print(f"市场最新交易日(Sina 时间字段): {date}", flush=True)
                 return date
     except Exception as e:
-        print(f"Sina 最新交易日获取失败，回退本地缓存: {e}", flush=True)
-    # fallback: latest date across kline files that are fresh (from Sina refresh)
-    latest = ""
-    for f in os.listdir(KT):
-        if not f.endswith("_daily_800.json"):
-            continue
-        bs = bars(os.path.join(KT, f))
-        if bs and bs[-1]["t"] > latest:
-            latest = bs[-1]["t"]
-    if latest:
-        print(f"市场最新交易日(本地缓存回退): {latest}", flush=True)
-        return latest
-    # 最后一个兜底：取当前日期（周一~五），避免 20260819 这种过期硬编码
-    import datetime
-    _today = datetime.date.today()
-    while _today.weekday() >= 5:  # 周末回退到周五
-        _today -= datetime.timedelta(days=1)
-    print(f"市场最新交易日(日期兜底): {_today.strftime('%Y%m%d')}", flush=True)
-    return _today.strftime("%Y%m%d")
+        print(f"Sina 最新交易日获取失败，生产模式不得使用本地回退: {e}", flush=True)
+    return ""
 
 
 def refresh_key_stocks():
@@ -170,6 +159,8 @@ if __name__ == "__main__":
         print("刷新关键股票（持仓+近期事件）...", flush=True)
         refresh_key_stocks()
     latest = market_latest()
+    if not latest and args.production:
+        raise RuntimeError("production blocked: authoritative market date unavailable")
     print(f"市场最新交易日: {latest}", flush=True)
     files = [f for f in os.listdir(KT) if f.endswith("_daily_800.json")]
     smc_cands = []
@@ -217,6 +208,7 @@ if __name__ == "__main__":
 
     # save
     result = {
+        "run_id": os.environ.get("SMC_RUN_ID") or "scan-" + time.strftime("%Y%m%d-%H%M%S"),
         "latest_date": latest,
         "fresh_count": fresh_count,
         "stale_count": len(files) - fresh_count,
@@ -237,7 +229,7 @@ if __name__ == "__main__":
     try:
         import core.manifest as CM
         _m = CM.build_manifest(
-            run_id="scan-" + time.strftime("%Y%m%d-%H%M%S"),
+            run_id=result["run_id"],
             strategy_id="smc_combined", strategy_version="v20f_scan",
             params={"freshness": "strict", "min_len": 400},
             data_asof=latest, data_snapshot_id="kline_tencent_" + latest,

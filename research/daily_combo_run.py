@@ -51,6 +51,54 @@ def _resume_monitor():
     except Exception as e:
         print(f"恢复监控异常: {e}", flush=True)
 
+
+def _write_failed_run(run_id, step_status, reason):
+    """Persist an invalid run without allowing downstream stale artifacts to run."""
+    payload = {
+        "run_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "run_id": run_id,
+        "steps": step_status,
+        "data_complete": False,
+        "signal_complete": False,
+        "execution_complete": False,
+        "frontend_complete": False,
+        "production_eligible": False,
+        "manifest_ok": False,
+        "fallback_used": True,
+        "failure_reason": reason,
+    }
+    tmp = os.path.join(RESEARCH, "run_status.json.tmp")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, ensure_ascii=False, indent=2)
+    os.replace(tmp, os.path.join(RESEARCH, "run_status.json"))
+    print(f"[FAIL-CLOSED] {reason} → 跳过选股/发布", flush=True)
+
+
+def _merge_scanner_outputs(run_id):
+    """Merge same-run SMC and CONT artifacts into the single selection input."""
+    scanner_path = os.path.join(RESEARCH, "current_scanner_result.json")
+    cont_path = os.path.join(RESEARCH, "continuation_scanner_result.json")
+    with open(scanner_path, encoding="utf-8") as fh:
+        scanner = json.load(fh)
+    with open(cont_path, encoding="utf-8") as fh:
+        cont = json.load(fh)
+    if scanner.get("run_id") != run_id or cont.get("run_id") != run_id:
+        raise RuntimeError("scanner artifact run_id mismatch")
+    if not scanner.get("latest_date") or scanner.get("latest_date") != cont.get("latest_date"):
+        raise RuntimeError("scanner artifact latest_date mismatch or unavailable")
+    scanner["continuation_candidates"] = cont.get("continuation_candidates") or []
+    scanner["continuation_count"] = cont.get("continuation_count", 0)
+    scanner["continuation_run_id"] = cont.get("run_id")
+    scanner["merged_run_id"] = run_id
+    tmp = scanner_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(scanner, fh, ensure_ascii=False, indent=2)
+    os.replace(tmp, scanner_path)
+    import shutil
+    for d in MIRROR_DIRS:
+        os.makedirs(d, exist_ok=True)
+        shutil.copyfile(scanner_path, os.path.join(d, "current_scanner_result.json"))
+
 def main():
     import argparse
     ap = argparse.ArgumentParser()
@@ -186,6 +234,21 @@ def _run_main_steps():
     # 2b. continuation scanner (MARKUP structure support, v20c leg)
     rc2b = run("continuation_scanner.py", timeout=1800)
     step_status["continuation"] = rc2b
+    # Both scanners must succeed before selection may consume scanner output.
+    # CONT writes a separate artifact; never let a failed stage fall through to
+    # an older current_scanner_result.json.
+    if rc2 != 0 or rc2b != 0:
+        _write_failed_run(_run_id, step_status,
+                          "scanner stage failed: " + ", ".join(
+                              f"{k}={step_status[k]}" for k in ("scanner", "continuation")
+                              if step_status.get(k) != 0))
+        return
+    try:
+        _merge_scanner_outputs(_run_id)
+    except Exception as _scan_merge_error:
+        step_status["scanner_merge"] = 1
+        _write_failed_run(_run_id, step_status, f"scanner artifact merge failed: {_scan_merge_error}")
+        return
     # 3. sim trading: selection (new pending orders) + mark-to-market + TP/SL
     #    FIX(2026-08-22): 兜底逻辑 —— 即使前面步骤失败（数据未更新完），仍用最后更新完的数据选股，标注数据日期
     rc3 = run("sim_scheduler.py", "--daily", timeout=1200)
@@ -273,8 +336,12 @@ def _run_main_steps():
     # FIX(2026-09-08, 审计 P1-3): 运行状态四层分层判定。
     # 原 `data_complete = rc0 and rc2 and rc3` 未含公告/continuation/dashboard/shadow/reconcile，
     # 公告没拉到或延续腿失败等仍会误标完整（前端显示旧数据）。现按责任域分层：
-    _data_complete = rc0 == 0 and rc2 == 0 and rc3 == 0          # 行情/选股数据完整
-    _signal_complete = all(step_status.get(k, 1) == 0 for k in ("announce", "refresh", "holdings", "scanner", "selection", "funnel_monitor"))
+    _data_complete = all(step_status.get(k, 1) == 0 for k in
+                         ("announce", "refresh", "kline_incremental", "holdings",
+                          "scanner", "continuation", "selection"))
+    _signal_complete = all(step_status.get(k, 1) == 0 for k in
+                           ("announce", "refresh", "holdings", "scanner", "continuation",
+                            "selection", "funnel_monitor"))
     _execution_complete = all(step_status.get(k, 1) == 0 for k in ("shadow", "reconcile"))
     _frontend_complete = step_status.get("dashboard", 1) == 0
     _production_eligible = _data_complete and _signal_complete and _execution_complete and _frontend_complete
@@ -311,13 +378,17 @@ def _run_main_steps():
             params={"steps": step_status},
             data_asof=_data_date, data_snapshot_id="kline_tencent_" + _data_date,
             artifact_paths=[os.path.join(RESEARCH, "combo_dashboard.json"),
-                            os.path.join(RESEARCH, "run_status.json")],
+                             os.path.join(RESEARCH, "run_status.json"),
+                             os.path.join(RESEARCH, "current_scanner_result.json"),
+                             os.path.join(RESEARCH, "continuation_scanner_result.json")],
             status="production" if _data_complete else "degraded",
             extra={"data_complete": _data_complete, "fallback_used": bool(_failed)})
         # 生产模式 fail-closed: 先验证 artifact 再写（finalize 内含原子写+复核）
         _mp, _manifest_ok = _CM.finalize_manifest(
             _m, [os.path.join(RESEARCH, "combo_dashboard.json"),
-                 os.path.join(RESEARCH, "run_status.json")],
+                 os.path.join(RESEARCH, "run_status.json"),
+                 os.path.join(RESEARCH, "current_scanner_result.json"),
+                 os.path.join(RESEARCH, "continuation_scanner_result.json")],
             os.path.join(RESEARCH, "run_manifests"))
         for _d in MIRROR_DIRS:
             try:

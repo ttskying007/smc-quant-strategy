@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 """延续腿 scanner 集成：扫描当前 MARKUP 结构支撑 + VWAP10% + 低波动 信号
 （v20c 生产 = 反转 + 延续；scanner 需输出延续候选。VWAP 5%->10% 于 2026-08-22 优化）"""
-import io, json, os, sys
+import io, json, os, sys, time
 from collections import defaultdict
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+if not getattr(sys.stdout, "_smc_utf8", False):
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stdout._smc_utf8 = True
+    except (AttributeError, ValueError):
+        pass
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config as CFG  # 审计 P1: 统一路径
 # FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径(WDH_DIR)
@@ -77,6 +82,11 @@ def compute_median():
 V_MED = compute_median()
 print(f"vol20 中位: {V_MED:.4f}", flush=True)
 
+# CONT must use the same authoritative market-date source as the primary
+# scanner. A local max date is only a cache observation, not proof of freshness.
+from current_scanner import market_latest as _authoritative_market_latest
+_PRODUCTION = "--production" in sys.argv or bool(os.environ.get("SMC_PRODUCTION"))
+
 # FIX(2026-09-08, 审计 P0-3): 交易日历（惰性构建）—— 仅在出现候选需计算 next_td 时才扫描全市场。
 # 避免每次运行都多读一遍 ~4551 个 K 线文件（IO 翻倍）。
 _ALL_TRADE_DATES = None
@@ -117,12 +127,22 @@ for p in sorted(os.listdir(KT)) if os.path.isdir(KT) else []:
         continue
     if daily[-1]["t"] > latest:
         latest = daily[-1]["t"]
+# Keep the local scan above as a diagnostic, but never use it as the production
+# freshness reference. If the authority is unavailable, produce no candidates.
+_local_latest = latest
+latest = _authoritative_market_latest()
+if not latest:
+    if _PRODUCTION:
+        raise RuntimeError("production blocked: authoritative market date unavailable")
+    print("权威市场最新交易日不可用，CONT 仅输出空候选(不消费本地日期)", flush=True)
 for p in sorted(os.listdir(KT)) if os.path.isdir(KT) else []:
     if not p.endswith("_daily_800.json"):
         continue
     n += 1
     daily = bars(os.path.join(KT, p))
     if len(daily) < 400:
+        continue
+    if not latest:
         continue
     # R33(第八轮 5.9): freshness gate —— 该股最新 bar 落后于市场最新日 → 跳过
     if latest and daily[-1]["t"] != latest:
@@ -200,17 +220,19 @@ if _dropped:
 for c in cands[:10]:
     print(f"  {c['symbol']}: signal={c['signal_date']} ref={c['reference_price']} support={c['support']}")
 
-# merge into scanner result
-# FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径(RESEARCH_DIR)
-_CSR = os.path.join(CFG.RESEARCH_DIR, "current_scanner_result.json")
-try:
-    with open(_CSR, encoding="utf-8") as fh:
-        res = json.load(fh)
-except Exception:
-    res = {}
-res["continuation_candidates"] = cands
-res["continuation_count"] = len(cands)
-res["latest_date"] = latest
-with open(_CSR, "w", encoding="utf-8") as fh:
-    json.dump(res, fh, ensure_ascii=False, indent=2)
-print("scanner result updated with continuation candidates")
+# Write an isolated stage artifact. daily_combo_run merges it only after both
+# scanners succeed and verifies the shared run_id/latest_date contract.
+_CONT_RESULT = os.path.join(CFG.RESEARCH_DIR, "continuation_scanner_result.json")
+_cont_result = {
+    "run_id": os.environ.get("SMC_RUN_ID") or "cont-" + time.strftime("%Y%m%d-%H%M%S"),
+    "latest_date": latest,
+    "continuation_candidates": cands,
+    "continuation_count": len(cands),
+    "local_cache_latest": _local_latest,
+    "status": "complete" if latest else "invalid",
+}
+_tmp = _CONT_RESULT + ".tmp"
+with open(_tmp, "w", encoding="utf-8") as fh:
+    json.dump(_cont_result, fh, ensure_ascii=False, indent=2)
+os.replace(_tmp, _CONT_RESULT)
+print(f"continuation result saved: {_CONT_RESULT}")
