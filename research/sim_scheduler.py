@@ -82,6 +82,23 @@ def main():
                 print(f"[{_ts()}] ⚠ 代码版本守卫: {_ch} 已更新(进程启动后) —— "
                       f"本进程撮合语义过期(可能缺新守卫), 退出要求重启。"
                       f"exit code 3。", flush=True)
+                # R32(2026-09-14): 守卫触发后自重启 —— R27-R31 期间发现: 守卫
+                # 正确退出(exit 3)但无人接管, 开盘窗口出现无 monitor 空窗(000157
+                # T+1 挂单无人撮合)。机制: 触发守卫时先拉起新实例(subprocess
+                # 继承最新代码), 新实例写自己的 monitor.pid 覆盖旧 pid, 旧进程
+                # 再退出 —— 无缝换血, 不依赖外部调度。失败(拉不起)则保持纯退出
+                # 语义(原 R26 契约不变, exit 3 仍可被调度器识别重启)。
+                try:
+                    import subprocess as _sp
+                    _sp.Popen([sys.executable, "-X", "utf8",
+                               os.path.join(ROOT_DIR, "sim_scheduler.py"),
+                               "--loop", "--interval", str(args.interval)],
+                              cwd=ROOT_DIR, creationflags=getattr(_sp, "CREATE_NO_WINDOW", 0),
+                              stdout=open(os.path.join(ROOT_DIR, "monitor_stdout.log"), "ab"),
+                              stderr=open(os.path.join(ROOT_DIR, "monitor_stderr.log"), "ab"))
+                    print(f"[{_ts()}] 自重启: 新实例已拉起(载最新代码), 旧进程退出", flush=True)
+                except Exception as _re:
+                    print(f"[{_ts()}] 自重启失败({ _re}) → 保持纯退出语义, 依赖外部调度重启", flush=True)
                 sys.exit(3)
             try:
                 nf, nc = loop_once()
