@@ -6,8 +6,10 @@
 调度: daily_combo_run 尾部(在 escore_daily 之前)。"""
 import io, json, os, sys, time, urllib.request
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "research"))
+import config as CFG
 
-OUT = r"E:\test\smc_project\hermes\kline_cache_etf"
+OUT = CFG.ETF_CACHE
 os.makedirs(OUT, exist_ok=True)
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
       "Referer": "https://gu.qq.com/", "Accept": "*/*"}

@@ -45,8 +45,9 @@ try:
     HERMES = _CFG.HERMES_DIR
     OUT = _CFG.WDH_DIR
 except Exception:
-    HERMES = r"E:\test\smc_project\hermes"
-    OUT = r"E:\test\smc_project\wdh"
+    _PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    HERMES = os.path.join(_PROJECT, "hermes")
+    OUT = os.path.join(_PROJECT, "wdh")
 KLINE = os.path.join(HERMES, "kline_cache_tencent")
 os.makedirs(OUT, exist_ok=True)
 

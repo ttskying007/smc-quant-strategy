@@ -5,10 +5,12 @@
 幂等(同日只记一次)。可挂每日任务(paper_sim 之后)或手动跑。
 只读快照, 不动 paper_sim 本身。"""
 import json, os, sys, io, time
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-SRC = r"E:\test\smc_project\research\selection_funnel.json"
-HIST = r"E:\test\smc_project\research\handover\selection_funnel_history.json"
+SRC = os.path.join(CFG.RESEARCH_DIR, "selection_funnel.json")
+HIST = os.path.join(CFG.RESEARCH_DIR, "handover", "selection_funnel_history.json")
 
 try:
     snap = json.load(open(SRC, encoding="utf-8"))
@@ -30,6 +32,7 @@ if os.path.exists(HIST):
 hist = [h for h in hist if h.get("day") != day]   # 同日覆盖
 hist.append(entry)
 hist = hist[-60:]
+os.makedirs(os.path.dirname(HIST), exist_ok=True)
 json.dump({"days": len(hist), "history": hist}, open(HIST, "w", encoding="utf-8"),
           ensure_ascii=False, indent=2)
 print(f"累积 {day}: raw={entry['raw']} positive={entry['positive']} orders={entry['orders']} → 共{len(hist)}天")

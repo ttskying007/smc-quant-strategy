@@ -234,9 +234,9 @@ if __name__ == "__main__":
             print(f"警告: artifact 缺失/为空 {_art_p}（研究模式继续）", flush=True)
         _mp = CM.save_manifest(_m, os.path.join(OUT, "run_manifests"))
         print(f"manifest: {_mp}")
-        # 前端同步（hermes/smc_monitor + E:\root\.hermes）
+        # 前端同步到配置的镜像目录。
         import shutil
-        for _d in (os.path.join(CFG.HERMES_DIR, "smc_monitor"), r"E:\root\.hermes\smc_monitor"):
+        for _d in CFG.MIRROR_DIRS:
             try:
                 os.makedirs(_d, exist_ok=True)
                 shutil.copyfile(os.path.join(OUT, "current_scanner_result.json"),

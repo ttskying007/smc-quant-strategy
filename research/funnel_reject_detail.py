@@ -8,12 +8,13 @@
   ④ 汇总: 按原因分组的 fwd5/fwd10 均值 → 直接回答"每类拒绝放走了多少收益"
 与 L2 追踪器互补: L2 管事件腿 soft-reject, 本工具管全漏斗(含 stage/adx/dup)。"""
 import io, json, os, sys, time
-sys.path.insert(0, r"E:\test\smc_project\research")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-KT = r"E:\test\smc_project\hermes\kline_cache_tencent"
-SRC = r"E:\test\smc_project\research\selection_result.json"
-LEDGER = r"E:\test\smc_project\research\handover\funnel_reject_ledger.json"
+KT = CFG.KT_CACHE
+SRC = CFG.SELECTION_RESULT
+LEDGER = os.path.join(CFG.RESEARCH_DIR, "handover", "funnel_reject_ledger.json")
 KEEP = 90
 
 if not os.path.exists(SRC):
@@ -104,6 +105,7 @@ for k, v in sorted(grp.items(), key=lambda kv: -len(kv[1])):
                   "avg_fwd10": round(sum(f10s) / len(f10s), 2) if f10s else None}
 ledger["summary"] = summary
 ledger["days_accum"] = ledger.get("days_accum", 0) + (1 if n_new else 0)
+os.makedirs(os.path.dirname(LEDGER), exist_ok=True)
 json.dump(ledger, open(LEDGER, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 print(f"新拒 {n_new} | 回填 {n_fill} | 总 {len(ledger['rejects'])}")
 for k, s in list(summary.items())[:8]:

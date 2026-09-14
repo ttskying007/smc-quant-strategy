@@ -4,8 +4,12 @@ datalen=10 拉最新 10 根 bar 追加到本地 800 缓存（每只 ~0.3s，全�
 + refresh_progress.json 实时进度（前端展示同步状态/进度条）"""
 import io, json, os, sys, time, urllib.request
 
-OUT = r"E:\test\smc_project\hermes\kline_cache_tencent"
-PROGRESS = r"E:\test\smc_project\research\refresh_progress.json"
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "research"))
+import config as CFG
+
+OUT = CFG.KT_CACHE
+PROGRESS = os.path.join(CFG.RESEARCH_DIR, "refresh_progress.json")
+os.makedirs(OUT, exist_ok=True)
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Referer": "https://finance.sina.com.cn/"}
 if __name__ == "__main__":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")

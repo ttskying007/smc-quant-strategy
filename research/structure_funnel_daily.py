@@ -8,7 +8,8 @@ V3 Phase B 要求: 每层不只记 count, 还要记【丢失候选的前向收�
 """
 import glob, io, json, os, sys, time
 from collections import defaultdict
-sys.path.insert(0, r"E:\test\smc_project\research")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 import core.liquidity as LQ
@@ -17,12 +18,13 @@ import core.mss as MSS
 import core.fvg_ob as FO
 from core.sequence import run_sequence_v2
 
-KL = r"E:\test\smc_project\hermes\kline_cache_tencent"
-OUT = r"E:\test\smc_project\research\handover\structure_funnel_daily.json"
+KL = CFG.KT_CACHE
+OUT = os.path.join(CFG.RESEARCH_DIR, "handover", "structure_funnel_daily.json")
 SAMPLE_STRIDE = 10        # 全量太慢: 每10只抽1(研究监测口径)
 RECENT_BARS = 30          # 只扫最近30根(每日增量)
 
 files = sorted(glob.glob(KL + os.sep + "*_daily_800.json"))[::SAMPLE_STRIDE]
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 funnel = defaultdict(int)
 lost_ret = defaultdict(list)     # V3 Phase B: 各层丢失候选的前向收益(5D/10D)
 today = time.strftime("%Y%m%d")

@@ -5,8 +5,11 @@
 import datetime, io, json, os, sqlite3, sys, time, urllib.request, urllib.parse
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "research"))
+import config as CFG
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Referer": "https://data.eastmoney.com/notices/"}
-DB = r"E:\test\smc_project\announce\smc_announce.db"
+DB = CFG.ANNOUNCE_DB
+os.makedirs(os.path.dirname(DB), exist_ok=True)
 
 
 def fetch_notices(date):

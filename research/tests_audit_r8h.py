@@ -28,7 +28,7 @@ _r = subprocess.run([sys.executable, "-X", "utf8", "-c",
 _l = _r.stdout.strip().splitlines()
 ok("子进程无环境变量默认推导: 三行输出", len(_l) == 3, _r.stdout[:200] + _r.stderr[:200])
 if len(_l) == 3:
-    ok("默认 PROJECT_ROOT = repo 根", _l[0].endswith("smc_project"), _l[0])
+    ok("默认 PROJECT_ROOT = repo 根", os.path.abspath(_l[0]) == os.path.dirname(HERE), _l[0])
     ok("默认 KT_CACHE 在根下", "kline_cache_tencent" in _l[1], _l[1])
     ok("默认 MIRROR 第二项含 smc_monitor", "smc_monitor" in _l[2], _l[2])
 # 设置环境变量后覆盖
@@ -47,8 +47,8 @@ import config as CFG
 import io as _io, contextlib as _ctx
 _b = _io.StringIO()
 with _ctx.redirect_stdout(_b):
-    _v = CFG.validate_paths()
-ok("本机实际路径全部存在 → True", _v is True)
+    _v = CFG.validate_paths(required=("RESEARCH_DIR", "WDH_DIR"))
+ok("本机代码路径全部存在 → True", _v is True)
 _out = _b.getvalue()
 ok("打印 SMC_DATA_ROOT 状态", "SMC_DATA_ROOT" in _out, _out[:120])
 ok("打印解析后的绝对路径", "PROJECT_ROOT=" in _out and "[paths] OK" in _out)

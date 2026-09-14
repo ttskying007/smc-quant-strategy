@@ -6,11 +6,12 @@
 """
 import io, json, os, sys, random
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-sys.path.insert(0, r"E:\test\smc_project\research")
-sys.path.insert(0, r"E:\test\smc_project\wdh")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "wdh"))
 import wdh_engine as WE
+import config as CFG
 
-KLINE = r"E:\test\smc_project\hermes\kline_cache"
+KLINE = CFG.KT_CACHE
 PASS = FAIL = 0
 def ok(name, cond, detail=""):
     global PASS, FAIL
@@ -18,6 +19,10 @@ def ok(name, cond, detail=""):
         PASS += 1; print("  OK " + name)
     else:
         FAIL += 1; print("  FAIL " + name + " " + detail)
+
+if not os.path.isdir(KLINE):
+    print(f"SKIP 无本地行情缓存: {KLINE}")
+    sys.exit(0)
 
 def load(path):
     raw = json.load(open(path, encoding="utf-8"))

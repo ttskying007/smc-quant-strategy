@@ -19,6 +19,11 @@ def ok(name, cond, detail=""):
 print("== 1. 模块元 ==")
 ok("版本标记", _version_ == "escore_v1")
 
+if not os.path.isdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/hermes/kline_cache_etf"):
+    print("SKIP 无本地 ETF 指数缓存")
+    print("\n结果: PASS=%d FAIL=%d (数据依赖项跳过)" % (PASS, FAIL))
+    sys.exit(0)
+
 print("== 2. 指数加载与因子 ==")
 sh = _load_index("SH_000001_daily.json") or _load_index("000001_SH_day.json")
 ok("上证指数加载", len(sh) > 100)

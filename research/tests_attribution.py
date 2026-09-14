@@ -38,7 +38,12 @@ ok("GAP贡献60%", s["LOSS_GAP"]["contribution_pct"] == 60.0)
 ok("覆盖全标签", len([k for k in s if not k.startswith("_")]) == len(ALL_LABELS))
 
 print("== 3. 事件腿 1640 笔应用(真实数据) ==")
-rows = [r for r in csv.DictReader(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "combo_v20f_trades.csv"), encoding="utf-8-sig"))
+_trades_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "combo_v20f_trades.csv")
+if not os.path.exists(_trades_path):
+    print("  SKIP combo_v20f_trades.csv 尚未提供")
+    print("\n结果: PASS=%d FAIL=%d (数据依赖项跳过)" % (PASS, FAIL))
+    sys.exit(0)
+rows = [r for r in csv.DictReader(open(_trades_path, encoding="utf-8-sig"))
         if r.get("src") == "EVENT" and r.get("net_pnl_pct") not in (None, "", "None")]
 tagged = []
 gap_sl = 0

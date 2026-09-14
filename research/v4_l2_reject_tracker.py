@@ -11,11 +11,12 @@
 注意: 前向收益≠策略收益(未含入场时机/退出), 只回答"被杀候选的事后质量"。"""
 import glob, io, json, os, sqlite3, sys, time
 from collections import defaultdict
-sys.path.insert(0, r"E:\test\smc_project\research")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-KT = r"E:\test\smc_project\hermes\kline_cache_tencent"
-CFG_RES = r"E:\test\smc_project\research\selection_result.json"
+KT = CFG.KT_CACHE
+CFG_RES = CFG.SELECTION_RESULT
 
 # ---- 读最新 selection_result(被拒清单在 skipped_detail; picks 在 new_orders/days) ----
 sel = json.load(open(CFG_RES, encoding="utf-8"))
@@ -94,6 +95,8 @@ if d5 is not None and p5 is not None:
 else:
     out["verdict"] = "样本不足(数据窗口内无可配对事件)"
     print("样本不足 — selection_result 的被拒记录可能不含历史日期/今日事件前向收益未走完")
-json.dump(out, open(r"E:\test\smc_project\research\handover\V4_L2_被拒事件追踪.json", "w",
+_out_path = os.path.join(CFG.RESEARCH_DIR, "handover", "V4_L2_被拒事件追踪.json")
+os.makedirs(os.path.dirname(_out_path), exist_ok=True)
+json.dump(out, open(_out_path, "w",
                     encoding="utf-8"), ensure_ascii=False, indent=2)
 print("已写 handover/V4_L2_被拒事件追踪.json")

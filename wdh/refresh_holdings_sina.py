@@ -4,7 +4,9 @@ Sina gives full 2000-bar daily history quickly. Update kline_cache_tencent files
 import io, json, os, sys, time, urllib.request
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-OUT = r"E:\test\smc_project\hermes\kline_cache_tencent"
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "research"))
+import config as CFG
+OUT = CFG.KT_CACHE
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Referer": "https://finance.sina.com.cn/"}
 
 
@@ -34,7 +36,7 @@ def fetch_one(symbol):
 
 
 def main():
-    ledger = json.load(open(r"E:\test\smc_project\research\paper_ledger.json", encoding="utf-8"))
+    ledger = json.load(open(CFG.LEDGER, encoding="utf-8"))
     codes = sorted({t["code"] for t in ledger})
     symbols = [f"{c}.{'SH' if c.startswith('6') else 'SZ'}" for c in codes]
     print(f"paper holdings: {len(symbols)}", flush=True)

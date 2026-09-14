@@ -56,6 +56,8 @@ def stage_detailed(bs, i):
 
 # global median vol20 (computed once from fresh files)
 def compute_median():
+    if not os.path.isdir(KT):
+        return 0.0
     vols = []
     for p in os.listdir(KT):
         if not p.endswith("_daily_800.json"):
@@ -87,7 +89,7 @@ def next_trade_day(d8):
         return ""
     if _ALL_TRADE_DATES is None:
         _s = set()
-        for _p in sorted(os.listdir(KT)):
+        for _p in sorted(os.listdir(KT)) if os.path.isdir(KT) else []:
             if not _p.endswith("_daily_800.json"):
                 continue
             for _b in bars(os.path.join(KT, _p)):
@@ -107,7 +109,7 @@ n = 0
 # 市场最新日" → 旧数据信号)。freshness gate = 数据陈旧跳过, fail-closed
 # 不产生信号(与 current_scanner 生产模式同语义)。
 latest = ""
-for p in sorted(os.listdir(KT)):
+for p in sorted(os.listdir(KT)) if os.path.isdir(KT) else []:
     if not p.endswith("_daily_800.json"):
         continue
     daily = bars(os.path.join(KT, p))
@@ -115,7 +117,7 @@ for p in sorted(os.listdir(KT)):
         continue
     if daily[-1]["t"] > latest:
         latest = daily[-1]["t"]
-for p in sorted(os.listdir(KT)):
+for p in sorted(os.listdir(KT)) if os.path.isdir(KT) else []:
     if not p.endswith("_daily_800.json"):
         continue
     n += 1

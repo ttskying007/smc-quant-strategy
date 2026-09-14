@@ -35,6 +35,10 @@ ok("TTL 暂停的诚实注释在", "晚撤不早撤" in src)
 ok("解析失败 fail-open(守卫是增强)", "_in_session = True  # 时区/日历不可用" in src)
 
 print("== 2. 守卫行为(真实时间=01:xx 非时段) ==")
+if not os.path.exists(os.path.join(HERE, "paper_ledger.json")):
+    print("  SKIP 无运行时账本/日志")
+    print("\n结果: PASS=%d FAIL=%d (数据依赖项跳过)" % (PASS, FAIL))
+    sys.exit(0)
 import paper_sim as PS
 from core.time_cn import shanghai_now, cn_today
 from core.trading_calendar import is_td

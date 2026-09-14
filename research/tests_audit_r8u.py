@@ -48,6 +48,10 @@ ok("代码级 strftime=0", not [n for n in ast.walk(ast.parse(src))
     and a.value.id == "time" and a.attr == "strftime"])
 
 print("== 4. 当前 monitor 状态(实弹) ==")
+if not os.path.exists(os.path.join(HERE, "paper_ledger.json")):
+    print("  SKIP 无运行时 monitor/账本产物")
+    print("\n结果: PASS=%d FAIL=%d (数据依赖项跳过)" % (PASS, FAIL))
+    sys.exit(0)
 import json
 _pid = None
 try:

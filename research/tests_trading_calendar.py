@@ -7,6 +7,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core import trading_calendar as TC
 
+if not os.path.isdir(TC.CFG.KT_CACHE):
+    print(f"SKIP 无本地行情缓存: {TC.CFG.KT_CACHE}")
+    sys.exit(0)
+
 PASS = FAIL = 0
 def ok(name, cond, detail=""):
     global PASS, FAIL

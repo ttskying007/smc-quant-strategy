@@ -4,13 +4,15 @@
 PAPER/SHADOW 消费方每日读最新快照, 不再各自全市场慢扫(单源)。
 另: 对 PAPER 台账全部信号补当日 E 标注(下一交易日重估用)。"""
 import io, json, os, sys, time
-sys.path.insert(0, r"E:\test\smc_project\research")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+import config as CFG
 
 from core.escore import escore_for_date, breadth_newhigh_pct, exposure_coef, _version_
 
-HIST = r"E:\test\smc_project\research\handover\escore_history.json"
+HIST = os.path.join(CFG.RESEARCH_DIR, "handover", "escore_history.json")
 KEEP = 60
+os.makedirs(os.path.dirname(HIST), exist_ok=True)
 
 hist = {"days": [], "version": _version_}
 if os.path.exists(HIST):
@@ -22,7 +24,7 @@ if os.path.exists(HIST):
 # 当日 = K线缓存最新交易日(从任一文件尾部读, 不假设今天是交易日)
 import glob
 d_today = None
-for fp in sorted(glob.glob(r"E:\test\smc_project\hermes\kline_cache_tencent\*_daily_800.json"))[:5]:
+for fp in sorted(glob.glob(os.path.join(CFG.KT_CACHE, "*_daily_800.json")))[:5]:
     try:
         raw = json.load(open(fp, encoding="utf-8"))
         ts = [str(b.get("t"))[:8] for b in raw if b.get("t")]
@@ -37,7 +39,7 @@ if not d_today:
 
 # ---- 历史回填(先于幂等检查): 快照缺日 → K 线日期序列回补(最多60日) ----
 _dates = set()
-for fp in sorted(glob.glob(r"E:\test\smc_project\hermes\kline_cache_tencent\*_daily_800.json"))[::20]:
+for fp in sorted(glob.glob(os.path.join(CFG.KT_CACHE, "*_daily_800.json")))[::20]:
     try:
         raw = json.load(open(fp, encoding="utf-8"))
         for b in raw[-70:]:

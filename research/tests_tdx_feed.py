@@ -15,6 +15,10 @@ def ok(name, cond, detail=""):
     else:
         FAIL += 1; print("  FAIL " + name + " " + detail)
 
+if not os.path.isdir(TF.KLINE_TENCENT):
+    print(f"SKIP 无本地行情缓存: {TF.KLINE_TENCENT}")
+    sys.exit(0)
+
 # 1. 腾讯后端路径存在（默认主源）
 ok("T1: 腾讯K线目录存在", os.path.isdir(TF.KLINE_TENCENT), TF.KLINE_TENCENT)
 

@@ -19,7 +19,8 @@ V3审计§六 两个问题修正:
 (若未来决策改为 Setup Engine 唯一生产源, 需先完成 6.1 run transaction 重构
 并替换 paper_sim 选股链, 届时更新本声明。)"""
 import glob, io, json, os, sys, time
-sys.path.insert(0, r"E:\test\smc_project\research")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 from core.entry import fill_in_zone
@@ -28,7 +29,7 @@ from core.setup_engine import build_setup, validate_setup, ENGINE_VERSION
 from core.escore import escore_for_date, exposure_coef
 
 # E-score 快照单源读取: escore_daily.py 维护的 escore_history(避免每次全市场扫)
-ESCORE_HIST = r"E:\test\smc_project\research\handover\escore_history.json"
+ESCORE_HIST = os.path.join(CFG.RESEARCH_DIR, "handover", "escore_history.json")
 _ehist, ESCORE_META = {}, {}
 try:
     _h = json.load(open(ESCORE_HIST, encoding="utf-8"))
@@ -47,8 +48,8 @@ def escore_at(d8, want_coef=False):
     e = escore_for_date(d8)          # 无快照日: F1 需全市场(慢), 仅必要时
     return (exposure_coef(e) if want_coef else e)
 
-KL = r"E:\test\smc_project\hermes\kline_cache_tencent"
-LEDGER = r"E:\test\smc_project\research\handover\setup_engine_paper_ledger.json"
+KL = CFG.KT_CACHE
+LEDGER = os.path.join(CFG.RESEARCH_DIR, "handover", "setup_engine_paper_ledger.json")
 FEE = 0.2
 SAMPLE = 10           # [::10] —— SAMPLED PAPER(监测抽样), 非全市场
 RECENT_DECISIONS = 3
@@ -200,7 +201,7 @@ gates["G3_concentration"] = len(closed) > 0 and top1 / tot < 0.10 and top5 / tot
 # G4 与回测方向一致: 回测 OOS 基准(修正后全面回测复盘.json) avg>0, PAPER 同向且差距<3pp
 _bt = None
 try:
-    _bt = json.load(open(r"E:\test\smc_project\research\handover\V3修正后全面回测复盘.json",
+    _bt = json.load(open(os.path.join(CFG.RESEARCH_DIR, "handover", "V3修正后全面回测复盘.json"),
                          encoding="utf-8")).get("total", {}).get("oos", {})
 except Exception:
     pass

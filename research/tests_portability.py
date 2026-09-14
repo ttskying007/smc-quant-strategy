@@ -44,8 +44,8 @@ for f in ["paper_sim.py", "current_scanner.py", "continuation_scanner.py",
 
 print("== 3. wdh_engine 独立运行块 config 派生 ==")
 r = subprocess.run([PY, "-X", "utf8", "-c",
-                    "import sys; sys.path.insert(0, r'E:\\test\\smc_project\\wdh'); "
-                    "import wdh_engine; print('WDH_OK', wdh_engine.MAX_HOLD)"],
+                     f"import sys; sys.path.insert(0, r'{os.path.join(ROOT, 'wdh')}'); "
+                     "import wdh_engine; print('WDH_OK', wdh_engine.MAX_HOLD)"],
                    capture_output=True, text=True, timeout=60)
 ok("wdh_engine import 正常", r.returncode == 0 and "WDH_OK" in r.stdout, (r.stderr or "")[-150:])
 

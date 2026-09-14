@@ -39,6 +39,10 @@ ok("与 sub_signals_cont 口径统一注释在", "sub_signals_cont()" in src)
 print("== 3. 实弹证据(市场最新日/覆盖率) ==")
 import continuation_scanner as CS
 KT = CS.KT
+if not os.path.isdir(KT):
+    print(f"  SKIP 无本地行情缓存: {KT}")
+    print("\n结果: PASS=%d FAIL=%d (数据依赖项跳过)" % (PASS, FAIL))
+    sys.exit(0)
 latest = ""
 dates_cnt = {}
 for p in sorted(os.listdir(KT)):

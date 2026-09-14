@@ -41,7 +41,8 @@ ok("交替震荡 ADX 低于单调上升", _a_chop is not None and _a_up is not N
 
 print("== 2. 单源迁移逐位一致(真实数据抽验) ==")
 import paper_sim as PS
-KT = r"E:\test\smc_project\hermes\kline_cache_tencent"
+import config as CFG
+KT = CFG.KT_CACHE
 _files = sorted(glob.glob(os.path.join(KT, "*_daily_800.json")))[:40]
 _checked = _mismatch = 0
 for p in _files:
@@ -57,7 +58,10 @@ for p in _files:
         _checked += 1
         if a_core is None or a_ps is None or abs(a_core - a_ps) > 1e-12:
             _mismatch += 1
-ok("真实数据 40 股×3 点逐位一致", _checked > 60 and _mismatch == 0, f"checked={_checked} mismatch={_mismatch}")
+if _files:
+    ok("真实数据 40 股×3 点逐位一致", _checked > 60 and _mismatch == 0, f"checked={_checked} mismatch={_mismatch}")
+else:
+    print("  SKIP 无本地行情缓存(真实数据抽验)")
 # 一致性内部断言(即使文件数少也强制 mismatch=0)
 ok("mismatch 严格=0", _mismatch == 0, _mismatch)
 

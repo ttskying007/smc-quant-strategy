@@ -15,9 +15,10 @@ import io, os, sys, time
 
 if __name__ == "__main__":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-sys.path.insert(0, r"E:\test\smc_project\research")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG
 import paper_sim as ps
-ROOT_DIR = r"E:\test\smc_project\research"
+ROOT_DIR = CFG.RESEARCH_DIR
 # R26: 代码版本守卫基准 —— 启动时记录核心撮合模块 mtime
 _CODE_WATCH = [os.path.join(ROOT_DIR, "paper_sim.py"),
                os.path.join(ROOT_DIR, "core", "execution.py"),

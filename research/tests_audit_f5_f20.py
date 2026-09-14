@@ -3,7 +3,7 @@
 import io, os, sys
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, r"E:\test\smc_project\wdh")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "wdh"))
 
 import paper_sim as PS
 import wdh_engine as WE

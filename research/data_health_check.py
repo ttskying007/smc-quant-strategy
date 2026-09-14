@@ -3,8 +3,10 @@
 检查各数据源可用性 + 覆盖率，异常写告警文件（前端可显示）"""
 import io, json, os, sys, time, datetime
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG
 
-ALERT_FILE = r"E:\test\smc_project\research\data_health.json"
+ALERT_FILE = os.path.join(CFG.RESEARCH_DIR, "data_health.json")
 
 def check_source(name, url, timeout=8):
     import urllib.request
@@ -32,7 +34,7 @@ for name, url in sources.items():
 
 # coverage from scanner
 try:
-    s = json.load(open(r"E:\test\smc_project\research\current_scanner_result.json", encoding="utf-8"))
+    s = json.load(open(os.path.join(CFG.RESEARCH_DIR, "current_scanner_result.json"), encoding="utf-8"))
     coverage = s.get("coverage_pct", 0)
     latest = s.get("latest_date", "")
 except Exception:
@@ -43,8 +45,15 @@ if not any(v["ok"] for v in status.values()):
     alerts.append("所有数据源不可用（严重）")
 if coverage < 95:
     alerts.append(f"数据覆盖率低 {coverage}%")
-if latest < "20260820":
-    alerts.append(f"数据滞后 {latest}")
+try:
+    _latest_day = datetime.datetime.strptime(str(latest), "%Y%m%d").date()
+    _lag_days = (datetime.date.today() - _latest_day).days
+    # Monday after Friday is healthy; a longer gap indicates a stale feed.
+    if _lag_days > 4:
+        alerts.append(f"数据滞后 {latest}({_lag_days}日)")
+except (TypeError, ValueError):
+    if not latest:
+        alerts.append("无有效最新交易日")
 
 health = {
     "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -53,6 +62,7 @@ health = {
     "latest": latest,
     "alerts": alerts,
 }
+os.makedirs(os.path.dirname(ALERT_FILE), exist_ok=True)
 with open(ALERT_FILE, "w", encoding="utf-8") as fh:
     json.dump(health, fh, ensure_ascii=False, indent=2)
 print(f"\n告警: {alerts if alerts else '无'}")

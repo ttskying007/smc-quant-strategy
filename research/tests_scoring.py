@@ -12,6 +12,7 @@ import core.mss as MSS
 import core.fvg_ob as FO
 import core.entry as EN
 import core.scoring as SC
+import config as CFG
 
 PASS = FAIL = 0
 def ok(name, cond, detail=""):
@@ -44,10 +45,14 @@ z_ok = {"risk_at_optimal": 10, "optimal_entry": 100, "tp1": 112}
 ok("合法 zone 过", SC.hard_gates_passed(z_ok) == (True, "OK"))
 
 print("== 4. TradeScore OOS 分桶单调性(新引擎 READY) ==")
-KL = r"E:\test\smc_project\hermes\kline_cache_tencent"
+KL = CFG.KT_CACHE
 OOS = "20250701"
 FEE = 0.20
 files = sorted(glob.glob(KL + os.sep + "*_daily_800.json"))[::5][:800]
+if not files:
+    print("  SKIP 无本地行情缓存(OOS 分桶)")
+    print("\n结果: PASS=%d FAIL=%d (数据依赖项跳过)" % (PASS, FAIL))
+    sys.exit(0)
 
 def sim_b3(daily, q, zone, wide=1.5, hold=15):
     f = EN.fill_in_zone(daily, q, zone, max_bars=6)

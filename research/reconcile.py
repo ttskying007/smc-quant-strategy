@@ -4,12 +4,13 @@
 """
 import io, json, os, sys
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-sys.path.insert(0, r"E:\test\smc_project\research")
-sys.path.insert(0, r"E:\test\smc_project\wdh")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG
+sys.path.insert(0, CFG.WDH_DIR)
 import paper_sim as PS
 import core.execution as EX
 
-RESEARCH = r"E:\test\smc_project\research"
+RESEARCH = CFG.RESEARCH_DIR
 LEDGER = os.path.join(RESEARCH, "paper_ledger.json")
 
 led = json.load(open(LEDGER, encoding="utf-8"))

@@ -7,7 +7,7 @@
 import io, json, os, sys, tempfile, datetime as _dt
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, r"E:\test\smc_project\wdh")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "wdh"))
 
 import paper_sim as PS
 
@@ -130,13 +130,16 @@ with tempfile.TemporaryDirectory() as td:
 
 # ---------------- 6. structural_sltp ----------------
 print("== 6. structural_sltp ==")
-try:
-    tp1, tp2, tp3, tp4, sl1, sl2, note = PS.structural_sltp("600519", "20260904", src="EVENT", stage="ACCUM", adx=25)
-    # 契约：ACCUM 弱趋势下 tp4 可为 None（代码在调用方回退），tp1/sl1/tp2/tp3/sl2 应有效
-    ok("EVENT/ACCUM 生成TP/SL(契约)", all(x and x > 0 for x in (tp1, tp2, tp3, sl1, sl2)), f"{tp1},{sl1}")
-    ok("ACCUM tp4 允许 None(弱趋势)", tp4 is None or tp4 > 0, f"tp4={tp4}")
-except Exception as e:
-    ok("structural_sltp 可调用", False, str(e))
+if PS.bars_of("600519"):
+    try:
+        tp1, tp2, tp3, tp4, sl1, sl2, note = PS.structural_sltp("600519", "20260904", src="EVENT", stage="ACCUM", adx=25)
+        # 契约：ACCUM 弱趋势下 tp4 可为 None（代码在调用方回退），tp1/sl1/tp2/tp3/sl2 应有效
+        ok("EVENT/ACCUM 生成TP/SL(契约)", all(x and x > 0 for x in (tp1, tp2, tp3, sl1, sl2)), f"{tp1},{sl1}")
+        ok("ACCUM tp4 允许 None(弱趋势)", tp4 is None or tp4 > 0, f"tp4={tp4}")
+    except Exception as e:
+        ok("structural_sltp 可调用", False, str(e))
+else:
+    print("  SKIP structural_sltp 无本地行情缓存")
 
 # ---------------- 汇总 ----------------
 print(f"\n结果: PASS={PASS} FAIL={FAIL}")

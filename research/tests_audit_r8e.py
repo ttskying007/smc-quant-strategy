@@ -56,6 +56,8 @@ try:
     _st = json.load(open(os.path.join(HERE, "shadow_status.json"), encoding="utf-8"))
     ok("shadow_status.json 含 replay_mode", _st.get("replay_mode") is True, _st.get("replay_mode"))
     ok("kill 判定字段在", "kill_switch_triggered" in _st)
+except FileNotFoundError:
+    print("  SKIP shadow_status.json 尚未生成")
 except Exception as ex:
     ok("shadow_status.json 读取", False, ex)
 

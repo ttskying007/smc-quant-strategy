@@ -8,11 +8,13 @@
 输出: handover/paper_weekly_report.json + 控制台摘要。可由 daily_combo_run 调度。"""
 import io, json, os, sys, time
 from collections import Counter, defaultdict
-sys.path.insert(0, r"E:\test\smc_project\research")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-LEDGER = r"E:\test\smc_project\research\handover\setup_engine_paper_ledger.json"
-OUT = r"E:\test\smc_project\research\handover\paper_weekly_report.json"
+LEDGER = os.path.join(CFG.RESEARCH_DIR, "handover", "setup_engine_paper_ledger.json")
+OUT = os.path.join(CFG.RESEARCH_DIR, "handover", "paper_weekly_report.json")
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 
 led = {"signals": [], "summary": {}}
 if os.path.exists(LEDGER):

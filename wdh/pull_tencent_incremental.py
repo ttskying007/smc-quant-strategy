@@ -9,8 +9,10 @@ fqkline 端点 501(2026-09-12 风控/停用) → 改 kline/kline(不复权)。
 调度: daily_combo_run 开头。"""
 import argparse, concurrent.futures, glob, io, json, os, sys, time, urllib.request
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "research"))
+import config as CFG
 
-KT = r"E:\test\smc_project\hermes\kline_cache_tencent"
+KT = CFG.KT_CACHE
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
       "Referer": "https://gu.qq.com/", "Accept": "*/*"}
 
@@ -20,6 +22,7 @@ ap.add_argument("--workers", type=int, default=8)
 ap.add_argument("--sample", type=int, default=0,
                 help="只刷排序后前 N 个待刷新文件(分批; 0=全量)")
 args = ap.parse_args()
+os.makedirs(KT, exist_ok=True)
 TARGET = args.target
 JUMP_GUARD = 0.11          # 11% 跳变守卫
 

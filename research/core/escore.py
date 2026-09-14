@@ -18,10 +18,12 @@ WFO 3/4 窗稳健。D2v2/D3 弃案后, E 是事件腿唯一被确认的环境因
   e = escore_for_date(d8, f1=breadth_newhigh_pct(daily_map, d8))
   # 或每日累积器 escore_daily.py 预计算快照 → handover/escore_history.json
 """
-import glob, json, os
+import glob, json, os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import config as CFG
 
-ETF_DIR = r"E:\test\smc_project\hermes\kline_cache_etf"
-KT = r"E:\test\smc_project\hermes\kline_cache_tencent"
+ETF_DIR = CFG.ETF_CACHE
+KT = CFG.KT_CACHE
 STALE_DAYS = 10
 
 _version_ = "escore_v1"

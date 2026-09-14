@@ -147,11 +147,36 @@ def _run_main_steps():
     # 0c. 数据新鲜度治理(2026-09-13, §50): 60min 缓存刷新 —— m60 接口 ifzq.gtimg.cn
     #     (rc0/rc0b 只刷日频; 60min 曾断供 5 交易日, F7 armB VALIDATION 被阻塞)
     #     全量 9119 只 ~25min(0.15s/只限速), 幂等(接口每次全量覆盖 count=500)
-    rc0c = run("refresh_60min_full.py", timeout=3600)
+    _refresh60 = os.path.join(RESEARCH, "refresh_60min_full.py")
+    if os.path.exists(_refresh60):
+        rc0c = run("refresh_60min_full.py", timeout=3600)
+    else:
+        # This optional feed is not part of the checked-in production chain.
+        # Do not turn a missing research-only data source into a false hard failure.
+        print("60min 刷新脚本不存在，跳过可选数据源", flush=True)
+        rc0c = 0
     step_status["refresh_60min"] = rc0c
     # 1. refresh key stocks (holdings + recent events) from Sina
     rc = run("refresh_holdings_sina.py", cwd=WDH, timeout=1200)
     step_status["holdings"] = rc
+    # Fail closed before any candidate/ledger-producing step.  A scanner can
+    # safely inspect data only after all mandatory upstream refreshes returned
+    # successfully; otherwise it would publish stale or partially refreshed
+    # signals as if they were current.
+    _upstream = {k: step_status.get(k, 0) for k in
+                 ("announce", "refresh", "kline_incremental", "holdings")}
+    if any(v != 0 for v in _upstream.values()):
+        _reason = "mandatory upstream failed: " + ", ".join(
+            f"{k}={v}" for k, v in _upstream.items() if v != 0)
+        print(f"[FAIL-CLOSED] {_reason} → 跳过扫描/选股/发布", flush=True)
+        json.dump({"run_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                   "run_id": _run_id, "steps": step_status,
+                   "data_complete": False, "production_eligible": False,
+                   "manifest_ok": False, "fallback_used": True,
+                   "note": _reason},
+                  open(os.path.join(RESEARCH, "run_status.json"), "w", encoding="utf-8"),
+                  ensure_ascii=False, indent=2)
+        return
     # 2. scan current with freshness gate (only latest-data signals)
     # FIX(2026-09-13, 第八轮审计 6.2): 传 --production —— 该分支含 freshness/artifact
     # 硬门禁(缺失即硬失败), 生产链必须走生产模式而非研究默认(审计 §6.2:
