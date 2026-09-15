@@ -16,12 +16,18 @@ def position_size(equity, risk_budget=0.01, entry=None, stop=None):
 
 def throttle_open(daily_opens, sector_counts, max_positions=10, max_sector=3,
                   max_daily_opens=5):
-    """开仓节流：最大持仓 / 同板块≤N / 单日新开≤M。返回是否允许开仓。"""
+    """开仓节流：最大持仓 / 同板块≤N / 单日新开≤M。返回是否允许开仓。
+    daily_opens: bool 列表(该持仓是否当日新开)。
+    FIX(2026-09-15, R37 000157 误拒): 单日新开计数原用 len(daily_opens) ——
+    把非当日(False)历史持仓也计入, live>5 时任何新单恒触发 MAX_DAILY_OPEN
+    (实弹: 6 旧仓+本单=7≥5)。改 sum(真值) —— 与字段名"单日新开"语义一致。
+    sector_counts: {行业: n}; R37 调用方约定只传候选股自己行业的桶
+    (满桶才拒候选; 传全行业桶会把无关行业的满桶变成全局禁开仓)。"""
     if len([p for p in daily_opens if p]) >= max_positions:
         return False, "MAX_POSITIONS"
     if any(v >= max_sector for v in sector_counts.values()):
         return False, "MAX_SECTOR"
-    if len(daily_opens) >= max_daily_opens:
+    if sum(1 for p in daily_opens if p) >= max_daily_opens:
         return False, "MAX_DAILY_OPEN"
     return True, "OK"
 

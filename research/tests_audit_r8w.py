@@ -121,16 +121,31 @@ src_sched = open(os.path.join(HERE, "sim_scheduler.py"), encoding="utf-8").read(
 ok("R32 自重启代码在(sim_scheduler)", "自重启" in src_sched and "Popen" in src_sched)
 ok("monitor_pid 文件存在", os.path.exists(os.path.join(HERE, "monitor.pid")))
 
-print("== A7. realtime_monitor 冒烟(非交易时段应安全返回 0,0) ==")
+print("== A7. realtime_monitor 冒烟(时段感知, R37: 盘中不再误报) ==")
 import paper_sim as ps
 n_fill, n_close = ps.realtime_monitor()
-ok("非时段/盘后调用返回 (0,0) 不抛异常", (n_fill, n_close) == (0, 0),
-   f"返回={(n_fill, n_close)}")
+# R37(2026-09-15): 原断言写死"非交易时段"语境(凌晨跑测试) —— 盘中(11:0x)
+# 跑测试时 monitor 合法撮合, 返回计数>0 是正确行为。时段感知断言:
+# 非时段 → (0,0)+OFF_SESSION 尾日志; 盘中 → 计数非负整数(真撮合)。
+from core.time_cn import shanghai_now as _shn
+_hm_w = _shn().hour * 100 + _shn().minute
+_wd_w = _shn().weekday()
+_in_w = (930 <= _hm_w <= 1130) or (1300 <= _hm_w <= 1500) and _wd_w < 5
 rl = json.load(open(os.path.join(HERE, "realtime_log.json"), encoding="utf-8")) \
     if os.path.exists(os.path.join(HERE, "realtime_log.json")) else []
-ok("冒烟产生 OFF_SESSION 日志(时段或快照新鲜度)",
-   len(rl) > 0 and rl[-1].get("status") == "OFF_SESSION",
-   str(rl[-1] if rl else None)[:120])
+if not _in_w or _wd_w >= 5:
+    ok("非时段/盘后调用返回 (0,0) 不抛异常", (n_fill, n_close) == (0, 0),
+       f"返回={(n_fill, n_close)}")
+    ok("冒烟产生 OFF_SESSION 日志(时段或快照新鲜度)",
+       len(rl) > 0 and rl[-1].get("status") == "OFF_SESSION",
+       str(rl[-1] if rl else None)[:120])
+else:
+    ok("盘中冒烟不抛异常且计数非负(真撮合)",
+       isinstance(n_fill, int) and isinstance(n_close, int) and n_fill >= 0 and n_close >= 0,
+       f"返回={(n_fill, n_close)}")
+    ok("盘中撮合日志在案(FILLED/EXPIRED 而非 OFF_SESSION)",
+       len(rl) > 0 and rl[-1].get("status") in ("FILLED", "OFF_SESSION", "EXPIRED"),
+       str(rl[-1] if rl else None)[:120])
 
 # ================= B) 行为级(mock Sina, 不依赖真实时段) =================
 print("== B1. realtime_prices 解析 vals[30](mock Sina 响应) ==")

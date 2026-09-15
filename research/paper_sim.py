@@ -647,7 +647,7 @@ def daily_selection():
             # R35(第八轮审计, 行业上限数据源): sector_counts 接真实行业映射
             # (此前恒空 dict —— max_sector=3 门存在但无数据)。候选桶只计
             # live 条目(不含本单); UNKNOWN 不归桶(缺映射 fail-open, 不误杀)。
-            from core.industry_map import sector_counts as _sector_counts
+            from core.industry_map import sector_counts as _sector_counts, get_industry as _get_industry
             live = [t for t in led if t.get("status") in ("PENDING_ORDER", "FILLED")
                     and t is not order]
             positions = [{"code": t.get("code"),
@@ -657,10 +657,18 @@ def daily_selection():
                               "position_pct": float(order.get("position_pct") or 0.01)})
             ok_exposure, why_exposure, total = portfolio_exposure_check(positions)
             today = cn_now("%Y-%m-%d")
+            # R37(2026-09-15, 000157 误拒复盘): ①行业门语义 = 候选股自己行业
+            #   满桶才拒(V3-A DailyPortfolioEngine L308-313 同语义), 不传全行业
+            #   桶(否则任一行业满 3 拒一切新开仓 —— 09:30:15 C39 桶=3(002655 重复
+            #   条目×2+688035)误拒无关行业 C35 的 000157)。②单日新开数 =
+            #   当日 bool 数而非全部条目数(len(daily_opens) 含 False 历史持仓,
+            #   6 旧仓+本单=7≥5 恒触发 MAX_DAILY_OPEN)。
             day_opens = [t.get("created_at") == today for t in live] + [True]
-            _sect = _sector_counts([t.get("code") for t in live],
-                                   exclude=order.get("code"))
-            ok_throttle, why_throttle = throttle_open(day_opens, _sect, max_positions=10,
+            _cand_ind = _get_industry(order.get("code"))
+            _cand_bucket = {_cand_ind: _sector_counts(
+                [t.get("code") for t in live], exclude=order.get("code")).get(_cand_ind, 0)} \
+                if _cand_ind != "UNKNOWN" else {}
+            ok_throttle, why_throttle = throttle_open(day_opens, _cand_bucket, max_positions=10,
                                                        max_sector=3, max_daily_opens=5)
             recent = [float(t.get("pnl_pct") or 0) / 100 for t in live
                       if t.get("pnl_pct") is not None][-20:]
@@ -1373,7 +1381,7 @@ def realtime_monitor():
                     from core.portfolio import portfolio_exposure_check, throttle_open
                     # R35: 成交前二次校验同样接行业映射(与创建前同源, 防同行业
                     # 先成交后本单成交突破 max_sector)。
-                    from core.industry_map import sector_counts as _sector_counts
+                    from core.industry_map import sector_counts as _sector_counts, get_industry as _get_industry
                     _others = [t2 for t2 in led if t2.get("status") in ("PENDING_ORDER", "FILLED")
                               and t2 is not t]
                     # 模拟成交后: 本单转 FILLED, 其余 PENDING 保持(潜在暴露), 已 FILLED 计入
@@ -1383,13 +1391,18 @@ def realtime_monitor():
                     _pos_after.append({"code": t["code"],
                                        "position_pct": float(t.get("position_pct") or 0.01)})
                     _g_ok_e, _g_why_e, _ = portfolio_exposure_check(_pos_after)
+                    # R37(000157 误拒复盘, 与创建前 gate 同语义修复):
+                    # ①行业门只查候选股自己行业的桶(不传全行业桶);
+                    # ②单日新开 = 当日 bool 数(sum) 而非全部条目数(len)。
                     _today = cn_now("%Y-%m-%d")
                     _day_opens = [t2.get("filled_at", "").startswith(_today) for t2 in _others
                                   if t2.get("status") == "FILLED"] + [True]
-                    _sect2 = _sector_counts([t2["code"] for t2 in _others
-                                             if t2.get("status") == "FILLED"],
-                                            exclude=t["code"])
-                    _g_ok_t, _g_why_t = throttle_open(_day_opens, _sect2, max_positions=10,
+                    _cand_ind2 = _get_industry(t["code"])
+                    _cand_bucket2 = {_cand_ind2: _sector_counts(
+                        [t2["code"] for t2 in _others if t2.get("status") == "FILLED"],
+                        exclude=t["code"]).get(_cand_ind2, 0)} \
+                        if _cand_ind2 != "UNKNOWN" else {}
+                    _g_ok_t, _g_why_t = throttle_open(_day_opens, _cand_bucket2, max_positions=10,
                                                      max_sector=3, max_daily_opens=5)
                     if not _g_ok_e:
                         _gate_ok, _gate_why = False, _g_why_e

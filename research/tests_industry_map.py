@@ -79,6 +79,30 @@ gate2 = throttle_open([False]*2, IM.sector_counts(big_set[:2]),
                       max_positions=10, max_sector=3, max_daily_opens=5)
 ok("同行业 2 单 → 放行", gate2[0] is True, str(gate2))
 
+print("== B3b. R37 000157 误拒复盘(行为级) ==")
+# 09:30:15 实弹重构: live = 002655×2+688035(C39桶=3) + 600449+002801+601633(异行业)
+# + 000157(C35, 候选)。R35 旧接线(传全行业桶) → MAX_SECTOR 误拒无关候选;
+# R37 新语义: 只传候选股自己行业的桶 → 放行。
+_r37_live = ["002655", "002655", "688035", "600449", "002801", "601633"]
+_r37_cand = "000157"
+_cand_ind_r37 = IM.get_industry(_r37_cand)
+_full_buckets = IM.sector_counts(_r37_live, exclude=_r37_cand)
+ok("R37 复盘前提: C39 桶=3(002655×2+688035)", _full_buckets.get("C39计算机、通信和其他电子设备制造业") == 3, str(_full_buckets))
+_g_old = throttle_open([False]*6, _full_buckets, max_positions=10, max_sector=3, max_daily_opens=5)
+ok("旧 R35 接线复现: 全行业桶 → MAX_SECTOR 误拒(无关候选)",
+   _g_old == (False, "MAX_SECTOR"), str(_g_old))
+_cand_bucket_r37 = {_cand_ind_r37: _full_buckets.get(_cand_ind_r37, 0)} if _cand_ind_r37 != "UNKNOWN" else {}
+_g_new = throttle_open([False]*6, _cand_bucket_r37, max_positions=10, max_sector=3, max_daily_opens=5)
+ok("R37 候选桶语义: 000157(C35 桶=0) → 放行", _g_new == (True, "OK"), str(_g_new))
+# 单日新开修复: 6 旧仓(False)+本单 → True 数=1 < 5, 不触发 MAX_DAILY_OPEN
+_g_daily = throttle_open([False]*6, {}, max_positions=10, max_sector=3, max_daily_opens=5)
+ok("R37 单日新开: 旧仓 False 不计入(放行)", _g_daily == (True, "OK"), str(_g_daily))
+_g_daily2 = throttle_open([True]*5, {}, max_positions=10, max_sector=3, max_daily_opens=5)
+ok("单日新开真 5 → MAX_DAILY_OPEN 保持", _g_daily2 == (False, "MAX_DAILY_OPEN"), str(_g_daily2))
+# MAX_POSITIONS 语义保持(当日开仓数≥10)
+_g_pos = throttle_open([True]*10, {}, max_positions=10, max_sector=3, max_daily_opens=50)
+ok("当日开仓 10 → MAX_POSITIONS 保持", _g_pos == (False, "MAX_POSITIONS"), str(_g_pos))
+
 print("== B4. 数据缺失降级(fail-open) ==")
 IM.reset_cache_for_tests()
 _orig_exists, _orig_env = os.path.exists, os.environ.get("SMC_INDUSTRY_MAP", None)
@@ -105,16 +129,17 @@ else:
 print("== C1. 生产接线(paper_sim 源码) ==")
 src = open(os.path.join(HERE, "paper_sim.py"), encoding="utf-8").read()
 ok("创建前 gate 导入 sector_counts", "from core.industry_map import sector_counts as _sector_counts" in src)
-ok("创建前 gate 传真实行业桶(非空 dict)",
-   "_sect = _sector_counts([t.get(\"code\") for t in live]," in src
-   and "throttle_open(day_opens, _sect," in src)
-ok("成交前 gate 同源接行业桶",
-   "_sect2 = _sector_counts([t2[\"code\"] for t2 in _others" in src
-   and "throttle_open(_day_opens, _sect2," in src)
+ok("创建前 gate 候选桶语义(R37: 只传候选自己行业)",
+   "_cand_bucket = {_cand_ind:" in src and "throttle_open(day_opens, _cand_bucket," in src)
+ok("成交前 gate 候选桶语义(R37 同源修复)",
+   "_cand_bucket2 = {_cand_ind2:" in src and "throttle_open(_day_opens, _cand_bucket2," in src)
+ok("全行业桶直传已消除(R37 复盘 000157 误拒根因)",
+   "throttle_open(day_opens, _sect," not in src
+   and "throttle_open(_day_opens, _sect2," not in src)
 ok("空 dict 直传已消除(仅历史注释除外)",
    src.count("throttle_open(day_opens, {},") == 0
    and src.count("throttle_open(_day_opens, {},") == 0)
-ok("R35 标记存在", "R35" in src)
+ok("R35+R37 标记存在", "R35" in src and "R37" in src)
 
 print(f"\n结果: PASS={PASS} FAIL={FAIL}")
 sys.exit(0 if FAIL == 0 else 1)
