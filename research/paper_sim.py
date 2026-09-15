@@ -644,6 +644,10 @@ def daily_selection():
         """One fail-closed gate shared by EVENT, CONT and SMC order creation."""
         try:
             from core.portfolio import portfolio_exposure_check, throttle_open, kill_switch as _ks
+            # R35(第八轮审计, 行业上限数据源): sector_counts 接真实行业映射
+            # (此前恒空 dict —— max_sector=3 门存在但无数据)。候选桶只计
+            # live 条目(不含本单); UNKNOWN 不归桶(缺映射 fail-open, 不误杀)。
+            from core.industry_map import sector_counts as _sector_counts
             live = [t for t in led if t.get("status") in ("PENDING_ORDER", "FILLED")
                     and t is not order]
             positions = [{"code": t.get("code"),
@@ -654,7 +658,9 @@ def daily_selection():
             ok_exposure, why_exposure, total = portfolio_exposure_check(positions)
             today = cn_now("%Y-%m-%d")
             day_opens = [t.get("created_at") == today for t in live] + [True]
-            ok_throttle, why_throttle = throttle_open(day_opens, {}, max_positions=10,
+            _sect = _sector_counts([t.get("code") for t in live],
+                                   exclude=order.get("code"))
+            ok_throttle, why_throttle = throttle_open(day_opens, _sect, max_positions=10,
                                                        max_sector=3, max_daily_opens=5)
             recent = [float(t.get("pnl_pct") or 0) / 100 for t in live
                       if t.get("pnl_pct") is not None][-20:]
@@ -1365,6 +1371,9 @@ def realtime_monitor():
                 _gate_why = ""
                 try:
                     from core.portfolio import portfolio_exposure_check, throttle_open
+                    # R35: 成交前二次校验同样接行业映射(与创建前同源, 防同行业
+                    # 先成交后本单成交突破 max_sector)。
+                    from core.industry_map import sector_counts as _sector_counts
                     _others = [t2 for t2 in led if t2.get("status") in ("PENDING_ORDER", "FILLED")
                               and t2 is not t]
                     # 模拟成交后: 本单转 FILLED, 其余 PENDING 保持(潜在暴露), 已 FILLED 计入
@@ -1377,7 +1386,10 @@ def realtime_monitor():
                     _today = cn_now("%Y-%m-%d")
                     _day_opens = [t2.get("filled_at", "").startswith(_today) for t2 in _others
                                   if t2.get("status") == "FILLED"] + [True]
-                    _g_ok_t, _g_why_t = throttle_open(_day_opens, {}, max_positions=10,
+                    _sect2 = _sector_counts([t2["code"] for t2 in _others
+                                             if t2.get("status") == "FILLED"],
+                                            exclude=t["code"])
+                    _g_ok_t, _g_why_t = throttle_open(_day_opens, _sect2, max_positions=10,
                                                      max_sector=3, max_daily_opens=5)
                     if not _g_ok_e:
                         _gate_ok, _gate_why = False, _g_why_e
