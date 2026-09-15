@@ -170,16 +170,24 @@ review = {
         {"id": "RANK-PATH", "name": "rank 分层加权", "result": "❌ 无效(路径关闭)",
          "detail": "E方案 rank/4 加权: PF 3.19 vs 等权 3.21 —— 零改善; F方案 ACCUM×2×rank闸 "
                    "累计降至 +3527(rank<4 减半损失过大)。rank 不是有效分层变量"},
+        {"id": "EXIT-SWEEP", "name": "退出参数扫描(7配置)", "result": "现有退出局部最优",
+         "detail": "D长持有20 全样本PF3.26最高但OOS 3.33最差(不稳健); E无部分止盈 avg+4.44% "
+                   "但MDD恶化43%; F/G 与基线持平。退出结构已局部最优, 不采纳D"},
+        {"id": "P1-8-RESOLVED", "name": "审计P1-8分叉解决(15 vs 12)", "result": "✅ 生产口径更稳健",
+         "detail": "B生产口径(max_hold=12): 全样本PF3.11略低, 但 **OOS PF4.41最高 + MDD-630最优**。"
+                   "生产口径以小幅IS损失换OOS稳健性与回撤控制 —— 分叉不是缺陷, 保持CFG.MAX_HOLD=12"},
         {"id": "R38-CONVERGE", "name": "R38 迭代收敛判断", "result": "接近该 alpha 最优",
-         "detail": "10+ 假设全部测试: 技术腿/事件扩池(预增预减)/stage放宽/rank加权/regime系数/"
-                   "C1指数过滤 —— 除 ACCUM 温和加权外全部否决或证伪。剩余提升空间在"
-                   "仓位管理与执行, 不在信号定义"},
+         "detail": "12轮 10+ 假设: 技术腿/事件扩池/stage放宽/rank/退出扫描/C1/regime系数 —— "
+                   "除 ACCUM 温和加权外全部否决或验证现状。剩余空间在仓位管理接线, 不在信号定义"},
     ],
     "production": [
         "生产 _market_proxy 弱市加仓机制正确保持(已验证 PF3.20→3.64) —— 唯一确认的生产机制",
         "技术腿: 未经稳健检验前**不得接线**(最优变体 OOS PF0.99 = 零 edge)",
         "业绩预增: 同口径 PF0.68 否决 —— 与基线 stage 过滤器(ACCUM/DOWNTREND)错配(利好出尽)",
         "stage 放宽: 否决 —— 现有白名单(ACCUM/DOWNTREND)经 OOS 验证为正确设计, 非保守惯性",
+        "退出参数: 现有结构局部最优 —— 保持 CFG.MAX_HOLD=12(生产口径 OOS PF4.41/MDD-630 最优); "
+        "审计 P1-8 分叉已解决(非缺陷)",
+        "唯一待接线候选: ACCUM×2 温和加权(PF 3.21→3.29) —— 需走 paper_sim 完整审计",
         "扩池三连否: 技术腿(0.99) / 业绩预增(0.68) / stage放宽(1.09-1.88) —— "
         "'选股量少'是 alpha 内在属性(内部人事件×超跌反转窄带), 不可通过扩量修复",
         "下一轮: ①ACCUM 核心精选仓位优化(OOS PF6.87 最强子集) ②rank×仓位联合优化",
@@ -196,7 +204,8 @@ review = {
         {"round": "R38i", "commit": "b655dd6", "content": "事件腿扩池: 业绩预增晋级(裸持有)/业绩预减否决(退市偏差41.9%)"},
         {"round": "R38j", "commit": "7077c2f", "content": "业绩预增同口径回测: PF0.68 否决(与ACCUM/DOWNTREND过滤错配)"},
         {"round": "R38k", "commit": "6001498", "content": "stage白名单放宽: 否决(UPTREND PF1.09/MARKUP OOS0.96); 现有白名单验证正确"},
-        {"round": "R38l", "commit": "-", "content": "ACCUM核心精选仓位: 温和正面(PF3.21→3.29); rank加权无效(路径关闭); R38迭代收敛"},
+        {"round": "R38l", "commit": "d6813e2", "content": "ACCUM核心精选仓位: 温和正面(PF3.21→3.29); rank加权无效(路径关闭)"},
+        {"round": "R38m", "commit": "-", "content": "退出参数扫描(7配置): 现有退出局部最优; 审计P1-8分叉解决(生产12 OOS最优)"},
     ],
     "schools": {"ICT/SMC": 1250, "PriceAction": 229, "ChanLun缠论": 110, "Indicator": 214,
                 "OrderFlow": 34, "Volume/VSA": 10, "Wyckoff": 5, "ElliottWave": 8, "TheStrat": 4},
