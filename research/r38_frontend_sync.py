@@ -162,9 +162,18 @@ review = {
          "detail": "扩池三连否(技术腿OOS0.99 / 业绩预增同口径0.68 / stage放宽1.09-1.88)证明: "
                    "alpha 高度集中在'内部人事件×超跌反转'窄带, 任何方向扩量只引入零/负期望。"
                    "正解=接受供给约束+把质量与资金效率做到极致"},
-        {"id": "ACCUM-CORE", "name": "ACCUM 核心精选(正面发现)", "result": "⭐ 待优化",
-         "detail": "缩量吸筹+增持: n=243 avg+4.72% PF3.86, OOS PF6.87 > IS 2.76 —— "
-                   "最强子集, 下一轮作为核心精选单独优化仓位"},
+        {"id": "ACCUM-CORE", "name": "ACCUM 核心精选仓位", "result": "✅ 温和正面(非突破)",
+         "detail": "ACCUM×2: PF 3.21→3.29, 累计 +5766→+6913%, 但 MDD -760→-876; "
+                   "ACCUM×3: PF3.36/累计+8061%/MDD-992。仅ACCUM: PF3.86/MDD-118(敞口仅15%)。"
+                   "按敞口归一后 MDD 近似 —— 优势在每单位收益(+4.72% vs +3.52%), 非风险更低。"
+                   "2025-2026 显著改善(A+4.37→D+7.36), 但与 R38k OOS 同源, 非独立验证"},
+        {"id": "RANK-PATH", "name": "rank 分层加权", "result": "❌ 无效(路径关闭)",
+         "detail": "E方案 rank/4 加权: PF 3.19 vs 等权 3.21 —— 零改善; F方案 ACCUM×2×rank闸 "
+                   "累计降至 +3527(rank<4 减半损失过大)。rank 不是有效分层变量"},
+        {"id": "R38-CONVERGE", "name": "R38 迭代收敛判断", "result": "接近该 alpha 最优",
+         "detail": "10+ 假设全部测试: 技术腿/事件扩池(预增预减)/stage放宽/rank加权/regime系数/"
+                   "C1指数过滤 —— 除 ACCUM 温和加权外全部否决或证伪。剩余提升空间在"
+                   "仓位管理与执行, 不在信号定义"},
     ],
     "production": [
         "生产 _market_proxy 弱市加仓机制正确保持(已验证 PF3.20→3.64) —— 唯一确认的生产机制",
@@ -186,7 +195,8 @@ review = {
         {"round": "R38h", "commit": "318f50f", "content": "技术腿独立SL/TP搜索(PF5.26)→IS/OOS检验 OOS PF0.99 否决"},
         {"round": "R38i", "commit": "b655dd6", "content": "事件腿扩池: 业绩预增晋级(裸持有)/业绩预减否决(退市偏差41.9%)"},
         {"round": "R38j", "commit": "7077c2f", "content": "业绩预增同口径回测: PF0.68 否决(与ACCUM/DOWNTREND过滤错配)"},
-        {"round": "R38k", "commit": "-", "content": "stage白名单放宽: 否决(UPTREND PF1.09/MARKUP OOS0.96); 现有白名单验证正确"},
+        {"round": "R38k", "commit": "6001498", "content": "stage白名单放宽: 否决(UPTREND PF1.09/MARKUP OOS0.96); 现有白名单验证正确"},
+        {"round": "R38l", "commit": "-", "content": "ACCUM核心精选仓位: 温和正面(PF3.21→3.29); rank加权无效(路径关闭); R38迭代收敛"},
     ],
     "schools": {"ICT/SMC": 1250, "PriceAction": 229, "ChanLun缠论": 110, "Indicator": 214,
                 "OrderFlow": 34, "Volume/VSA": 10, "Wyckoff": 5, "ElliottWave": 8, "TheStrat": 4},

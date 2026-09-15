@@ -1,5 +1,5 @@
 {
- "updated": "2026-09-16 00:15:47",
+ "updated": "2026-09-16 00:19:32",
  "backtest": {
   "base": {
    "n": 1640,
@@ -467,9 +467,21 @@
    },
    {
     "id": "ACCUM-CORE",
-    "name": "ACCUM 核心精选(正面发现)",
-    "result": "⭐ 待优化",
-    "detail": "缩量吸筹+增持: n=243 avg+4.72% PF3.86, OOS PF6.87 > IS 2.76 —— 最强子集, 下一轮作为核心精选单独优化仓位"
+    "name": "ACCUM 核心精选仓位",
+    "result": "✅ 温和正面(非突破)",
+    "detail": "ACCUM×2: PF 3.21→3.29, 累计 +5766→+6913%, 但 MDD -760→-876; ACCUM×3: PF3.36/累计+8061%/MDD-992。仅ACCUM: PF3.86/MDD-118(敞口仅15%)。按敞口归一后 MDD 近似 —— 优势在每单位收益(+4.72% vs +3.52%), 非风险更低。2025-2026 显著改善(A+4.37→D+7.36), 但与 R38k OOS 同源, 非独立验证"
+   },
+   {
+    "id": "RANK-PATH",
+    "name": "rank 分层加权",
+    "result": "❌ 无效(路径关闭)",
+    "detail": "E方案 rank/4 加权: PF 3.19 vs 等权 3.21 —— 零改善; F方案 ACCUM×2×rank闸 累计降至 +3527(rank<4 减半损失过大)。rank 不是有效分层变量"
+   },
+   {
+    "id": "R38-CONVERGE",
+    "name": "R38 迭代收敛判断",
+    "result": "接近该 alpha 最优",
+    "detail": "10+ 假设全部测试: 技术腿/事件扩池(预增预减)/stage放宽/rank加权/regime系数/C1指数过滤 —— 除 ACCUM 温和加权外全部否决或证伪。剩余提升空间在仓位管理与执行, 不在信号定义"
    }
   ],
   "production": [
@@ -533,8 +545,13 @@
    },
    {
     "round": "R38k",
-    "commit": "-",
+    "commit": "6001498",
     "content": "stage白名单放宽: 否决(UPTREND PF1.09/MARKUP OOS0.96); 现有白名单验证正确"
+   },
+   {
+    "round": "R38l",
+    "commit": "-",
+    "content": "ACCUM核心精选仓位: 温和正面(PF3.21→3.29); rank加权无效(路径关闭); R38迭代收敛"
    }
   ],
   "schools": {
