@@ -3217,7 +3217,7 @@ def build_monitor(start='', end=''):
             f'<td class="mono" style="color:#ff6b6b">{t.get("sl2",0):.3f}</td>'
             f'<td style="font-size:10px" title="{html.escape(_subs_tt(t))}">{html.escape((_subs_tt(t)[:28] + "…") if len(_subs_tt(t)) > 28 else _subs_tt(t))}</td>'
             f'<td>{html.escape(str(t.get("status","")))}</td>'
-            f'<td style="color:{("#f85149" if (t.get("mark_pnl_pct") or 0) < 0 else "#3fb950")}">{t.get("mark_pnl_pct",0):+.2f}%</td></tr>'
+            f'<td style="color:{("#f85149" if (t.get("mark_pnl_pct") or 0) < 0 else "#3fb950")}">{(t.get("mark_pnl_pct") or 0):+.2f}%</td></tr>'
             for t in open_pos) or '<tr><td colspan="11">当前无模拟持仓/挂单</td></tr>'
         # recent event candidates (last 3 disclosure days)
         try:
@@ -3275,7 +3275,7 @@ def build_monitor(start='', end=''):
                 f"<td>{html.escape(str(r.get('name','')))}</td>"
                 f"<td class=mono>{r.get('price',0):.2f}</td>"
                 f"<td>{html.escape(str(r.get('status','')))}</td>"
-                f"<td style=\"color:{('#f85149' if (r.get('mark_pnl_pct') or 0) < 0 else '#3fb950')}\">{r.get('mark_pnl_pct',0):+.2f}%</td></tr>"
+                f"<td style=\"color:{('#f85149' if (r.get('mark_pnl_pct') or 0) < 0 else '#3fb950')}\">{(r.get('mark_pnl_pct') or 0):+.2f}%</td></tr>"
                 for r in _rt)
         except Exception:
             pass
@@ -3738,7 +3738,7 @@ def build_combo():
             f'<td class="mono" style="color:#ff6b6b">{t.get("sl2",0):.3f}</td>'
             f'<td>{html.escape(str(t.get("status","")))}</td>'
             f'<td>{html.escape(str(t.get("trigger",""))[:24])}</td>'
-            f'<td style="color:{("#f85149" if (t.get("mark_pnl_pct") or 0) < 0 else "#3fb950")}">{t.get("mark_pnl_pct",0):+.2f}%</td></tr>'
+            f'<td style="color:{("#f85149" if (t.get("mark_pnl_pct") or 0) < 0 else "#3fb950")}">{(t.get("mark_pnl_pct") or 0):+.2f}%</td></tr>'
             for t in _active)
         sim_table = f'<div class="card"><h2>模拟持仓/挂单（{len(_active)}）</h2><table><thead><tr><th>代码</th><th>名称</th><th>信号组合</th><th>信号日期</th><th>选股日期</th><th>阶段/量能</th><th>子信号</th><th>买入价</th><th>TP1<br><span style="font-weight:normal;font-size:9px;color:#8b949e">swing高</span></th><th>TP2<br><span style="font-weight:normal;font-size:9px;color:#8b949e">FVG/次近</span></th><th>TP3<br><span style="font-weight:normal;font-size:9px;color:#8b949e">流动性池</span></th><th>TP4<br><span style="font-weight:normal;font-size:9px;color:#8b949e">60日前高</span></th><th>SL1<br><span style="font-weight:normal;font-size:9px;color:#8b949e">swing低</span></th><th>SL2<br><span style="font-weight:normal;font-size:9px;color:#8b949e">FVG/深层</span></th><th>状态</th><th>触发条件</th><th>盈亏</th></tr></thead><tbody>{_sim_rows or "<tr><td colspan=16>无</td></tr>"}</tbody></table><p style="color:#8b949e">点击代码跳转 K 线；分层止盈：TP1(swing高)→TP2(FVG)→TP3(流动性)→TP4(60日前高)；SL1(swing低)→SL2(FVG/深层)；阶段=ACCUM/DOWNTREND，+放量=大资金响应；子信号悬停查看链。</p></div>'
     except Exception:
@@ -5450,7 +5450,7 @@ def build_live():
             f'<td class="mono" style="color:#ff6b6b">{t.get("sl2",0):.3f}</td>'
             f'<td>{html.escape(str(t.get("status","")))}</td>'
             f'<td>{"🔒T+1锁定" if t.get("t1_locked") else ("TP1✓" if t.get("tp1_hit") else "-")}</td>'
-            f'<td style="color:{("#f85149" if (t.get("mark_pnl_pct") or 0) < 0 else "#3fb950")}">{t.get("mark_pnl_pct",0):+.2f}%</td></tr>'
+            f'<td style="color:{("#f85149" if (t.get("mark_pnl_pct") or 0) < 0 else "#3fb950")}">{(t.get("mark_pnl_pct") or 0):+.2f}%</td></tr>'
             for t in active)
         stats_html = f'''<div class="card" style="border-left:3px solid #d29922"><h3>📊 持仓盈亏统计（{len(active)} 笔）</h3>
 <table><tr><th>总浮盈</th><th>平均浮盈</th><th>浮盈胜率</th><th>T+1锁定(今日买入)</th><th>TP1已触发</th></tr>
@@ -5469,7 +5469,7 @@ def build_live():
                 f'<td class="mono">{html.escape(str(r.get("code","")))}</td>'
                 f'<td class="mono">{r.get("price",0):.2f}</td>'
                 f'<td>{html.escape(str(r.get("status","")))}</td>'
-                f'<td style="color:{("#f85149" if (r.get("mark_pnl_pct") or 0) < 0 else "#3fb950")}">{r.get("mark_pnl_pct",0):+.2f}%</td></tr>'
+                f'<td style="color:{("#f85149" if (r.get("mark_pnl_pct") or 0) < 0 else "#3fb950")}">{(r.get("mark_pnl_pct") or 0):+.2f}%</td></tr>'
                 for r in rt)
         except Exception:
             pass
@@ -5910,10 +5910,48 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        self._route()
+        # FIX(2026-09-15, 前端打不开): 顶层兜底 —— build_* 抛异常时原先直接
+        # 关连接(Empty reply → 浏览器"打不开"), 现返回可见的 500 诊断页。
+        # ThreadingHTTPServer 下单页崩溃不再传染其它页。
+        import traceback as _tb
+        try:
+            self._route()
+        except BrokenPipeError:
+            pass  # 客户端已断开(刷新/关页), 无需回写
+        except Exception as e:
+            _msg = f"{type(e).__name__}: {e}"
+            _loc = ''
+            try:
+                st = _tb.extract_tb(e.__traceback__) if e.__traceback__ else []
+                _loc = f"{st[-1].filename}:{st[-1].lineno} {st[-1].name}" if st else ''
+            except Exception:
+                _loc = ''
+            body = (f"<!doctype html><html><head><meta charset='utf-8'><title>500</title></head>"
+                    f"<body style='background:#0a0e14;color:#c9d1d9;font:13px monospace;padding:24px'>"
+                    f"<h2 style='color:#f85149'>页面构建异常 500</h2>"
+                    f"<p>path: {html.escape(self.path)}</p><p>{html.escape(_msg)}</p>"
+                    f"<p style='color:#8b949e'>{html.escape(_loc)}</p>"
+                    f"<p style='color:#8b949e'>其它页面不受影响; 刷新或稍后重试。</p></body></html>").encode()
+            try:
+                self.send_response(500)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Length', str(len(body)))
+                self.send_header('Cache-Control', 'no-store')
+                self.end_headers()
+                self.wfile.write(body)
+            except Exception:
+                pass
 
     def do_POST(self):
-        self._route()
+        try:
+            self._route()
+        except BrokenPipeError:
+            pass
+        except Exception as e:
+            try:
+                self._json({'ok': False, 'error': f"{type(e).__name__}: {e}"})
+            except Exception:
+                pass
 
     def _post_qs(self):
         try:
