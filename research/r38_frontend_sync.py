@@ -180,6 +180,12 @@ review = {
          "detail": "旧版单窗DX 双向出错: 错杀610笔好票(avg+4.15%/PF4.01) + 误收979笔差票"
                    "(+1.19%/PF1.71)。切到 Wilder ADX: 池 n 1642→1547(-6%), avg +3.50→+4.56%, "
                    "PF 3.19→4.03 —— 纯质量提升。需走完整审计(冻结线变更), 不得直接改 gen_v20f.py"},
+        {"id": "P1-7-MECH-FIX", "name": "P1-7 注释方向复核", "result": "⚠ 机制描述修正(结论仍成立)",
+         "detail": "core/indicators.py 注释'旧单窗DX系统性偏低'经 fixture 复核**不成立**: "
+                   "合成序列两版几乎一致; 真实数据 n=120 Wilder-legacy 中位 -3.66(Wilder更低); "
+                   "通过率 legacy 65.0% > Wilder 56.7%(旧版通过更多)。正确机制=旧版判定**噪声大**"
+                   "(双向出错), 非'偏低导致门过严'。但核心结论(Wilder更好)仍成立 —— 证据是"
+                   "R38n 质量分析(PF3.19→4.03), 非通过率。建议修正注释(文档改动, 不改逻辑)"},
         {"id": "R38-CONVERGE", "name": "R38 迭代收敛判断(修正)", "result": "收敛点已修正",
          "detail": "13轮: 扩池三连否 + stage/rank/退出验证现状 + P1-8解决 + **P1-7确认可改进**。"
                    "结论修正为: 基线的 ADX 实现有已知缺陷, 修复后可提升核心池质量 —— "
@@ -214,7 +220,8 @@ review = {
         {"round": "R38k", "commit": "6001498", "content": "stage白名单放宽: 否决(UPTREND PF1.09/MARKUP OOS0.96); 现有白名单验证正确"},
         {"round": "R38l", "commit": "d6813e2", "content": "ACCUM核心精选仓位: 温和正面(PF3.21→3.29); rank加权无效(路径关闭)"},
         {"round": "R38m", "commit": "9c42d9e", "content": "退出参数扫描(7配置): 现有退出局部最优; 审计P1-8分叉解决(生产12 OOS最优)"},
-        {"round": "R38n", "commit": "-", "content": "P1-7 ADX分叉量化: 旧版单窗DX双向出错; Wilder修复提升核心池(avg+1.06pp/PF+0.84)"},
+        {"round": "R38n", "commit": "4919b00", "content": "P1-7 ADX分叉量化: 旧版单窗DX双向出错; Wilder修复提升核心池(avg+1.06pp/PF+0.84)"},
+        {"round": "R38o", "commit": "-", "content": "P1-7注释方向复核: '系统性偏低'不成立(实测Wilder更低); 机制修正为'旧版噪声大', 结论仍成立"},
     ],
     "schools": {"ICT/SMC": 1250, "PriceAction": 229, "ChanLun缠论": 110, "Indicator": 214,
                 "OrderFlow": 34, "Volume/VSA": 10, "Wyckoff": 5, "ElliottWave": 8, "TheStrat": 4},
