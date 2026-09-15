@@ -29,7 +29,17 @@ if not os.path.exists(os.path.join(HERE, "paper_ledger.json")):
 led = json.load(open(os.path.join(HERE, "paper_ledger.json"), encoding="utf-8"))
 _157 = next((t for t in led if t.get("code") == "000157" and t.get("valid_from") == "20260914"), None)
 _203 = next((t for t in led if t.get("code") == "002203" and t.get("valid_from") == "20260914"), None)
-ok("000157 回滚为 PENDING_ORDER", _157 and _157["status"] == "PENDING_ORDER", _157 and _157["status"])
+# R37(2026-09-15): 000157 从"回滚 PENDING"进一步演化为"合法成交" —— 误拒
+# 修复(R37候选桶语义)后恢复 PENDING, 14:32 回踩触价 6.455 合法成交
+# (fill 6.461 < sl 6.515, 几何合规)。断言从"固定 PENDING"更新为"守卫链
+# 正常处置终态(PENDING 或 几何合法 FILLED 皆合规)"。
+_157_ok = _157 and float(_157.get("entry_price", 0)) < float(_157.get("sl1", 0))
+if _157 and _157["status"] == "FILLED":
+    _157_ok = _157_ok and float(_157.get("filled_price") or 0) < float(_157.get("sl1", 0))
+else:
+    _157_ok = _157_ok and _157["status"] in ("PENDING_ORDER", "EXPIRED")
+ok("000157 守卫链正常处置(R26回滚→R37恢复→合规成交/挂单)",
+   _157_ok, _157 and _157["status"])
 # R27 更新: 002203 回滚后被新 monitor 以 R8 守卫正确撤单(非法几何
 # limit 19.453>=sl 18.864, 触价成交必亏) —— 事故回滚恢复 T+1 语义后,
 # 守卫链正常接管。非 PENDING 也不是旧非法 FILLED 即为正确终态。
@@ -40,9 +50,14 @@ ok("002203 回滚后由 R8 守卫处置(非旧非法FILLED)",
 ok("002203 事故 note 仍在(历史痕迹)", _203 and "R26事故回滚" in (_203.get("note") or ""))
 ok("000157 事故 note 在", _157 and "R26事故回滚" in (_157.get("note") or ""))
 ok("rollback_ts 在(两单)", _157 and _203 and _157.get("rollback_ts") and _203.get("rollback_ts"))
-ok("filled_price 清空(两单)", _157 and _203 and not _157.get("filled_price") and not _203.get("filled_price"))
-ok("_trade_logged_buy 复位(两单)", _157 and _203 and not _157.get("_trade_logged_buy")
-   and not _203.get("_trade_logged_buy"))
+# R37: 000157 已合法成交(FILLED, filled_price=6.461) —— 只校验"非旧非法回溯
+# 成交"(R26 事故时 00:00 用旧 open, fill>=sl)。002203 仍须未成交(BAD_GEOMETRY)。
+ok("000157 成交合规(fill<sl, 非R26旧非法回溯价)", _157 and (
+    (not _157.get("filled_price")) or float(_157["filled_price"]) < float(_157["sl1"])),
+   _157 and _157.get("filled_price"))
+ok("002203 未成交(R8 撤单)", _203 and not _203.get("filled_price"))
+ok("_trade_logged_buy 复位或已按新成交记账(两单)", _157 and _203 and (
+    not _157.get("_trade_logged_buy") or _157["status"] == "FILLED"))
 ok("valid_from 保持 20260914(正常 T+1 语义)", _157 and _157.get("valid_from") == "20260914")
 
 print("== 2. trade_log 作废标记 ==")

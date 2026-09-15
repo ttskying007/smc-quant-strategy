@@ -94,8 +94,16 @@ ok("expire_reason=BAD_GEOMETRY_FILL_GE_SL", _203 and _203.get("expire_reason") =
 ok("R8 实弹拦截 note 在", _203 and "R8合同守卫" in (_203.get("note") or ""))
 ok("002203 几何非法(limit>=sl)", _203 and float(_203.get("entry_price", 0)) >= float(_203.get("sl1", 0)))
 _157 = next((t for t in led if t.get("code") == "000157" and t.get("valid_from") == "20260914"), None)
-ok("000157 几何合法(limit<sl)保持 PENDING", _157 and _157["status"] == "PENDING_ORDER"
-   and float(_157["entry_price"]) < float(_157["sl1"]), _157 and _157["status"])
+# R37(2026-09-15): 000157 经历 误拒(09:30 CAPACITY_REJECT_FILL bug) → R37 恢复
+# PENDING → 14:32 回踩触价 6.455 合法成交(fill 6.461 < sl 6.515)。断言从"保持
+# PENDING"更新为"按守卫链正常处置(几何合法成交或 PENDING)"。
+_157_ok = _157 and float(_157.get("entry_price", 0)) < float(_157.get("sl1", 0))
+if _157 and _157["status"] == "FILLED":
+    _157_ok = _157_ok and float(_157.get("filled_price") or 0) < float(_157.get("sl1", 0))
+else:
+    _157_ok = _157_ok and _157["status"] in ("PENDING_ORDER", "EXPIRED")
+ok("000157 几何合法且按守卫链处置(R37: 误拒已恢复, 成交/挂单皆合规)",
+   _157_ok, _157 and _157["status"])
 
 print("== 5. R12-R26 修复保持 ==")
 ok("leg_flags 仍在", '"leg_flags"' in src)

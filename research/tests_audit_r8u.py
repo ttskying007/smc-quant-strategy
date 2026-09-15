@@ -67,11 +67,15 @@ except Exception:
 ok("monitor 启动横幅在(版本守卫说明)", "代码版本守卫" in _log[-2000:])
 ok("当前 monitor 载时段守卫(07:xx 前非时段 OFF_SESSION)",
    "时段守卫" in open(os.path.join(HERE, "paper_sim.py"), encoding="utf-8").read())
-# 账本: 000157 待开盘撮合(PENDING 保持), 002203 已 R8 撤单
+# 账本: 000157 已合规成交(R37 误拒修复后 14:32 回踩触价), 002203 已 R8 撤单
 led = json.load(open(os.path.join(HERE, "paper_ledger.json"), encoding="utf-8"))
 _157 = next((t for t in led if t.get("code") == "000157" and t.get("valid_from") == "20260914"), None)
 _203 = next((t for t in led if t.get("code") == "002203" and t.get("valid_from") == "20260914"), None)
-ok("000157 PENDING 待开盘窗口撮合", _157 and _157["status"] == "PENDING_ORDER")
+# R37: 000157 从 PENDING 演化为合规 FILLED(fill<sl) —— 接受 PENDING 或合规成交
+_157_ok = _157["status"] in ("PENDING_ORDER", "FILLED")
+if _157 and _157["status"] == "FILLED":
+    _157_ok = _157_ok and float(_157.get("filled_price") or 0) < float(_157.get("sl1", 0))
+ok("000157 合规处置(PENDING 或 几何合法 FILLED)", _157_ok, _157 and _157["status"])
 ok("002203 EXPIRED(R8 撤单终态)", _203 and _203["status"] == "EXPIRED")
 
 print("== 5. R12-R31 修复保持 ==")

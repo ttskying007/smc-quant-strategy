@@ -91,16 +91,27 @@ led_path = os.path.join(HERE, "paper_ledger.json")
 if os.path.exists(led_path):
     led = json.load(open(led_path, encoding="utf-8"))
     t157_live = [t for t in led if t.get("code") == "000157"
-                 and t.get("status") == "PENDING_ORDER"]
-    ok("000157 保持 PENDING_ORDER(窗口已过不回溯补成交)",
+                 and t.get("status") in ("PENDING_ORDER", "FILLED")]
+    # R37(2026-09-15): 000157 误拒修复后恢复 PENDING, 14:32 回踩触价 6.455
+    # 合规成交(fill 6.461 < sl 6.515) —— 由"保持 PENDING"更新为"合规成交/挂单"
+    ok("000157 合规处置(R37 误拒已修复, 成交/挂单皆合规)",
        len(t157_live) >= 1,
-       f"PENDING 数={len(t157_live)}")
+       f"live 数={len(t157_live)}")
     if t157_live:
-        ok("000157 not_filled_reason=MISSED_OPEN(R24 窗口守卫)",
-           t157_live[-1].get("not_filled_reason") == "MISSED_OPEN",
-           str(t157_live[-1].get("not_filled_reason")))
-        ok("000157 未被 R34 回溯成交(filled_price 仍 None)",
-           t157_live[-1].get("filled_price") is None)
+        # R37(2026-09-15): 000157 演化链 09-14 MISSED_OPEN(未触价) → 09-15 误拒
+        # (R37 gate bug) → 恢复 PENDING → 14:32 回踩触价合规成交(fill 6.461<sl 6.515)。
+        # 断言: 若 FILLED 则 fill<sl(几何合规); 若 PENDING 则未触价 MISSED_OPEN。
+        ok("000157 成交几何合规(fill<sl) 或 仍挂单未触价",
+           (t157_live[-1]["status"] == "FILLED"
+            and float(t157_live[-1].get("filled_price") or 0) < float(t157_live[-1].get("sl1", 0)))
+           or (t157_live[-1]["status"] == "PENDING_ORDER"
+               and t157_live[-1].get("not_filled_reason") in (None, "MISSED_OPEN", "WAIT_RETRACE")),
+           str(t157_live[-1].get("filled_price")))
+        ok("000157 成交为回踩触价(限价×(1+滑点))而非开盘兜底回溯",
+           t157_live[-1]["status"] != "FILLED"
+           or float(t157_live[-1].get("filled_price") or 0)
+           <= float(t157_live[-1].get("entry_price", 999)) * 1.005,
+           str(t157_live[-1].get("filled_price")))
 else:
     ok("paper_ledger.json 存在", False, "缺文件")
 
