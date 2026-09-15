@@ -176,9 +176,14 @@ review = {
         {"id": "P1-8-RESOLVED", "name": "审计P1-8分叉解决(15 vs 12)", "result": "✅ 生产口径更稳健",
          "detail": "B生产口径(max_hold=12): 全样本PF3.11略低, 但 **OOS PF4.41最高 + MDD-630最优**。"
                    "生产口径以小幅IS损失换OOS稳健性与回撤控制 —— 分叉不是缺陷, 保持CFG.MAX_HOLD=12"},
-        {"id": "R38-CONVERGE", "name": "R38 迭代收敛判断", "result": "接近该 alpha 最优",
-         "detail": "12轮 10+ 假设: 技术腿/事件扩池/stage放宽/rank/退出扫描/C1/regime系数 —— "
-                   "除 ACCUM 温和加权外全部否决或验证现状。剩余空间在仓位管理接线, 不在信号定义"},
+        {"id": "P1-7-FOUND", "name": "P1-7 ADX 分叉量化", "result": "⭐ 首个可改进基线的修复",
+         "detail": "旧版单窗DX 双向出错: 错杀610笔好票(avg+4.15%/PF4.01) + 误收979笔差票"
+                   "(+1.19%/PF1.71)。切到 Wilder ADX: 池 n 1642→1547(-6%), avg +3.50→+4.56%, "
+                   "PF 3.19→4.03 —— 纯质量提升。需走完整审计(冻结线变更), 不得直接改 gen_v20f.py"},
+        {"id": "R38-CONVERGE", "name": "R38 迭代收敛判断(修正)", "result": "收敛点已修正",
+         "detail": "13轮: 扩池三连否 + stage/rank/退出验证现状 + P1-8解决 + **P1-7确认可改进**。"
+                   "结论修正为: 基线的 ADX 实现有已知缺陷, 修复后可提升核心池质量 —— "
+                   "比扩池更根本的杠杆"},
     ],
     "production": [
         "生产 _market_proxy 弱市加仓机制正确保持(已验证 PF3.20→3.64) —— 唯一确认的生产机制",
@@ -188,6 +193,9 @@ review = {
         "退出参数: 现有结构局部最优 —— 保持 CFG.MAX_HOLD=12(生产口径 OOS PF4.41/MDD-630 最优); "
         "审计 P1-8 分叉已解决(非缺陷)",
         "唯一待接线候选: ACCUM×2 温和加权(PF 3.21→3.29) —— 需走 paper_sim 完整审计",
+        "⭐ P1-7 修复: 基线切到 Wilder ADX 可提升核心池质量(avg+1.06pp/PF+0.84) —— "
+        "需走完整审计(冻结线变更: 重跑全事件回测+全测试链+冻结基线重认定)",
+        "注: 需复核 core/indicators.py 注释'旧版偏低'与实际差值方向(实测旧版偏高)的一致性",
         "扩池三连否: 技术腿(0.99) / 业绩预增(0.68) / stage放宽(1.09-1.88) —— "
         "'选股量少'是 alpha 内在属性(内部人事件×超跌反转窄带), 不可通过扩量修复",
         "下一轮: ①ACCUM 核心精选仓位优化(OOS PF6.87 最强子集) ②rank×仓位联合优化",
@@ -205,7 +213,8 @@ review = {
         {"round": "R38j", "commit": "7077c2f", "content": "业绩预增同口径回测: PF0.68 否决(与ACCUM/DOWNTREND过滤错配)"},
         {"round": "R38k", "commit": "6001498", "content": "stage白名单放宽: 否决(UPTREND PF1.09/MARKUP OOS0.96); 现有白名单验证正确"},
         {"round": "R38l", "commit": "d6813e2", "content": "ACCUM核心精选仓位: 温和正面(PF3.21→3.29); rank加权无效(路径关闭)"},
-        {"round": "R38m", "commit": "-", "content": "退出参数扫描(7配置): 现有退出局部最优; 审计P1-8分叉解决(生产12 OOS最优)"},
+        {"round": "R38m", "commit": "9c42d9e", "content": "退出参数扫描(7配置): 现有退出局部最优; 审计P1-8分叉解决(生产12 OOS最优)"},
+        {"round": "R38n", "commit": "-", "content": "P1-7 ADX分叉量化: 旧版单窗DX双向出错; Wilder修复提升核心池(avg+1.06pp/PF+0.84)"},
     ],
     "schools": {"ICT/SMC": 1250, "PriceAction": 229, "ChanLun缠论": 110, "Indicator": 214,
                 "OrderFlow": 34, "Volume/VSA": 10, "Wyckoff": 5, "ElliottWave": 8, "TheStrat": 4},
