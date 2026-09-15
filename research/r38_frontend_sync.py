@@ -134,15 +134,21 @@ review = {
          "detail": "70%触发但 avg-0.14pp —— 收紧SL打掉回摆单"},
         {"id": "C1", "name": "指数UP-regime过滤", "result": "修正废弃",
          "detail": "生产_market_proxy分桶: 弱市信号最好(PF3.98) —— C1方向相反, 2024-25通过是样本巧合"},
-        {"id": "V2", "name": "技术腿量能确认", "result": "验证通过",
-         "detail": "vol>1.5×20日均: PF1.53→2.63, avg+5.28% —— Volume Analysis扫损需参与度"},
-        {"id": "MERGE", "name": "两腿合并", "result": "互补确认",
-         "detail": "事件腿吃UP趋势市(PF5.54), 技术腿吃MIX震荡市(PF7.13) —— 每 regime 都有强信号源"},
+        {"id": "V2", "name": "技术腿量能确认(10日持有)", "result": "降级——未过稳健检验",
+         "detail": "10日持有 PF2.63 看似可用; 但套事件腿SL口径仅PF2.02(41%几何非法), "
+                   "独立SL搜索最优PF5.26 经 IS/OOS 检验 IS 7.96→OOS 0.99(比0.12) 严重过拟合"},
+        {"id": "TECH-VERIFY", "name": "技术腿最优变体稳健性", "result": "否决",
+         "detail": "IS n=1824 +7.76%/PF7.96 vs OOS n=500 -0.04%/PF0.99; PF5.26 全靠 2024"
+                   "(MIX×2024 PF29.7) 单年产物; 逐年最稳实为 DOWN 桶(3.6/3.1/2.4/1.1), "
+                   "非 MIX —— 技术腿不得接线生产"},
+        {"id": "MERGE", "name": "两腿合并", "result": "互补确认(但技术腿需重做)",
+         "detail": "事件腿吃UP(PF5.54), 技术腿吃MIX(PF7.13聚合值) —— 但技术腿MIX优势 "
+                   "经逐年交叉验证为 2024 单年假象, 合并结论待技术腿口径重做后复核"},
     ],
     "production": [
-        "生产 _market_proxy 弱市加仓机制正确保持(已验证 PF3.20→3.64)",
-        "生产候选: 事件腿×生产proxy加权(现状)",
-        "下一候选: 技术腿V2×量能确认×regime仓位系数(MIX满/UP减/DOWN停)——待审计",
+        "生产 _market_proxy 弱市加仓机制正确保持(已验证 PF3.20→3.64) —— 唯一确认的生产机制",
+        "技术腿: 未经稳健检验前**不得接线**(最优变体 OOS PF0.99 = 零 edge)",
+        "下一步: 技术腿信号需在 OOS 独立窗口重新定义/收紧, 或放弃技术腿路线",
     ],
     "iterations": [
         {"round": "R38a", "commit": "351ebd8", "content": "三维复盘+多学派诊断+A1/B1证伪+C1初验"},
@@ -150,7 +156,9 @@ review = {
         {"round": "R38c", "commit": "5535160", "content": "仓位缩放+2026特异性+技术腿可行性"},
         {"round": "R38d", "commit": "9f673a3", "content": "C1修正废弃(生产proxy正确)+量能闸验证+000157断言状态化"},
         {"round": "R38e", "commit": "7fbae53", "content": "两腿合并评估(信号×环境互补)"},
-        {"round": "R38f", "commit": "-", "content": "前端同步+技术腿SL/TP同口径回测(进行中)"},
+        {"round": "R38f", "commit": "09dab0f", "content": "前端同步(回测/选股/复盘面板 + /api/r38 实时轮询)"},
+        {"round": "R38g", "commit": "4255d95", "content": "技术腿同口径回测(41%几何非法)+regime系数验证(适配成立)"},
+        {"round": "R38h", "commit": "-", "content": "技术腿独立SL/TP搜索(PF5.26)→IS/OOS检验 OOS PF0.99 否决"},
     ],
     "schools": {"ICT/SMC": 1250, "PriceAction": 229, "ChanLun缠论": 110, "Indicator": 214,
                 "OrderFlow": 34, "Volume/VSA": 10, "Wyckoff": 5, "ElliottWave": 8, "TheStrat": 4},
