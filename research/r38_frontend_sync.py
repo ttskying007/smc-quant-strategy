@@ -154,13 +154,26 @@ review = {
                    "'正收益'纯属幸存者偏差 —— 被剔除的正是退市下跌股"},
         {"id": "激励观察", "name": "股权激励授予", "result": "⚠ 降级观察",
          "detail": "OOS PF1.61(比0.93)但缺失率61.7% + 2026 -1.99%; 样本不足以采信"},
+        {"id": "STAGE-RELAX", "name": "stage白名单放宽", "result": "❌ 否决(验证白名单正确)",
+         "detail": "全stage同口径: ACCUM PF3.86(OOS6.87)/DOWNTREND PF3.09(OOS2.95) ✅; "
+                   "UPTREND PF1.09(OOS1.17)/MARKUP 1.88(OOS0.96) ❌。放宽+53%量但PF 3.21→2.41, "
+                   "增量全是零edge的UPTREND。现有白名单是正确设计, 非保守惯性"},
+        {"id": "SCARCE-ROOT", "name": "选股量少的本质", "result": "内在属性(非可修缺陷)",
+         "detail": "扩池三连否(技术腿OOS0.99 / 业绩预增同口径0.68 / stage放宽1.09-1.88)证明: "
+                   "alpha 高度集中在'内部人事件×超跌反转'窄带, 任何方向扩量只引入零/负期望。"
+                   "正解=接受供给约束+把质量与资金效率做到极致"},
+        {"id": "ACCUM-CORE", "name": "ACCUM 核心精选(正面发现)", "result": "⭐ 待优化",
+         "detail": "缩量吸筹+增持: n=243 avg+4.72% PF3.86, OOS PF6.87 > IS 2.76 —— "
+                   "最强子集, 下一轮作为核心精选单独优化仓位"},
     ],
     "production": [
         "生产 _market_proxy 弱市加仓机制正确保持(已验证 PF3.20→3.64) —— 唯一确认的生产机制",
         "技术腿: 未经稳健检验前**不得接线**(最优变体 OOS PF0.99 = 零 edge)",
         "业绩预增: 同口径 PF0.68 否决 —— 与基线 stage 过滤器(ACCUM/DOWNTREND)错配(利好出尽)",
-        "扩池结论: 技术腿(OOS0.99)与事件扩池(同口径0.68)双双否决 —— alpha 与"
-        "'内部人事件×超跌反转'强绑定; 下一步转向同一 alpha 源内部优化(增持/回购 stage 白名单放宽 + rank/仓位联合优化)",
+        "stage 放宽: 否决 —— 现有白名单(ACCUM/DOWNTREND)经 OOS 验证为正确设计, 非保守惯性",
+        "扩池三连否: 技术腿(0.99) / 业绩预增(0.68) / stage放宽(1.09-1.88) —— "
+        "'选股量少'是 alpha 内在属性(内部人事件×超跌反转窄带), 不可通过扩量修复",
+        "下一轮: ①ACCUM 核心精选仓位优化(OOS PF6.87 最强子集) ②rank×仓位联合优化",
     ],
     "iterations": [
         {"round": "R38a", "commit": "351ebd8", "content": "三维复盘+多学派诊断+A1/B1证伪+C1初验"},
@@ -172,7 +185,8 @@ review = {
         {"round": "R38g", "commit": "4255d95", "content": "技术腿同口径回测(41%几何非法)+regime系数验证(适配成立)"},
         {"round": "R38h", "commit": "318f50f", "content": "技术腿独立SL/TP搜索(PF5.26)→IS/OOS检验 OOS PF0.99 否决"},
         {"round": "R38i", "commit": "b655dd6", "content": "事件腿扩池: 业绩预增晋级(裸持有)/业绩预减否决(退市偏差41.9%)"},
-        {"round": "R38j", "commit": "-", "content": "业绩预增同口径回测: PF0.68 否决(与ACCUM/DOWNTREND过滤错配)"},
+        {"round": "R38j", "commit": "7077c2f", "content": "业绩预增同口径回测: PF0.68 否决(与ACCUM/DOWNTREND过滤错配)"},
+        {"round": "R38k", "commit": "-", "content": "stage白名单放宽: 否决(UPTREND PF1.09/MARKUP OOS0.96); 现有白名单验证正确"},
     ],
     "schools": {"ICT/SMC": 1250, "PriceAction": 229, "ChanLun缠论": 110, "Indicator": 214,
                 "OrderFlow": 34, "Volume/VSA": 10, "Wyckoff": 5, "ElliottWave": 8, "TheStrat": 4},
