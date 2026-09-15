@@ -1,0 +1,317 @@
+# -*- coding: utf-8 -*-
+"""生成 v20e 回测 CSV：事件腿（rank_score 6特征 + 回踩买点 ×0.99 + 分层 TP/SL）+ 延续腿（固定10日）
+新 rank_score 特征（阶段跨度/ADX跨度/周线/放量分级/连续放量）的生产回测
+FIX(2026-09-08, 第七轮审计 消除平行实现): 事件过滤改用 core.events.classify_title
+（生产 paper_sim 与回测同一套分类；PROGRESS_WITH_DELTA 放开后回测同步纳入）。
+
+⚠ 实现分叉显式标注(R22, 第八轮审计 P1-7): 本文件的 ADX 过滤仍是 **legacy 单窗
+DX**(|PDI-MDI|/(PDI+MDI), 非平滑 ADX) —— 冻结基线 n=1639(±1) 依赖该口径,
+改动=毁基线。生产(paper_sim EVENT 腿)已在用 core/indicators.adx14_of(Wilder
+平滑 ADX, 2026-09-12 修复, 系统性偏高约 5-13pp) → 回测 universe 与生产
+universe 存在已知分叉, 本 CSV 的事件腿数字**不得直接作为生产事件腿证据**
+(审计 P1-7 判定保持)。统一需研究级重基线决策(重跑全事件回测+全测试链+冻结
+基线重认定), 不属于本轮接线范围。任何新代码需要 ADX 时只允许 import
+core.indicators.adx14_of。"""
+import csv, io, json, os, sqlite3, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.events import classify_title
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+
+KT = r"E:\test\smc_project\hermes\kline_cache_tencent"
+conn = sqlite3.connect(r"E:\test\smc_project\announce\smc_announce.db")
+cur = conn.cursor()
+code2file = {f.split("_")[0]: os.path.join(KT, f) for f in os.listdir(KT) if f.endswith("_daily_800.json")}
+bar_cache = {}
+
+# ===== R38 研究分叉: 指数 UP-regime 过滤 (C1 假设验证, 不修改生产) =====
+# 上证指数 20MA 上行 + 收盘>20MA 且 10MA>=20MA → UP; 否则过滤掉.
+_INDEX = json.load(open(r"E:\test\smc_project\research\_r38_index_sh000001.json", encoding="utf-8"))
+_INDEX.sort(key=lambda b: b["t"])
+_IDATES = [b["t"] for b in _INDEX]
+_ICLOSE = [b["c"] for b in _INDEX]
+import bisect as _bisect
+def _idx_up(d8):
+    i = _bisect.bisect_right(_IDATES, d8) - 1
+    if i < 20:
+        return True  # 数据不足不拦截(2023早期)
+    ma20 = sum(_ICLOSE[i-19:i+1]) / 20
+    ma10 = sum(_ICLOSE[i-9:i+1]) / 10
+    c = _ICLOSE[i]
+    return c > ma20 and ma10 >= ma20
+
+def bars_of(code):
+    if code not in bar_cache:
+        p = code2file.get(code)
+        if not p:
+            bar_cache[code] = []
+            return bar_cache[code]
+        raw = json.load(open(p, encoding="utf-8"))
+        bs = []
+        for r in raw:
+            t = "".join(x for x in str(r.get("t") or "") if x.isdigit())[:8]
+            if t and r.get("o") and r.get("h") and r.get("l") and r.get("c") and r.get("v"):
+                bs.append({"t": t, "o": float(r["o"]), "h": float(r["h"]), "l": float(r["l"]), "c": float(r["c"]), "v": float(r["v"])})
+        bs.sort(key=lambda b: b["t"])
+        bar_cache[code] = bs
+    return bar_cache[code]
+
+
+def is_strong(title):
+    """FIX(2026-09-08, 第七轮): 统一委托 core.events.classify_title ——
+    消除回测/生产两套事件过滤（原 is_strong 与 classify_title 语义不同：
+    is_strong 拒绝回购的完成/进展类但放行全部增持；classify_title 分层硬否/软否）。
+    生产与回测必须同一套分类，否则回测评估的不是生产行为。"""
+    is_ev, kind, pol, _amt, _pct = classify_title(title)
+    return bool(is_ev and pol > 0)
+
+
+def adx14(bs, i):
+    if i < 30:
+        return None
+    plus_dm = minus_dm = tr_sum = 0.0
+    for k in range(i - 14, i):
+        h, l, pc = bs[k]["h"], bs[k]["l"], bs[k - 1]["c"]
+        up = h - bs[k - 1]["h"]
+        dn = bs[k - 1]["l"] - l
+        plus_dm += up if (up > dn and up > 0) else 0
+        minus_dm += dn if (dn > up and dn > 0) else 0
+        tr = max(h - l, abs(h - pc), abs(l - pc))
+        tr_sum += tr
+    if tr_sum <= 0:
+        return None
+    pdi = 100 * plus_dm / tr_sum
+    mdi = 100 * minus_dm / tr_sum
+    if pdi + mdi == 0:
+        return None
+    return 100 * abs(pdi - mdi) / (pdi + mdi)
+
+
+def stage_of(bs, i):
+    if i < 91:
+        return None
+    w60 = bs[i - 60:i]
+    ret60 = w60[-1]["c"] / w60[0]["c"] - 1
+    v20 = sum(b["v"] for b in bs[i - 20:i]) / 20
+    v60 = sum(b["v"] for b in bs[i - 60:i]) / 60
+    vt = v20 / v60 if v60 else 1
+    if ret60 < -0.15 and vt < 0.9:
+        return "ACCUM"
+    if ret60 > 0.30 and vt > 1.3:
+        return "DISTRIB"
+    if ret60 > 0.20 and vt > 1.1:
+        return "MARKUP"
+    return "UPTREND" if ret60 > 0 else "DOWNTREND"
+
+
+def weekly_trend_of(bs, i):
+    closes = []
+    j = i
+    while j >= 0 and len(closes) < 20:
+        closes.append(bs[j]["c"])
+        j -= 5
+    closes.reverse()
+    if len(closes) < 12:
+        return None
+    ma10 = sum(closes[-10:]) / 10
+    ma_prev = sum(closes[-12:-2]) / 10
+    return "up" if ma10 > ma_prev else "down"
+
+
+ev = []
+seen = set()
+cur.execute("SELECT date, stock_code, title FROM announce WHERE title LIKE '%增持%' OR title LIKE '%回购%'")
+for date, code, title in cur.fetchall():
+    if not is_strong(title):
+        continue
+    d = str(date)[:10].replace("-", "")
+    if (code, d) in seen:
+        continue
+    seen.add((code, d))
+    bs = bars_of(code)
+    if not bs:
+        continue
+    dates = [b["t"] for b in bs]
+    if d not in dates:
+        continue
+    i = dates.index(d)
+    st = stage_of(bs, i)
+    if st not in ("ACCUM", "DOWNTREND"):
+        continue
+    adx = adx14(bs, i)
+    if adx is None or adx < 20:
+        continue
+    entry_idx = i + 1
+    if entry_idx + 17 >= len(bs) or entry_idx < 130:
+        continue
+    if bs[entry_idx]["t"] < "20230901":
+        continue
+    # R38 研究分叉(C1): 指数 UP-regime 过滤 —— 入场日上证指数 20MA 上行才保留
+    if not _idx_up(bs[entry_idx]["t"]):
+        continue
+    ep_open = bs[entry_idx]["o"]
+    disc_close = bs[i]["c"]
+    if ep_open <= 0:
+        continue
+    avg_v = sum(bs[k]["v"] for k in range(i - 19, i + 1)) / 20 if i >= 19 else 0
+    # FIX(2026-08-22): 无泄漏 —— v_ratio 用 T 日量（披露日收盘可得，决策时点），v2_ratio 用 T-1 量
+    v_ratio = bs[i]["v"] / avg_v if avg_v > 0 else 1.0
+    v2_ratio = bs[i - 1]["v"] / avg_v if (avg_v > 0 and i >= 1) else 0
+    stage_span = 0
+    for j in range(i, max(0, i - 60), -1):
+        if stage_of(bs, j) == st:
+            stage_span += 1
+        else:
+            break
+    adx_span = 0
+    for j in range(i, max(0, i - 40), -1):
+        if (adx14(bs, j) or 0) >= 20:
+            adx_span += 1
+        else:
+            break
+    wt = weekly_trend_of(bs, i)
+    # FIX(2026-08-22): rank_score 特征对齐（7↔7 与 paper_sim 一致）—— 加事件类型 +1
+    _etype = 1 if ("方案" in str(title) or "首次" in str(title) or "计划" in str(title)) else 0
+    rs = (2 if st == "ACCUM" else 1)
+    rs += (1 if v_ratio > 1.2 else 0) + (1 if v_ratio >= 2.0 else 0)
+    rs += (1 if 6 <= stage_span <= 15 else 0) + (1 if adx_span > 15 else 0)
+    rs += 1 if wt == "down" else 0
+    rs += 1 if (v_ratio >= 1.5 and v2_ratio >= 1.5) else 0
+    rs += _etype
+    highs = []
+    lows = []
+    for j in range(i - 1, max(0, i - 60), -1):
+        if j < 3 or j + 3 >= i:
+            continue
+        if len(highs) < 2 and bs[j]["h"] > max(bs[k]["h"] for k in range(j - 3, j)) and bs[j]["h"] >= max(bs[k]["h"] for k in range(j + 1, j + 4)):
+            highs.append(bs[j]["h"])
+        if len(lows) < 2 and bs[j]["l"] < min(bs[k]["l"] for k in range(j - 3, j)) and bs[j]["l"] <= min(bs[k]["l"] for k in range(j + 1, j + 4)):
+            lows.append(bs[j]["l"])
+        if len(highs) >= 2 and len(lows) >= 2:
+            break
+    if not highs or not lows:
+        continue
+    highs.sort()
+    # retrace entry (回踩买点 ×0.99)
+    limit = disc_close * 0.99
+    ep = limit if bs[entry_idx]["l"] <= limit else ep_open
+    # tiered TP/SL exit
+    tp1, tp2, tp3 = highs[0], (highs[1] if len(highs) > 1 else highs[0] * 1.05), highs[-1]
+    # FIX(2026-08-22) P2: SL = sweep low − 0.5×ATR（A股可执行，P1 已落地模拟器）
+    _atr = 0
+    if i >= 15:
+        _trs = []
+        for _k in range(i - 14, i):
+            _tr = max(bs[_k]["h"] - bs[_k]["l"], abs(bs[_k]["h"] - bs[_k - 1]["c"]), abs(bs[_k]["l"] - bs[_k - 1]["c"]))
+            _trs.append(_tr)
+        _atr = sum(_trs) / 14 if _trs else 0
+    sl1 = (lows[0] - 0.5 * _atr) if _atr > 0 else lows[0] * 0.99
+    # V2第7批受控A/B实验(受控SL语义AB.json): 结构位收紧 OOS avg +3.96→+3.99(微升)但
+    # PF 4.08→3.82(降) / IS avg 3.64→3.58(降) —— 不满足预注册双升线, 不晋级生产。
+    # 收紧SL砍小亏损(WR+2.8pp)但也打掉可回摆单。维持原SL语义, 证据见 handover。
+    # P2: TP 单调去重（确保 tp1<tp2<tp3 且都 > ep）
+    _tps = sorted([x for x in (tp1, tp2, tp3) if x and x > ep])
+    if not _tps:
+        continue
+    tp1 = _tps[0]
+    tp2 = _tps[1] if len(_tps) > 1 else tp1 * 1.05
+    tp3 = _tps[2] if len(_tps) > 2 else tp2 * 1.05
+    remaining = 1.0
+    net = 0.0
+    # FIX(2026-09-08, 第七轮 消除平行退出实现): 退出改委托 core.execution.simulate
+    # （tp1 30%部分+保本/tp2/tp3 runner/15根持有，与原内联循环语义等价：TP2 先于 TP3 判定，
+    #  SL 按 stop=be?ep:sl1 逐 bar，跳空穿越按开盘价 —— simulate 的 SL_GAP 同保守语义）
+    from core.execution import simulate as _sim
+    # ⚠ 持有期分叉标注(R23, 第八轮审计 P1-8): max_hold=15 是本冻结基线
+    # (n=1639±1)的回测口径; 生产统一退出用 CFG.MAX_HOLD=12 —— 回测/生产
+    # 持有期存在已知分叉(15 vs 12), 影响 TIME_STOP 占比与收益分布, 本 CSV
+    # 数字不得直接作为生产事件腿证据(审计 P1-8 判定保持)。统一=研究级
+    # 重基线决策(与 P1-7 ADX 分叉同批处理), 不属于接线范围。
+    _r = _sim(bs, entry_idx, ep, sl1, tp1=tp1, tp2=tp2, tp3=tp3,
+              partial_tp1=0.3, stop_to_be=True, max_hold=15, code=code[:6])
+    net = _r.get("net_pnl_pct", 0.0)
+    if _r.get("skipped"):
+        continue  # BAD_ENTRY(ep<sl 非法区间几何) / SKIP_LIMIT_UP(一字涨停) —— 非真实交易，跳过
+    # FIX(2026-09-08, P8-2): 事件腿逐笔明细 —— 从 simulate 结果补齐 buy/sell/hold/reason/TP-SL/MFE-MAE，
+    # 供 gen_full_backtest_data 逐笔审计（原 CSV 只有 net_pnl_pct，无逐笔字段）
+    _risk = ep - sl1
+    _hb = _r.get("hold_bars", 0)
+    _sell_i = min(len(bs) - 1, entry_idx + max(1, _hb)) if _hb else entry_idx
+    ev.append({
+        "symbol": code + (".SH" if code.startswith("6") else ".SZ"), "entry_date": bs[entry_idx]["t"],
+        "src": "EVENT",
+        "buy_date": bs[entry_idx]["t"], "buy_price": round(ep, 3),
+        "sell_date": bs[_sell_i]["t"] if _hb else "",
+        "sell_price": round(_r.get("exit_price", 0), 3) if _hb else "",
+        "reason": _r.get("reason", ""), "hold_bars": _hb,
+        "tp": round(tp2, 3), "sl": round(sl1, 3), "risk_pct": round(_risk / ep * 100, 3) if _risk > 0 else 0,
+        "net_pnl_pct": round(net, 4),
+        "mfe_pct": _r.get("mfe_pct", 0), "mae_pct": _r.get("mae_pct", 0),
+        "mfe_r": _r.get("mfe_r", 0), "mae_r": _r.get("mae_r", 0),
+        "rr_exit": round((_r.get("exit_price", ep) / ep - 1) / (_risk / ep), 3) if _risk > 0 else 0,
+        "signal_chain": "insider-event", "r20": "", "rank": rs})
+conn.close()
+print("事件(v20e):", len(ev))
+
+# continuation (P2-1: VWAP10% + 支撑新鲜度≤5, from cont_v20f_new.csv)
+cont = []
+with open(r"E:\test\smc_project\research\cont_v20f_new.csv", encoding="utf-8-sig") as fh:
+    for r in csv.DictReader(fh):
+        # R38 研究分叉(C1): CONT 腿同样按指数 UP-regime 过滤
+        if not _idx_up(r.get("entry_date", "")):
+            continue
+        cont.append({"symbol": r.get("symbol"), "entry_date": r.get("entry_date"),
+                     "src": "CONT", "net_pnl_pct": float(r["net_pnl_pct"]), "rank": 3})
+
+# dedup
+seen_c = set()
+combo = []
+for t in ev + cont:
+    k = (str(t["symbol"]), str(t["entry_date"]))
+    if k in seen_c:
+        continue
+    seen_c.add(k)
+    combo.append(t)
+
+# FIX(2026-09-05, 审计集中度): 按月 cap=500 分散约束 —— 202402 单月曾占 31.2%（1433笔），
+# 单月极端行情主导收益。保留每月 rank 最高的前 500 笔，显著降低集中风险。
+# 研究: cap=500 → n=3663 avg+6.30% PF6.98（vs 无cap n=4596 avg+8.97% PF11.43，集中度下降）
+COMBO_MONTH_CAP = 500
+from collections import defaultdict
+by_month_combo = defaultdict(list)
+for t in combo:
+    by_month_combo[str(t["entry_date"])[:6]].append(t)
+combo_capped = []
+for m, v in sorted(by_month_combo.items()):
+    v_sorted = sorted(v, key=lambda t: -(float(t.get("rank") or 0)))
+    combo_capped.extend(v_sorted[:COMBO_MONTH_CAP])
+combo = combo_capped
+
+out_path = r"E:\test\smc_project\research\r38_combo_uponly_trades.csv"
+with open(out_path, "w", encoding="utf-8-sig", newline="") as fh:
+    w = csv.DictWriter(fh, fieldnames=["symbol", "entry_date", "src", "net_pnl_pct", "rank",
+                                       "buy_date", "buy_price", "sell_date", "sell_price",
+                                       "reason", "hold_bars", "tp", "sl", "risk_pct",
+                                       "mfe_pct", "mae_pct", "mfe_r", "mae_r", "rr_exit",
+                                       "signal_chain", "r20"])
+    w.writeheader()
+    for t in combo:
+        w.writerow(t)
+print(f"v20f CSV(无泄漏+月度cap={COMBO_MONTH_CAP}): {len(combo)} 笔 → {out_path}")
+
+# quick stats
+import statistics
+# FIX(2026-09-04, 审计 P2 幸存者偏差): 回测仅覆盖当前缓存中有 K 线的股票（退市/长期停牌股被排除），
+# 存在正向幸存者偏差。此处提供"剔除极端尾部(net<=-50%，疑似退市/暴跌)"对照，量化偏差影响。
+for y in ("2024", "2025", "2026"):
+    ys = [t for t in combo if str(t["entry_date"])[:4] == y]
+    if ys:
+        pnls = [t["net_pnl_pct"] for t in ys]
+        wins = [x for x in pnls if x > 0]
+        pf = sum(wins) / abs(sum(x for x in pnls if x <= 0)) if any(x <= 0 for x in pnls) else 99
+        # 剔除尾部对照
+        pnls_c = [x for x in pnls if x > -50.0]
+        wins_c = [x for x in pnls_c if x > 0]
+        pf_c = sum(wins_c) / abs(sum(x for x in pnls_c if x <= 0)) if any(x <= 0 for x in pnls_c) else 99
+        n_tail = len(pnls) - len(pnls_c)
+        print(f"  {y}: n={len(ys)} avg={sum(pnls)/len(pnls):+.2f}% PF={pf:.2f} | 剔除尾部后 n={len(pnls_c)} avg={sum(pnls_c)/len(pnls_c):+.2f}% PF={pf_c:.2f} (剔除{n_tail}笔 net<=-50%)")
+print("注: 回测存在正向幸存者偏差（仅覆盖现存股票），剔除尾部对照供参考。")
