@@ -174,6 +174,17 @@ review = {
                     "OOS PF4.03) + 逐笔核对(0 mismatch; 20 笔差额=月度cap挤出) + 全测试链。 "
                     "canonical combo_v20f_trades.csv 已接管新基线, 139 处消费方(含生产)自动生效。 "
                     "性质=让回测追上生产, 生产行为零变化"},
+         {"id": "RANK-OOS", "name": "rank 门槛 IS/OOS 验证", "result": "✅ 唯一通过稳健检验的信号层候选",
+          "detail": "C rank>=3: IS PF3.94→OOS PF4.41(比1.12) 保留89%; "
+                    "D rank>=4: IS PF4.29→OOS PF4.39(比1.02) 保留62%, OOS MDD-54(vs等权-115); "
+                    "E rank>=5: OOS PF3.00(比0.70) ❌ 过严反而劣化 → 存在真实最优点。 "
+                    "逐年: 2024 +3.93→+4.53 / 2026 +4.87→+5.40 改善; 2025 +2.26→+2.14 轻微劣化(n=70)"},
+         {"id": "RANK-WIRE-BLOCK", "name": "rank 接线前置检查", "result": "⚠ 语义不等价(阻断天真接线)",
+          "detail": "生产 paper_sim rank_score(L849/L851) 比回测**多 2 项增持强度特征** "
+                    "(占比>=1% / 金额>=1亿 各+1) → 同一事件生产可多得 2 分, rank 分布上移。 "
+                    "故 R38v 的 rank>=4 仅**回测口径内**成立, 直接搬到生产会放行大量低质量交易。 "
+                    "可行路径: ①生产口径重算 rank 并重做门槛搜索 ②对齐两侧特征集 ③改用分位数门槛。 "
+                    "推荐 ①+③。**不得跳过该检查接线**"},
         {"id": "R38-CONVERGE", "name": "R38 迭代收敛(最终)", "result": "两处改进 + 一处口径修正",
          "detail": "18轮 12+ 假设测试完毕。真实改进: (1)ACCUM×2 温和加权(PF3.21→3.29) (2)Wilder+h12 合并重基线(PF3.08→3.72, MDD -629→-448) —— 后者性质是修正回测与生产的口径分叉。扩池三连否 + stage/rank/退出全部验证现状; 最高价值工作 = P1-7+P1-8 合并重基线(走审计)"},
     ],
@@ -211,6 +222,10 @@ review = {
         {"round": "R38q", "commit": "640fd49", "content": "P1-7审计路径确认: 生产早已用Wilder → 重基线性质='回测追上生产', 风险中→低"},
         {"round": "R38r", "commit": "-", "content": "P1-7+P1-8合并重基线证据包: Wilder h12 = PF3.72/MDD-448/OOS4.03 最佳合并口径; 待批准执行审计"},
         {"round": "R38s", "commit": "-", "content": "P1-7+P1-8合并重基线执行完成(归档+新生成器+重认定+逐笔核对+全测试链); tests_regime断言按诚实原则更新"},
+        {"round": "R38t", "commit": "61cdeba", "content": "重基线后 R38 结论复核: 4-5-6月弱势跨口径稳定; rank梯度再确认"},
+        {"round": "R38u", "commit": "0f72bae", "content": "stage重扫(命中100%): ACCUM×2仍成立+0.14pp; 4/5/6月弱势归因(6月样本足最可信)"},
+        {"round": "R38v", "commit": "6cd2f70", "content": "rank门槛IS/OOS: rank>=3/>=4 均过线; rank>=5否决(过严劣化) — 唯一通过稳健检验的信号层候选"},
+        {"round": "R38w", "commit": "-", "content": "rank接线前置检查: 生产比回测多2项增持特征 → 语义不等价, 阻断天真接线"},
     ],
     "schools": {"ICT/SMC": 1250, "PriceAction": 229, "ChanLun缠论": 110, "Indicator": 214,
                 "OrderFlow": 34, "Volume/VSA": 10, "Wyckoff": 5, "ElliottWave": 8, "TheStrat": 4},
