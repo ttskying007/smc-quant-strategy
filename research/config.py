@@ -93,6 +93,24 @@ ENABLE_EVENT_LEG = _env_bool("SMC_ENABLE_EVENT_LEG", True)
 # promoted; operators must opt in explicitly with SMC_ENABLE_CONT_LEG=1.
 ENABLE_CONT_LEG = _env_bool("SMC_ENABLE_CONT_LEG", False)
 
+# ---- EVENT 腿 rank 门槛（R38ab 接线, 2026-09-16 用户批准）----
+# 依据: 全链路审计(r38_rank_chain.py) + 研究分叉(r38_gen_v20f_rank3.py) 双路径逐项一致:
+#   全组合 n=1735 | IS n=1243 PF3.44 | OOS n=492 PF3.67
+# 预期效果(相对无门槛基线 n=1861 PF3.35 MDD-415):
+#   PF 3.35→3.52 | OOS 3.57→3.67 | MDD -415→-383 | avg +4.054→+4.297%
+#   代价: 候选量 -126 笔(-6.8%), EVENT 腿保留约 89%(OOS)
+# 作用范围: **仅 EVENT 腿**(paper_sim EVENT 筛选链); CONT 腿 rank 恒=3 不经该门槛。
+# 关键纪律(勿忘): 回测口径 7 特征 ≠ 生产口径 9 特征(R38w), 故本门槛必须用
+#   **生产 rank_score**(含增持占比≥1% / 金额≥1亿 两项)判定 —— paper_sim 正是该口径。
+#   若将来回测/生产特征集再变动, 需重跑 r38_rank_chain.py 重定阈值(勿照搬 3)。
+# 回滚: 设 SMC_EVENT_RANK_GATE_MIN=0 即刻恢复旧行为(无需改代码)。
+try:
+    EVENT_RANK_GATE_MIN = int(os.environ.get("SMC_EVENT_RANK_GATE_MIN", "3"))
+except ValueError:
+    EVENT_RANK_GATE_MIN = 3
+if EVENT_RANK_GATE_MIN < 0:
+    EVENT_RANK_GATE_MIN = 0
+
 # ---- 弱市加权（2026-09-08 regime 发现正向应用 → 2026-09-08 WF 复核后禁用）----
 # 事件腿为逆向策略: 弱市(proxy<0)信号质量最高(avg+6.6%/PF6.6 vs 强市+1.3%)。
 # 启用历史: A/B 双段(OOS+IS) k=2/4/8 单调提升风险调整收益(b4d8e35)。

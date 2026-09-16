@@ -849,6 +849,21 @@ def daily_selection():
                 rank_score += 1  # 实质增持（≥1%）
             if _amt is not None and _amt >= 10000:  # ≥1亿元
                 rank_score += 1
+            # ══ R38ab 接线(2026-09-16 用户批准): EVENT 腿 rank 门槛 ══
+            # 依据: 全链路审计 + 研究分叉双路径逐项一致(r38_rank_chain / r38_gen_v20f_rank3)
+            # 预期: 组合 PF 3.35→3.52 / OOS 3.57→3.67 / MDD -415→-383(保留约 62% 候选)
+            # 仅作用于 EVENT 腿; CONT 腿(rank 恒=3)不经此处, 不受影响。
+            # 开关: CFG.EVENT_RANK_GATE_MIN(0 = 关闭, 保持旧行为 → 可一键回滚)。
+            _rank_gate = int(getattr(CFG, "EVENT_RANK_GATE_MIN", 0) or 0)
+            if _rank_gate > 0 and rank_score < _rank_gate:
+                _sel_stats["skipped_rank"] = _sel_stats.get("skipped_rank", 0) + 1
+                _mark_funnel(_key, "RANK_LT%d" % _rank_gate)
+                _skipped_detail.append({"code": code, "name": name, "date": dd,
+                                        "reason": f"rank_score={rank_score}<{_rank_gate}"})
+                _reject_records.append({"code": code, "name": name, "date": dd,
+                                        "stage": "RANK_LT%d" % _rank_gate,
+                                        "adx": adx, "title": title[:80]})
+                continue
             # FIX(2026-09-05, 审计 F18): 风险归一仓位 —— 固定风险预算 / (入场-SL)，替代等权
             _risk_budget = 0.01  # 单笔账户风险 1%
             _risk_dist = (limit_px - sl1) if sl1 and limit_px > sl1 else None
