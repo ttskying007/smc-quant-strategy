@@ -168,6 +168,12 @@ review = {
          "detail": "决定性确认: 生产 paper_sim.py L314-321 的 adx14_of 是兼容入口, 委托 core.indicators.adx14_of(Wilder); L744-745 EVENT 腿门 = Wilder ADX>=20 —— 生产早已在用 Wilder。故重基线='让回测追上生产', 生产行为零变化, 审计风险 中→低"},
         {"id": "REBASE-MERGE", "name": "P1-7+P1-8 合并重基线证据包", "result": "最佳合并口径=Wilder+h12",
          "detail": "一次扫描两口径: 冻结基线 n=1974/PF3.08/MDD-629 | Wilder h15 n=1547/PF4.04/MDD-482 | Wilder h12(生产口径) n=1547/PF3.72/MDD-448/OOS PF4.03。h12 MDD最优+OOS最高+2026最强(+4.87/4.41)+RR左尾最低(19.2%)。两分叉一次性统一; 待用户批准后走完整审计"},
+         {"id": "REBASELINE-DONE", "name": "P1-7+P1-8 合并重基线(已执行)", "result": "✅ 已完成(用户批准)",
+          "detail": "2026-09-16 执行完整审计: 归档 legacy(DX+h15, n=1974/PF3.08/MDD-629) + "
+                    "新生成器 gen_v20f2_wilder_h12.py + 重认定(新认证 EVENT n=1527 avg+3.767% PF3.63, "
+                    "OOS PF4.03) + 逐笔核对(0 mismatch; 20 笔差额=月度cap挤出) + 全测试链。 "
+                    "canonical combo_v20f_trades.csv 已接管新基线, 139 处消费方(含生产)自动生效。 "
+                    "性质=让回测追上生产, 生产行为零变化"},
         {"id": "R38-CONVERGE", "name": "R38 迭代收敛(最终)", "result": "两处改进 + 一处口径修正",
          "detail": "18轮 12+ 假设测试完毕。真实改进: (1)ACCUM×2 温和加权(PF3.21→3.29) (2)Wilder+h12 合并重基线(PF3.08→3.72, MDD -629→-448) —— 后者性质是修正回测与生产的口径分叉。扩池三连否 + stage/rank/退出全部验证现状; 最高价值工作 = P1-7+P1-8 合并重基线(走审计)"},
     ],
@@ -180,7 +186,9 @@ review = {
         "接线候选①(幅度小): ACCUM×2 温和加权(PF 3.21→3.29) —— 需走 paper_sim 完整审计",
         "首选候选: P1-7+P1-8 合并重基线 (Wilder ADX + max_hold=12) —— PF 3.08→3.72, MDD -629→-448, OOS PF 3.48→4.03, RR左尾 19.6→19.2%",
         "重基线性质 = 让回测追上生产(生产早已用Wilder, R38q 确认 L314-321/L744-745) —— 生产行为零变化, 审计风险 中→低",
-        "证据包就绪: r38_combo_wilder_h15_trades.csv / r38_combo_wilder_h12_trades.csv (各1547笔) —— 待用户批准后执行完整审计(全测试链62库 + 冻结基线重认定)",
+         "⭐ 重基线已执行(2026-09-16, 用户批准): canonical combo_v20f_trades.csv 已接管",
+         "  新基线(Wilder ADX + max_hold=12); EVENT n=1527 avg+3.767% PF3.63, OOS PF4.03; COMBO n=1861 avg+4.054% PF3.35 MDD-415",
+         "  归档对照: archive/combo_v20f_trades_legacy_dx_h15.csv (n=1974 PF3.08 MDD-629); 生产行为零变化(让回测追上生产)",
         "扩池三连否: 技术腿(0.99) / 业绩预增(0.68) / stage放宽(1.09-1.88) —— '选股量少'是 alpha 内在属性, 不可通过扩量修复",
     ],
     "iterations": [
@@ -202,6 +210,7 @@ review = {
         {"round": "R38p", "commit": "e71a924/5930ae5", "content": "P1-7 Wilder重基线A/B: PF3.08→3.56/MDD-629→-490, 四项判据全过(晋级)"},
         {"round": "R38q", "commit": "640fd49", "content": "P1-7审计路径确认: 生产早已用Wilder → 重基线性质='回测追上生产', 风险中→低"},
         {"round": "R38r", "commit": "-", "content": "P1-7+P1-8合并重基线证据包: Wilder h12 = PF3.72/MDD-448/OOS4.03 最佳合并口径; 待批准执行审计"},
+        {"round": "R38s", "commit": "-", "content": "P1-7+P1-8合并重基线执行完成(归档+新生成器+重认定+逐笔核对+全测试链); tests_regime断言按诚实原则更新"},
     ],
     "schools": {"ICT/SMC": 1250, "PriceAction": 229, "ChanLun缠论": 110, "Indicator": 214,
                 "OrderFlow": 34, "Volume/VSA": 10, "Wyckoff": 5, "ElliottWave": 8, "TheStrat": 4},

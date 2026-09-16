@@ -1,30 +1,32 @@
 # -*- coding: utf-8 -*-
-"""⚠⚠ 已废弃(SUPERSEDED) —— R38 合并重基线, 用户批准 2026-09-16 ⚠⚠
+"""生成 v20f2 回测 CSV（**新冻结基线**，R38r 合并重基线，用户批准 2026-09-16）。
 
-本生成器(legacy 单窗 DX + max_hold=15)已被 **gen_v20f2_wilder_h12.py** 取代:
-  · 新基线: research/gen_v20f2_wilder_h12.py → research/combo_v20f_trades.csv
-    (Wilder ADX + max_hold=CFG.MAX_HOLD=12, n=1547, PF3.72, MDD-448)
-  · 旧基线归档: research/archive/combo_v20f_trades_legacy_dx_h15.csv
-    (legacy DX + h15, n=1974, PF3.08, MDD-629 —— 保留作历史对照, 不得删除)
+本文件 = gen_v20f.py 的逐行复制 + **仅两处口径修正**，用于消除回测与生产的
+两个已知分叉（第八轮审计 P1-7 / P1-8）：
 
-本文件**保留但不再作为冻结基线**: 仅供历史复现与审计追溯。新代码/新回测
-一律使用 gen_v20f2_wilder_h12.py 或直接消费 combo_v20f_trades.csv。
+  ① ADX: legacy 单窗 DX(|PDI-MDI|/(PDI+MDI)) → core.indicators.adx14_of
+     （标准 Wilder 平滑 ADX(14)，生产 paper_sim EVENT 腿在用，2026-09-12 修复）
+  ② max_hold: 15 → CFG.MAX_HOLD(12)，与生产统一退出持有期
 
-重基线依据(第八轮审计 P1-7 + P1-8, R38 研究循环 §97.16-97.21):
-  · P1-7: 本文件 ADX 过滤是 legacy 单窗 DX(|PDI-MDI|/(PDI+MDI), 非平滑);
-    生产 paper_sim EVENT 腿早已用 core.indicators.adx14_of(Wilder 平滑,
-    L314-321 兼容入口委托; L744-745 门=adx>=20) → 回测/生产口径分叉。
-  · P1-8: 本文件 max_hold=15; 生产 CFG.MAX_HOLD=12 → 第二处分叉。
-  · 合并重基线 = **"让回测追上生产"** —— 生产行为零变化, 仅回测口径修正。
-  · 效果: PF 3.08→3.72 / MDD -629→-448 / OOS PF 3.48→4.03 / RR<=-1R 19.6→19.2%
+性质（审计 P1-7/P1-8 结论）: 本重基线 = **"让回测追上生产"** —— 生产
+paper_sim.py 早已在用 Wilder ADX（L314-321 兼容入口委托 core.indicators；
+L744-745 EVENT 腿门 = adx14_of(bs,i) 配 adx>=20）与 CFG.MAX_HOLD=12。
+本文件不改变任何生产行为，只使回测数字首次可信地代表生产实际执行。
 
-原始设计说明(历史留存): 生成 v20e 回测 CSV：事件腿（rank_score 6特征 + 回踩买点
-×0.99 + 分层 TP/SL）+ 延续腿（固定10日）。FIX(2026-09-08, 第七轮审计 消除平行
-实现): 事件过滤改用 core.events.classify_title（生产 paper_sim 与回测同一套分类）。
+重基线证据（R38 研究循环，§97.18-97.20）:
+  冻结基线(legacy DX, h15): n=1974 avg+3.83% PF3.08 MDD-629 OOS PF3.48
+  本基线(Wilder, h12):       n=1547 avg+3.85% PF3.72 MDD-448 OOS PF4.03
+  → PF +0.64 / MDD +181pp / OOS PF +0.55 / RR<=-1R 19.6→19.2%
+
+历史基线归档: research/archive/combo_v20f_trades_legacy_dx_h15.csv
+（旧 n=1974 保留作对照，不得删除；旧生成器 gen_v20f.py 保留但已标注废弃）
+
 任何新代码需要 ADX 时只允许 import core.indicators.adx14_of。"""
 import csv, io, json, os, sqlite3, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from core.events import classify_title
+from core.indicators import adx14_of as wilder_adx14     # ← 修正① P1-7
+import config as CFG                                      # ← 修正② P1-8: MAX_HOLD
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 KT = r"E:\test\smc_project\hermes\kline_cache_tencent"
@@ -50,33 +52,15 @@ def bars_of(code):
 
 
 def is_strong(title):
-    """FIX(2026-09-08, 第七轮): 统一委托 core.events.classify_title ——
-    消除回测/生产两套事件过滤（原 is_strong 与 classify_title 语义不同：
-    is_strong 拒绝回购的完成/进展类但放行全部增持；classify_title 分层硬否/软否）。
-    生产与回测必须同一套分类，否则回测评估的不是生产行为。"""
+    """统一委托 core.events.classify_title —— 回测/生产同一套事件分类。"""
     is_ev, kind, pol, _amt, _pct = classify_title(title)
     return bool(is_ev and pol > 0)
 
 
 def adx14(bs, i):
-    if i < 30:
-        return None
-    plus_dm = minus_dm = tr_sum = 0.0
-    for k in range(i - 14, i):
-        h, l, pc = bs[k]["h"], bs[k]["l"], bs[k - 1]["c"]
-        up = h - bs[k - 1]["h"]
-        dn = bs[k - 1]["l"] - l
-        plus_dm += up if (up > dn and up > 0) else 0
-        minus_dm += dn if (dn > up and dn > 0) else 0
-        tr = max(h - l, abs(h - pc), abs(l - pc))
-        tr_sum += tr
-    if tr_sum <= 0:
-        return None
-    pdi = 100 * plus_dm / tr_sum
-    mdi = 100 * minus_dm / tr_sum
-    if pdi + mdi == 0:
-        return None
-    return 100 * abs(pdi - mdi) / (pdi + mdi)
+    """修正①(P1-7): 委托 core.indicators.adx14_of(标准 Wilder 平滑 ADX)，
+    替代 legacy 单窗 DX —— 与生产 paper_sim EVENT 腿口径一致。"""
+    return wilder_adx14(bs, i)
 
 
 def stage_of(bs, i):
@@ -186,7 +170,7 @@ for date, code, title in cur.fetchall():
     ep = limit if bs[entry_idx]["l"] <= limit else ep_open
     # tiered TP/SL exit
     tp1, tp2, tp3 = highs[0], (highs[1] if len(highs) > 1 else highs[0] * 1.05), highs[-1]
-    # FIX(2026-08-22) P2: SL = sweep low − 0.5×ATR（A股可执行，P1 已落地模拟器）
+    # SL = sweep low − 0.5×ATR（A股可执行，P1 已落地模拟器）
     _atr = 0
     if i >= 15:
         _trs = []
@@ -195,9 +179,6 @@ for date, code, title in cur.fetchall():
             _trs.append(_tr)
         _atr = sum(_trs) / 14 if _trs else 0
     sl1 = (lows[0] - 0.5 * _atr) if _atr > 0 else lows[0] * 0.99
-    # V2第7批受控A/B实验(受控SL语义AB.json): 结构位收紧 OOS avg +3.96→+3.99(微升)但
-    # PF 4.08→3.82(降) / IS avg 3.64→3.58(降) —— 不满足预注册双升线, 不晋级生产。
-    # 收紧SL砍小亏损(WR+2.8pp)但也打掉可回摆单。维持原SL语义, 证据见 handover。
     # P2: TP 单调去重（确保 tp1<tp2<tp3 且都 > ep）
     _tps = sorted([x for x in (tp1, tp2, tp3) if x and x > ep])
     if not _tps:
@@ -205,24 +186,15 @@ for date, code, title in cur.fetchall():
     tp1 = _tps[0]
     tp2 = _tps[1] if len(_tps) > 1 else tp1 * 1.05
     tp3 = _tps[2] if len(_tps) > 2 else tp2 * 1.05
-    remaining = 1.0
-    net = 0.0
-    # FIX(2026-09-08, 第七轮 消除平行退出实现): 退出改委托 core.execution.simulate
-    # （tp1 30%部分+保本/tp2/tp3 runner/15根持有，与原内联循环语义等价：TP2 先于 TP3 判定，
-    #  SL 按 stop=be?ep:sl1 逐 bar，跳空穿越按开盘价 —— simulate 的 SL_GAP 同保守语义）
+    # 退出委托 core.execution.simulate（tp1 30%部分+保本/tp2/tp3 runner/持有期）
     from core.execution import simulate as _sim
-    # ⚠ 持有期分叉标注(R23, 第八轮审计 P1-8): max_hold=15 是本冻结基线
-    # (n=1639±1)的回测口径; 生产统一退出用 CFG.MAX_HOLD=12 —— 回测/生产
-    # 持有期存在已知分叉(15 vs 12), 影响 TIME_STOP 占比与收益分布, 本 CSV
-    # 数字不得直接作为生产事件腿证据(审计 P1-8 判定保持)。统一=研究级
-    # 重基线决策(与 P1-7 ADX 分叉同批处理), 不属于接线范围。
+    # 修正②(P1-8): max_hold 15 → CFG.MAX_HOLD(12)，与生产统一退出持有期
     _r = _sim(bs, entry_idx, ep, sl1, tp1=tp1, tp2=tp2, tp3=tp3,
-              partial_tp1=0.3, stop_to_be=True, max_hold=15, code=code[:6])
+              partial_tp1=0.3, stop_to_be=True, max_hold=CFG.MAX_HOLD, code=code[:6])
     net = _r.get("net_pnl_pct", 0.0)
     if _r.get("skipped"):
         continue  # BAD_ENTRY(ep<sl 非法区间几何) / SKIP_LIMIT_UP(一字涨停) —— 非真实交易，跳过
-    # FIX(2026-09-08, P8-2): 事件腿逐笔明细 —— 从 simulate 结果补齐 buy/sell/hold/reason/TP-SL/MFE-MAE，
-    # 供 gen_full_backtest_data 逐笔审计（原 CSV 只有 net_pnl_pct，无逐笔字段）
+    # 事件腿逐笔明细 —— 从 simulate 结果补齐 buy/sell/hold/reason/TP-SL/MFE-MAE
     _risk = ep - sl1
     _hb = _r.get("hold_bars", 0)
     _sell_i = min(len(bs) - 1, entry_idx + max(1, _hb)) if _hb else entry_idx
@@ -240,7 +212,7 @@ for date, code, title in cur.fetchall():
         "rr_exit": round((_r.get("exit_price", ep) / ep - 1) / (_risk / ep), 3) if _risk > 0 else 0,
         "signal_chain": "insider-event", "r20": "", "rank": rs})
 conn.close()
-print("事件(v20e):", len(ev))
+print("事件(v20f2 Wilder+h12):", len(ev))
 
 # continuation (P2-1: VWAP10% + 支撑新鲜度≤5, from cont_v20f_new.csv)
 cont = []
@@ -261,7 +233,6 @@ for t in ev + cont:
 
 # FIX(2026-09-05, 审计集中度): 按月 cap=500 分散约束 —— 202402 单月曾占 31.2%（1433笔），
 # 单月极端行情主导收益。保留每月 rank 最高的前 500 笔，显著降低集中风险。
-# 研究: cap=500 → n=3663 avg+6.30% PF6.98（vs 无cap n=4596 avg+8.97% PF11.43，集中度下降）
 COMBO_MONTH_CAP = 500
 from collections import defaultdict
 by_month_combo = defaultdict(list)
@@ -273,10 +244,10 @@ for m, v in sorted(by_month_combo.items()):
     combo_capped.extend(v_sorted[:COMBO_MONTH_CAP])
 combo = combo_capped
 
-# ⚠ 已废弃: 本 legacy 生成器**不得**再写 canonical 名 combo_v20f_trades.csv
-# (该名自 R38r 起属于新基线 Wilder+h12)。输出改到 _regen 专用名, 避免
-# 任何误运行把 legacy 数据覆盖到活跃基线上; 归档原件保持 pristine。
-out_path = r"E:\test\smc_project\research\archive\_regen_legacy_dx_h15.csv"
+# R38r 重基线: 直接写 canonical 名 combo_v20f_trades.csv —— 139 处消费方
+# (含生产 hermes/scripts/smc_unified.py 4 处) 读该名, 新基线接管该名即
+# 全链路自动生效; 旧基线已归档 archive/combo_v20f_trades_legacy_dx_h15.csv。
+out_path = r"E:\test\smc_project\research\combo_v20f_trades.csv"
 with open(out_path, "w", encoding="utf-8-sig", newline="") as fh:
     w = csv.DictWriter(fh, fieldnames=["symbol", "entry_date", "src", "net_pnl_pct", "rank",
                                        "buy_date", "buy_price", "sell_date", "sell_price",
@@ -286,7 +257,7 @@ with open(out_path, "w", encoding="utf-8-sig", newline="") as fh:
     w.writeheader()
     for t in combo:
         w.writerow(t)
-print(f"v20f CSV(无泄漏+月度cap={COMBO_MONTH_CAP}): {len(combo)} 笔 → {out_path}")
+print(f"v20f2 CSV(新冻结基线, Wilder+h12, 月度cap={COMBO_MONTH_CAP}): {len(combo)} 笔 → {out_path}")
 
 # quick stats
 import statistics

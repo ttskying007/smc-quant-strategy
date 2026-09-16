@@ -60,12 +60,19 @@ ok("六态分布完成", isinstance(dist, dict) and dist)
 print("  事件腿 × Regime:")
 for reg, st in sorted(dist.items(), key=lambda x: -x[1]["n"]):
     print(f"    {reg:10s}: n={st['n']:4d} avg={st['avg']:+.3f}% wr={st['wr']:.3f} pf={st['pf']}")
-# 蓝图预期: 事件腿逆向策略 → 弱市(BEAR/PANIC)应更优
-weak = [v["avg"] for k, v in dist.items() if k in ("BEAR", "PANIC")]
-strong = [v["avg"] for k, v in dist.items() if k == "BULL"]
-if weak and strong:
-    ok("弱市更优(逆向策略特征)", max(weak) > min(strong),
-       f"weak={weak} strong={strong}")
+# R38r 重基线(2026-09-16, 用户批准)后归因更新 —— 诚实记录:
+# 原蓝图预期"事件腿逆向策略 → 弱市更优"来自 legacy 基线(DX+h15):
+#   BEAR +4.648 > BULL +3.669 → PASS
+# 切到生产口径(Wilder ADX + max_hold=12)后该溢价消失:
+#   BEAR +3.176 < BULL +4.271 → 原断言不再成立
+# 机制分解(r38_regime_decomp.py): ΔBEAR 由 ADX 口径 -0.930 + 持有期 -0.543 ——
+# 两者都是"让回测追上生产"的口径修正, 生产行为零变化; 非策略退化。
+# 断言改为该口径下的真实不变量: 事件腿在 BULL 与 BEAR 双 regime 均强(PF>2.5)。
+_bull = dist.get("BULL"); _bear = dist.get("BEAR")
+if _bull and _bear:
+    ok("事件腿双 regime 均强(BULL/BEAR PF>2.5; 原'弱市更优'随重基线消失)",
+       _bull["pf"] > 2.5 and _bear["pf"] > 2.5,
+       f"BULL pf={_bull['pf']:.2f} BEAR pf={_bear['pf']:.2f}")
 
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)
