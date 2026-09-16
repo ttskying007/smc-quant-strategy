@@ -179,14 +179,15 @@ review = {
                     "D rank>=4: IS PF4.29→OOS PF4.39(比1.02) 保留62%, OOS MDD-54(vs等权-115); "
                     "E rank>=5: OOS PF3.00(比0.70) ❌ 过严反而劣化 → 存在真实最优点。 "
                     "逐年: 2024 +3.93→+4.53 / 2026 +4.87→+5.40 改善; 2025 +2.26→+2.14 轻微劣化(n=70)"},
-         {"id": "RANK-PROD", "name": "生产口径 rank 重算(最终结论)", "result": "✅ 最优门槛 rank>=3(非>=4)",
-          "detail": "按 paper_sim 特征集重算 1527 笔 rank_prod(命中100%): 回测 rank 范围1-9, "
-                    "生产 rank_prod 范围1-8, **平均位移 -0.40 分(生产更低)** —— 与 R38w 预测方向相反 "
-                    "(adx_span 用 Wilder 值更低, 与新增2项增持特征抵消)。 "
-                    "IS/OOS 门槛搜索: **rank_prod>=3: IS PF4.20 / OOS PF4.52(+0.49 vs 基线) 保留83% ✅**; "
-                    "rank_prod>=4: OOS PF3.82 < 基线4.03 **未过线** ❌; >=5: OOS 2.13 ❌; >=6: OOS 0.99 ❌。 "
-                    "→ 回测的 rank>=4 确属回测口径特有, 直接搬生产会失效(R38w 阻断必要); "
-                    "生产正确门槛 = **rank_prod>=3**。分位数门槛在离散整数上塌缩为同一阈值, 可作双保险。"},
+         {"id": "RANK-CHAIN", "name": "rank 门槛全链路审计(最终)", "result": "✅ 确认 >=3(数字修正)",
+          "detail": "完整选择链重放(非CSV离线过滤): EVENT-only gate>=3 = IS PF3.77 / **OOS PF4.33** "
+                    "(R38x 的 4.52 无法复现 — 根因: R38x 在已过cap的1527笔上过滤, 全链路在过滤后才cap)。 "
+                    "**gate>=3 �� >=4 的 OOS PF 几乎相同(4.33 vs 4.32), 但 >=3 多保留 41% 交易** → >=3 严格更优。 "
+                    "**隐藏耦合**: >=4 的亮眼数字只在同时删掉整个CONT腿时成立; 保留CONT则OOS反降至3.58(≈基线)。 "
+                    "CONT腿复核: OOS n=194 avg+6.79% PF3.21 → 非拖累, 应保留。 "
+                    "**最终推荐: rank_prod>=3, 仅作用于EVENT腿, CONT不动** "
+                    "(EVENT OOS PF 4.03→4.33 保留89%; 组合 OOS 3.57→3.67)。 "
+                    "自检: 分解脚本E/F标签写反(数字正确, 结论按真实语义重述)"},
         {"id": "R38-CONVERGE", "name": "R38 迭代收敛(最终)", "result": "两处改进 + 一处口径修正",
          "detail": "18轮 12+ 假设测试完毕。真实改进: (1)ACCUM×2 温和加权(PF3.21→3.29) (2)Wilder+h12 合并重基线(PF3.08→3.72, MDD -629→-448) —— 后者性质是修正回测与生产的口径分叉。扩池三连否 + stage/rank/退出全部验证现状; 最高价值工作 = P1-7+P1-8 合并重基线(走审计)"},
     ],
@@ -229,6 +230,7 @@ review = {
         {"round": "R38v", "commit": "6cd2f70", "content": "rank门槛IS/OOS: rank>=3/>=4 均过线; rank>=5否决(过严劣化) — 唯一通过稳健检验的信号层候选"},
         {"round": "R38w", "commit": "-", "content": "rank接线前置检查: 生产比回测多2项增持特征 → 语义不等价, 阻断天真接线"},
         {"round": "R38x", "commit": "0c1e934", "content": "生产口径rank重算: 分布位移-0.40(非上移); 最优门槛rank_prod>=3(OOS PF4.52), 回测>=4在生产失效"},
+        {"round": "R38z", "commit": "ce121cf", "content": "rank全链路审计: 修正4.52→4.33; >=3与>=4 OOS相当但>=3多留41%量; >=4靠删CONT腿属隐藏耦合; 最终确认>=3(仅EVENT腿)"},
     ],
     "schools": {"ICT/SMC": 1250, "PriceAction": 229, "ChanLun缠论": 110, "Indicator": 214,
                 "OrderFlow": 34, "Volume/VSA": 10, "Wyckoff": 5, "ElliottWave": 8, "TheStrat": 4},
