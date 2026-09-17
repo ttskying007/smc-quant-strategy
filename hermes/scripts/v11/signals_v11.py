@@ -60,14 +60,48 @@ class Signal:
     confirmed_at: int = -1       # 确认的K线索引
     expired_at: int = -1         # 失效的K线索引
     is_active: bool = True       # 当前是否有效
-    
+
+    # 审计修复(2026-09, §3.3): 规范时间语义 —— 统一 event/visible/decision 时间.
+    # 原实现各检测器对 idx/confirmed_at 语义不统一(entry_idx 有时取 confirmed_at
+    # 有时取 idx), 结构价格字段可能来自确认窗口却无统一 visible_at.
+    # 新增规范字段(不破坏现有 idx/confirmed_at 兼容):
+    #   event_time:    形态发生 bar(默认 = idx)
+    #   visible_time:  信息首次可见 bar(默认 = confirmed_at, 若未设则 = idx;
+    #                  表示该信号的所有字段在此时点之后才可用于决策)
+    #   decision_time: 下游允许使用该信号的时间(默认 = visible_time;
+    #                  T+1 等执行延迟由执行层另行施加)
+    event_time: int = -1
+    visible_time: int = -1
+    decision_time: int = -1
+
     # 元数据
     grade: int = 1               # 1-4 质量等级
     trend_aligned: bool = False  # 是否与趋势对齐
     volume_ratio: float = 1.0    # 成交量比
     metadata: Dict = field(default_factory=dict)
-    
+
+    def causal_times(self) -> Dict:
+        """统一时间契约: (event, visible, decision).
+
+        - event_time   = self.event_time if set else self.idx
+        - visible_time = self.visible_time if set else (confirmed_at if >=0 else idx)
+        - decision_time= self.decision_time if set else visible_time
+        保证链: idx <= confirmed_at(当已设) <= event <= visible <= decision.
+        """
+        event = self.event_time if self.event_time >= 0 else self.idx
+        vis = self.visible_time
+        if vis < 0:
+            vis = self.confirmed_at if self.confirmed_at >= 0 else self.idx
+        dec = self.decision_time if self.decision_time >= 0 else vis
+        # 语义防护: visible 不得早于 event, decision 不得早于 visible
+        if vis < event:
+            vis = event
+        if dec < vis:
+            dec = vis
+        return {'event_time': event, 'visible_time': vis, 'decision_time': dec}
+
     def to_dict(self) -> Dict:
+        ct = self.causal_times()
         return {
             'type': self.type,
             'idx': self.idx,
@@ -79,6 +113,9 @@ class Signal:
             'upper': round(self.upper, 4),
             'lower': round(self.lower, 4),
             'confirmed_at': self.confirmed_at,
+            'event_time': ct['event_time'],
+            'visible_time': ct['visible_time'],
+            'decision_time': ct['decision_time'],
             'is_active': self.is_active,
             'grade': self.grade,
             'trend_aligned': self.trend_aligned,
