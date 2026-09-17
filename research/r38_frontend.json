@@ -1,5 +1,5 @@
 {
- "updated": "2026-09-17 11:15:25",
+ "updated": "2026-09-17 20:44:07",
  "backtest": {
   "base": {
    "n": 1527,
@@ -1086,6 +1086,7 @@
     "fallback 比例统计 + KEEP_RESEARCH/STAY_CLOSED 判定"
    ],
    "note": "真实缓存上逐年逐月回放需 /root/.hermes(环境依赖)"
-  }
+  },
+  "frontend_synced": "2026-09-17 20:44:07"
  }
 }
