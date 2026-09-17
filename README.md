@@ -2,8 +2,11 @@
 
 基于 **SMC（聪明钱概念）** 的 A 股事件驱动 + 结构确认量化选股/纸面交易系统。
 
-- **生产策略**：v20f = 事件腿（内部人增持/回购 + SMC 底部）+ 延续腿（MARKUP 结构支撑）
-- **当前状态**：纸面交易（PAPER_PRODUCTION_COMBO），`buy_enabled: true`
+> **版本状态（审计重构后）**：
+> - **生产版本**：由 `production_registry.json` 决定（`hermes/scripts/smc_unified.py`），当前为 **EMPTY_BOOK / fail-closed**（无许可生产策略，`buy_enabled: false`）
+> - **研究链**：V697-V699（confirmed SSL → sweep/reclaim → response → T+1 open）为 **no-write 研究链**，不产生生产订单
+> - **历史版本**：V88/V86/V85 因前视偏差（未来 bar 流动性目标）被正式否决（见 `V88重验报告.md`），其历史高胜率不得作为生产依据
+> - 任何版本字段（README / registry / 前端）都不能单独证明策略可交易；生产许可须通过严格 replay + 影子盘门槛（审计 §2.1）
 - **代码语言**：Python 3（生产 3.12 / 研究 3.13）
 
 ---
@@ -52,7 +55,7 @@
 
 ## 生产约束（审计重点）
 
-1. **`production_registry.json` 是生产合同**（本地 `hermes/smc_monitor/`，**不入库**）：`production_strategy=COMBO_SMC_EVENT`、`buy_enabled`、版本指针。
+1. **`production_registry.json` 是生产合同的唯一来源**（本地 `hermes/smc_monitor/`，**不入库**）：`production_strategy`、`buy_enabled`、版本指针。**审计重构后默认/当前为 `EMPTY_BOOK`**（无许可生产策略，fail-closed）；只有通过严格 replay + 影子盘门槛的策略才可写入。具体值以运行环境 registry 为准，README 不声称生产版本。
 2. **账本/选股不入库**：`paper_ledger.json`、`selection_result.json`、`run_status.json` 等运行时数据均在 `.gitignore` 排除（保护敏感持仓信息）。
 3. **数据缓存不入库**：K 线缓存、审计产物、优化产物、公告 DB 均为可再生数据，体积巨大（11.8 GB），未入库。
 4. **T+1 纪律**：信号日次日开盘买入。
