@@ -39,6 +39,7 @@ TESTS = [
     "tests_audit_research_gate.py",         # §10.3 研究门槛
     "tests_audit_funnel_diagnostic.py",     # §8.1/8.2 漏斗诊断
     "tests_audit_structural_sl_tp.py",      # §7.2/7.3 结构SL/TP
+    "tests_audit_fvg_ob_events.py",         # §4.2/4.3 FVG/OB
 ]
 
 # 本轮新建/修改的核心模块编译检查
