@@ -32,17 +32,20 @@ from strategy_contract import build_contract, contract_hash
 class DecisionPolicy:
     """只读 visible_at <= now 的事件, 生成候选(审计 §5.1).
 
-    候选含: symbol/entry_price(次日开盘)/sl(结构失败位)/tp(入场前可见目标).
-    演示实现: 用固定 R 倍数目标与 ATR 止损(可被真实结构替换).
+    候选含: symbol/entry_price(次日开盘)/sl(结构失败位优先)/tp(入场前可见
+    目标优先). 结构优先 SL/TP 由 structural_sl_tp.SLTPGenerator 提供
+    (§7.2/§7.3), ATR/R 倍数仅作 fallback 并统计比例。
     """
 
-    def __init__(self, tp_mult: float = 2.0, sl_atr: float = 1.5) -> None:
-        self.tp_mult = tp_mult
-        self.sl_atr = sl_atr
+    def __init__(self, tp_mult: float = 2.0, sl_atr: float = 1.5,
+                 use_structure: bool = True) -> None:
+        from structural_sl_tp import SLTPGenerator
+        self.gen = SLTPGenerator(atr_mult=sl_atr, r_mult=tp_mult,
+                                 use_structure=use_structure)
 
     def decide(self, events: set, bars_by_symbol: Dict[str, List[Dict[str, Any]]],
                sweep_by_symbol: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """事件 -> 候选: 计算次日开盘入场价、ATR 止损、2R 目标."""
+        """事件 -> 候选: 次日开盘入场价 + 结构优先 SL/TP(§7.2/§7.3)."""
         def _dk(x: str) -> str:
             return "".join(c for c in str(x) if c.isdigit())[:8]
 
@@ -61,20 +64,21 @@ class DecisionPolicy:
             entry_price = entry_bar["o"]
             if entry_price <= 0:
                 continue
-            # ATR 止损(过去 14 根, 无未来)
-            atr = 0.0
-            if idx >= 15:
-                trs = []
-                for k in range(idx - 14, idx):
-                    trs.append(max(bars[k]["h"] - bars[k]["l"],
-                                   abs(bars[k]["h"] - bars[k - 1]["c"]),
-                                   abs(bars[k]["l"] - bars[k - 1]["c"])))
-                atr = sum(trs) / len(trs) if trs else 0
-            sl = entry_price - max(0.01, self.sl_atr * atr) if atr > 0 else entry_price * 0.95
-            tp = entry_price * (1 + self.tp_mult * (entry_price - sl) / entry_price)
+            # 定位 sweep_idx(结构失败位 SL 需要)
+            sweep_idx = None
+            for i, b in enumerate(bars):
+                if _dk(b.get("t", "")) == _dk(sweep_date):
+                    sweep_idx = i
+                    break
+            if sweep_idx is None:
+                continue
+            # 结构优先 SL/TP(§7.2/§7.3): 结构失败位 SL + 入场前可见 swing high TP
+            st = self.gen.decide(bars, sweep_idx, idx, entry_price)
             cands.append({"symbol": sym, "entry_date": entry_bar["t"],
                           "entry_price": round(entry_price, 6),
-                          "sl": round(sl, 6), "tp": round(tp, 6),
+                          "sl": st["sl"]["stop"], "tp": st["tp"]["target"],
+                          "sl_source": st["sl"]["source"],
+                          "tp_source": st["tp"]["source"],
                           "direction": "bull"})
         return cands
 
@@ -116,4 +120,21 @@ class ReplayChain:
                 self.ledger.append({**c, "fill": r["price"]})
         return {"contract_hash": self.contract_hash,
                 "trades": self.ledger, "rejects": self.rejects,
-                "n_events": sum(len(v) for v in all_events.values())}
+                "n_events": sum(len(v) for v in all_events.values()),
+                "sl_fallback_ratio": (self.policy.gen.sl_fallback_count /
+                                      max(1, self.policy.gen.total)),
+                "tp_fallback_ratio": (self.policy.gen.tp_fallback_count /
+                                      max(1, self.policy.gen.total))}
+
+    def gate_evaluate(self) -> Dict[str, Any]:
+        """§10.3 研究门槛判定(审计 Iteration 3: 达标则保持, 否则关闭)."""
+        from research_gate import evaluate as gate_eval
+        rows = [{"entry_date": t.get("entry_date"),
+                 "net_pnl_pct": t.get("net_pnl_pct", 0.0)}
+                for t in self.ledger]
+        # 台账无收益时用占位 0(真实回放由 ExecutionSimulator 产出)
+        g = gate_eval(rows)
+        return {"gate_passed": g["passed"], "n_trades": g["n_trades"],
+                "checks": g["checks"],
+                "verdict": ("KEEP_RESEARCH" if g["passed"]
+                            else "STAY_CLOSED")}
