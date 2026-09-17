@@ -29,6 +29,7 @@ MIN_BARS = 120     # 最少需要120根K线才有足够滚动窗口
 ROLL_START = 80    # 从bar 80开始检查入场
 ROLL_END_OFFSET = 10  # 留10根K线作为退出空间
 MAX_HOLD = 40      # 最多持40根K线
+FEE_PCT = 0.20     # 审计修复(§3.5): 往返成本 0.20%(与 V699 标准一致)
 
 # 参数扫描范围
 SL_RANGE = [0.5, 0.7, 1.0, 1.3, 1.5, 2.0]
@@ -111,27 +112,46 @@ def analyze_at_point(ohlcv, all_signals, end_idx, params, tf='daily'):
     }
 
 
-def simulate_exit(ohlcv, entry_idx, direction, sl, tp, max_hold=MAX_HOLD):
-    """Simulate trade exit"""
+def simulate_exit(ohlcv, entry_idx, direction, sl, tp, max_hold=MAX_HOLD,
+                  fee_pct=FEE_PCT):
+    """Simulate trade exit —— 审计修复(2026-09, §3.5 P1).
+
+    继承 V699 的最低标准:
+      - **T+1**: 从 entry_idx+1 起评估(禁止同日退出)
+      - **SL 优先**: 同 bar 同时触发 TP/SL 时按 SL 处理(保守顺序)
+      - **跳空穿越止损**: bar 开盘价已低于 SL -> 按开盘价成交(GAP_SL),
+        而非用 SL 价(实盘跳空时止损单以开盘价成交)
+      - **成本**: 返回的 exit_price 扣除 fee_pct 往返成本(用于净收益)
+      - **超时**: 第 max_hold 根 bar 收盘平仓
+    返回: (exit_idx, exit_price_gross, won, reason)
+      reason: 'TP' / 'SL' / 'GAP_SL' / 'TIME'
+    """
     n = len(ohlcv)
+    entry_o = ohlcv[entry_idx]['o']
     for j in range(entry_idx + 1, min(entry_idx + max_hold + 1, n)):
         bar = ohlcv[j]
         if direction == 'bull':
-            if bar['h'] >= tp:
-                return j, tp, True
+            # 跳空穿越止损: 开盘价已 <= SL
+            if bar['o'] <= sl:
+                return j, bar['o'], False, 'GAP_SL'
+            # 同 bar 先 SL 后 TP(保守)
             if bar['l'] <= sl:
-                return j, sl, False
+                return j, sl, False, 'SL'
+            if bar['h'] >= tp:
+                return j, tp, True, 'TP'
         else:
-            if bar['l'] <= tp:
-                return j, tp, True
+            if bar['o'] >= sl:
+                return j, bar['o'], False, 'GAP_SL'
             if bar['h'] >= sl:
-                return j, sl, False
-    # Time out: close at close price
+                return j, sl, False, 'SL'
+            if bar['l'] <= tp:
+                return j, tp, True, 'TP'
+    # Time out: close at close price (扣除成本)
     exit_idx = min(entry_idx + max_hold, n - 1)
     exit_price = ohlcv[exit_idx]['c']
-    won = (exit_price > ohlcv[entry_idx]['o'] if direction == 'bull'
-           else exit_price < ohlcv[entry_idx]['o'])
-    return exit_idx, exit_price, won
+    won = (exit_price > entry_o if direction == 'bull'
+           else exit_price < entry_o)
+    return exit_idx, exit_price, won, 'TIME'
 
 
 def run_backtest(ohlcv, symbol, sl_pct, tp_pct, verbose=False):
@@ -183,17 +203,20 @@ def run_backtest(ohlcv, symbol, sl_pct, tp_pct, verbose=False):
             continue
         
         # Enter trade
-        exit_idx, exit_price, won = simulate_exit(
+        exit_idx, exit_price, won, exit_reason = simulate_exit(
             ohlcv, i, entry_info['direction'],
             entry_info['sl'], entry_info['tp']
         )
-        
-        # P&L
+
+        # P&L —— 审计修复(§3.5): 扣除 0.20% 往返成本(FEE_PCT)
+        fee = entry_info['entry_price'] * FEE_PCT / 100.0
         if entry_info['direction'] == 'bull':
-            pnl_pct = (exit_price - entry_info['entry_price']) / entry_info['entry_price'] * 100
+            gross_pnl = (exit_price - entry_info['entry_price']) * 100.0 / entry_info['entry_price']
+            pnl_pct = (exit_price - fee - entry_info['entry_price']) / entry_info['entry_price'] * 100
             actual_rr = abs(exit_price - entry_info['entry_price']) / abs(entry_info['entry_price'] - entry_info['sl'] + 0.001)
         else:
-            pnl_pct = (entry_info['entry_price'] - exit_price) / entry_info['entry_price'] * 100
+            gross_pnl = (entry_info['entry_price'] - exit_price) * 100.0 / entry_info['entry_price']
+            pnl_pct = (entry_info['entry_price'] - exit_price - fee) / entry_info['entry_price'] * 100
             actual_rr = abs(entry_info['entry_price'] - exit_price) / abs(entry_info['sl'] - entry_info['entry_price'] + 0.001)
         
         trades.append({
@@ -207,6 +230,7 @@ def run_backtest(ohlcv, symbol, sl_pct, tp_pct, verbose=False):
             'tp': round(entry_info['tp'], 2),
             'pnl_pct': round(pnl_pct, 2),
             'won': won,
+            'exit_reason': exit_reason,
             'rr': round(actual_rr, 2),
             'seq_name': entry_info['seq_name'],
             'resonance_grade': entry_info['resonance_grade'],
