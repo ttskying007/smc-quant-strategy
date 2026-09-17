@@ -64,8 +64,9 @@ def main():
     print("=" * 88)
 
     # 1. 编译检查
-    print("\n[1/2] 核心模块编译检查")
+    print("\n[1/2] 编译检查(核心模块 + 全量 compileall)")
     compile_fail = 0
+    # 1a. 核心模块逐个 py_compile
     for mod in COMPILE:
         p = os.path.join(HERE, mod)
         r = subprocess.run([PY, "-m", "py_compile", p],
@@ -74,6 +75,14 @@ def main():
         if r.returncode != 0:
             compile_fail += 1
         print("  %-8s %s" % (status, mod))
+
+    # 1b. 全量 compileall(审计 §11 验收: 整包编译通过)
+    r_all = subprocess.run([PY, "-m", "compileall", "-q", HERE],
+                           capture_output=True, text=True, encoding="utf-8")
+    if r_all.returncode != 0:
+        compile_fail += 1
+    print("  %-8s hermes/scripts 全量 compileall(审计§11)"
+          % ("OK" if r_all.returncode == 0 else "FAIL"))
 
     # 2. 回归测试
     print("\n[2/2] 回归测试(逐个运行, 收集 PASS/FAIL)")
