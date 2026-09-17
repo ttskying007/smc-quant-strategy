@@ -74,9 +74,14 @@ def visible_target(b:list[dict[str,Any]], sweep_idx:int, response_idx:int, entry
     # A pivot is visible by sweep time only if all RIGHT bars were completed before sweep.
     # Its liquidity must also remain unbroken through the response bar; an already
     # consumed swing high is not an upside structural target.
+    # 审计修复(2026-09, §3.7): 原实现只检查 pivot > response_high, 未验证
+    # 「未被消费」语义 —— 若 sweep bar 的低点已穿透(≤) pivot 高度, 说明该
+    # 流动性已被扫掉/消费(sweep 正是向下扫荡上方止损单的动作), 不得再作目标。
+    # 判定: sweep 低点 > pivot 高 => 未消费(可作目标); <= => 已消费(排除)。
     minimum_target = max(entry, b[response_idx]['h'])
+    sweep_low = b[sweep_idx]['l']
     for j in range(sweep_idx-RIGHT-1, LEFT-1, -1):
-        if high_pivot(b,j) and b[j]['h']>minimum_target:
+        if high_pivot(b,j) and b[j]['h']>minimum_target and b[j]['h'] < sweep_low:
             return j,b[j]['h']
     return None
 
