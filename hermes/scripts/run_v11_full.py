@@ -79,5 +79,26 @@ def test_signals(symbol='600519.SH'):
     
     limiter = get_limiter()
     ohlcv = fetch_single_tf(symbol, 'daily', 300, limiter=limiter)
-    
-    if not ohlcv or len(ohlcv) 
+
+    if not ohlcv or len(ohlcv) < 60:
+        print(f"  数据不足或获取失败: {symbol} (bars={len(ohlcv) if ohlcv else 0})")
+        return {"symbol": symbol, "ok": False, "bars": len(ohlcv) if ohlcv else 0}
+
+    # 自适应参数(传入前缀切片, 避免全样本 look-ahead)
+    params = calc_stock_params(ohlcv, symbol=symbol)
+    phase = detect_market_phase(ohlcv)
+    signals = detect_all_signals_v11(ohlcv, params=params)
+    print(f"  数据: {len(ohlcv)} bars | 阶段: {phase} | 信号数: {len(signals)}")
+
+    return {"symbol": symbol, "ok": True, "bars": len(ohlcv),
+            "phase": phase, "signals": len(signals), "params": params}
+
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description="SMC V11 诊断脚本")
+    ap.add_argument("--symbol", default="600519.SH", help="测试股票代码")
+    args = ap.parse_args()
+    test_limiter()
+    result = test_signals(args.symbol)
+    print(f"\n结果: {result}")

@@ -72,74 +72,76 @@ def load_kline(symbol, cache_dir=CACHE_DIR):
 
 def collect_structural_tps(ohlcv, entry_idx, entry_price, swings, all_signals):
     """
-    收集入场后所有结构阻力位作为TP候选
-    
+    V500审计修复(2026-09): 仅用入场前(≤entry_idx)的结构阻力位作为TP候选
+    —— 消除未来函数: 入场时点之后才形成的 swing/OB/FVG/CHOCH 结构,
+       实盘在入场时不知道其是否形成, 不得用作目标。
+    需满足: distance_pct ≥ MIN_TP_DIST_PCT
+
     返回: [(bar_idx, price, source, distance_pct), ...] 按距离排序
     """
     n = len(ohlcv)
     candidates = []
-    
-    # 1. 前方摆动高点
+
+    # 1. 入场前摆动高点
     for sh in swings.get('highs', []):
-        if sh['idx'] > entry_idx and sh['price'] > entry_price * (1 + MIN_TP_DIST_PCT / 100):
+        if sh['idx'] <= entry_idx and sh['price'] > entry_price * (1 + MIN_TP_DIST_PCT / 100):
             dist = (sh['price'] - entry_price) / entry_price * 100
             candidates.append((sh['idx'], sh['price'], 'swing_high', round(dist, 2)))
-    
-    # 2. OB区域上沿 (bull OB在支撑, 但前方OB可以做阻力参考)
+
+    # 2. OB区域上沿 (仅入场前已确认的)
     for s in all_signals:
         if s.get('type') in ('OB_Bull', 'OB_Bear'):
             ob_upper = s.get('upper', 0)
             if ob_upper > entry_price * (1 + MIN_TP_DIST_PCT / 100):
-                # OB位置在信号idx处, 用confirmed_at作为bar位置
                 ob_idx = s.get('confirmed_at', s.get('idx', entry_idx))
-                if ob_idx > entry_idx:
+                if ob_idx <= entry_idx:
                     dist = (ob_upper - entry_price) / entry_price * 100
                     candidates.append((ob_idx, ob_upper, 'ob_zone', round(dist, 2)))
-    
-    # 3. FVG区域上沿
+
+    # 3. FVG区域上沿 (仅入场前已确认的)
     for s in all_signals:
         if s.get('type') in ('FVG_Bull', 'FVG_Bear'):
             fvg_upper = s.get('upper', 0)
             if fvg_upper > entry_price * (1 + MIN_TP_DIST_PCT / 100):
                 fvg_idx = s.get('confirmed_at', s.get('idx', entry_idx))
-                if fvg_idx > entry_idx:
+                if fvg_idx <= entry_idx:
                     dist = (fvg_upper - entry_price) / entry_price * 100
                     candidates.append((fvg_idx, fvg_upper, 'fvg_zone', round(dist, 2)))
-    
-    # 4. CHOCH/BOS突破价格
+
+    # 4. CHOCH/BOS突破价格 (仅入场前已确认的)
     for s in all_signals:
         if s.get('type') in ('CHOCH_Bull', 'BOS_Bull'):
             tp = s.get('price', 0) or s.get('upper', 0)
             if tp > entry_price * (1 + MIN_TP_DIST_PCT / 100):
                 ch_idx = s.get('confirmed_at', s.get('idx', entry_idx))
-                if ch_idx > entry_idx:
+                if ch_idx <= entry_idx:
                     dist = (tp - entry_price) / entry_price * 100
                     candidates.append((ch_idx, tp, 'choch_bos', round(dist, 2)))
-    
+
     # 去重: 按价格聚合同一位置(0.3%内合并)
     candidates.sort(key=lambda x: x[1])  # 按价格排序
     deduped = []
     for c in candidates:
         if not deduped or abs(c[1] - deduped[-1][1]) / entry_price > 0.003:
             deduped.append(c)
-    
+
     # 按bar顺序排
     deduped.sort(key=lambda x: (x[0], x[1]))
-    
+
     # 去重: 同一bar只保留最近的一个
     final = []
     for c in deduped:
         if final and c[0] == final[-1][0]:
-            # 同一bar, 保留source优先级高的
+            # 同一bar, 保留source优先级高的 (source 在元组索引2)
             source_order = {'swing_high': 0, 'choch_bos': 1, 'ob_zone': 2, 'fvg_zone': 3}
-            if source_order.get(c[3], 99) < source_order.get(final[-1][3], 99):
+            if source_order.get(c[2], 99) < source_order.get(final[-1][2], 99):
                 final[-1] = c
         else:
             final.append(c)
-    
-    # 按距离排序
-    final.sort(key=lambda x: x[2])
-    
+
+    # 按距离排序 (distance_pct 在元组索引3, 与docstring"按距离排序"一致)
+    final.sort(key=lambda x: x[3])
+
     return final
 
 
