@@ -194,17 +194,35 @@ def detect_market_phase(ohlcv, lookback=60):
 
 
 def synthesize_weekly(ohlcv_daily):
-    """日线合成周线 — 审计修复(§6.2): 未完成周(不足5根)显式丢弃.
+    """日线合成周线 — 审计修复(§6.2): 未完成周(不足5根)显式丢弃 + fallback 统一.
 
-    原实现 L205 `if i > week_start` 只要有 1 根就算一周, 把未完成周当作
-    完整周 -> 周线边界偏移, 且当前未完成周被用于方向过滤(违反 §6.1).
+    原实现问题:
+      L205 `if i > week_start` 只要有 1 根就算一周 -> 未完成周当作完整周;
+      L207 fallback `date[:6]`(YYYY-MM 前6位) 在同月内恒等 -> 分组键失效,
+      整月 bar 被并成一组(与 weekly_trend.py/multi_tf.py 语义不统一).
+    修复:
+      - 不足 5 根的周显式丢弃(未完成周不得用于方向过滤, §6.1);
+      - 无 week 字段时 fallback 用 ISO 周编号(与 multi_tf.iso_week_key 一致).
     """
     weekly = []
     i = 0
     while i < len(ohlcv_daily):
         week_start = i
-        # 找同一周
-        while i < len(ohlcv_daily) and ohlcv_daily[i].get('week', ohlcv_daily[week_start].get('week', 0)) == ohlcv_daily[week_start].get('week', ohlcv_daily[week_start].get('date', '')[:6]):
+        # 找同一周: 优先 week 字段, fallback 用 ISO 周编号(非 date[:6])
+        def _wk_key(b):
+            if b.get('week') is not None:
+                return str(b.get('week'))
+            s = str(b.get('date') or '')[:10].replace('-', '')
+            if len(s) >= 8:
+                try:
+                    _d = datetime(int(s[:4]), int(s[4:6]), int(s[6:8]))
+                    _iso = _d.isocalendar()
+                    return 'iso:%d-%d' % (_iso[0], _iso[1])
+                except Exception:
+                    pass
+            return str(b.get('date') or '')[:6]
+        k0 = _wk_key(ohlcv_daily[week_start])
+        while i < len(ohlcv_daily) and _wk_key(ohlcv_daily[i]) == k0:
             i += 1
         seg = ohlcv_daily[week_start:i]
         # 未完成周(不足5根)丢弃: 不能把半周当完整周, 不得用于方向过滤

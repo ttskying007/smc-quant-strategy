@@ -29,7 +29,8 @@ src = open(os.path.join(V11, "v44_engine.py"), encoding="utf-8").read()
 start = src.find("def synthesize_weekly")
 end = src.find("\ndef ", start + 10)
 func_src = src[start:end] if end > start else src[start:]
-ns = {}
+import datetime as _dt
+ns = {"datetime": _dt.datetime}
 exec(compile(func_src, "v44sw", "exec"), ns)
 v44_synthesize_weekly = ns["synthesize_weekly"]
 
@@ -66,6 +67,16 @@ ok("3完整周+3半周 -> 3根(半周丢弃)", len(w) == 3, len(w))
 print("== 3. V44 synthesize_weekly 修复后丢弃未完成周 ==")
 w44 = v44_synthesize_weekly(bars)
 ok("V44 修复后 3完整周+3半周 -> 3根", len(w44) == 3, len(w44))
+
+print("== 3b. V44 无 week 字段时 ISO fallback 正确分组(§6.2) ==")
+# 去掉 week 字段, 验证 fallback(ISO 周编号)不再整月并成一组
+bars_no_week = []
+for b in bars:
+    b2 = dict(b)
+    b2.pop("week", None)
+    bars_no_week.append(b2)
+w44b = v44_synthesize_weekly(bars_no_week)
+ok("V44 无week字段 ISO fallback -> 3根(半周丢弃)", len(w44b) == 3, len(w44b))
 
 print("== 4. 15m 执行质量 ==")
 r = multi_tf.exec_quality_ok({"o": 11.0, "v": 1000}, 10.0, "bull")
