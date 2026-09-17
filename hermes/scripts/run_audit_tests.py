@@ -40,6 +40,7 @@ TESTS = [
     "tests_audit_funnel_diagnostic.py",     # §8.1/8.2 漏斗诊断
     "tests_audit_structural_sl_tp.py",      # §7.2/7.3 结构SL/TP
     "tests_audit_fvg_ob_events.py",         # §4.2/4.3 FVG/OB
+    "tests_audit_determinism.py",           # §10.2/5.3 确定性/截断
 ]
 
 # 本轮新建/修改的核心模块编译检查
