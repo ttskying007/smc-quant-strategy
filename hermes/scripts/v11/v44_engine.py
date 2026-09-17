@@ -194,7 +194,11 @@ def detect_market_phase(ohlcv, lookback=60):
 
 
 def synthesize_weekly(ohlcv_daily):
-    """日线合成周线"""
+    """日线合成周线 — 审计修复(§6.2): 未完成周(不足5根)显式丢弃.
+
+    原实现 L205 `if i > week_start` 只要有 1 根就算一周, 把未完成周当作
+    完整周 -> 周线边界偏移, 且当前未完成周被用于方向过滤(违反 §6.1).
+    """
     weekly = []
     i = 0
     while i < len(ohlcv_daily):
@@ -202,15 +206,17 @@ def synthesize_weekly(ohlcv_daily):
         # 找同一周
         while i < len(ohlcv_daily) and ohlcv_daily[i].get('week', ohlcv_daily[week_start].get('week', 0)) == ohlcv_daily[week_start].get('week', ohlcv_daily[week_start].get('date', '')[:6]):
             i += 1
-        if i > week_start:
-            seg = ohlcv_daily[week_start:i]
-            weekly.append({
-                'o': seg[0]['o'],
-                'h': max(b['h'] for b in seg),
-                'l': min(b['l'] for b in seg),
-                'c': seg[-1]['c'],
-                'v': sum(b.get('v', 0) for b in seg),
-            })
+        seg = ohlcv_daily[week_start:i]
+        # 未完成周(不足5根)丢弃: 不能把半周当完整周, 不得用于方向过滤
+        if len(seg) < 5:
+            continue
+        weekly.append({
+            'o': seg[0]['o'],
+            'h': max(b['h'] for b in seg),
+            'l': min(b['l'] for b in seg),
+            'c': seg[-1]['c'],
+            'v': sum(b.get('v', 0) for b in seg),
+        })
     return weekly
 
 
