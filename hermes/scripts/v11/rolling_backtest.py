@@ -138,28 +138,46 @@ def run_backtest(ohlcv, symbol, sl_pct, tp_pct, verbose=False):
     """Run rolling backtest with given SL/TP params"""
     n = len(ohlcv)
     roll_end = n - ROLL_END_OFFSET
-    
-    # 1. Get adaptive params (override SL/TP)
-    phase = detect_market_phase(ohlcv)
-    base_params = calc_stock_params(ohlcv, symbol, phase=phase, tf='daily')
+
+    # 审计修复(2026-09, 审计§3.4 P1): 消除参数层 look-ahead.
+    # 原实现用完整 ohlcv 一次性计算 detect_market_phase/calc_stock_params,
+    # 使后期波动/成交量进入早期决策. 现改为**滚动前缀参数**:
+    #   - 按 PARAM_REFRESH_BARS 分块, 每块边界处仅用 ohlcv[:i](过去前缀)重算参数
+    #   - 信号检测仍一次性(审计 P0 的事件流改造记为 Iteration 0-1 后续),
+    #     但参数不再读未来; 信号层的 confirmed_at 语义由 analyze_at_point 的
+    #     idx 过滤承担(已知限制, 见审计 §3.2).
+    PARAM_REFRESH_BARS = 20
+
+    # 1. 初始参数: 用滚动起点之前的**过去前缀**(而非全样本)
+    init_end = max(ROLL_START, PARAM_REFRESH_BARS)
+    prefix = ohlcv[:init_end]
+    phase = detect_market_phase(prefix)
+    base_params = calc_stock_params(prefix, symbol, phase=phase, tf='daily')
     params = {**base_params, 'sl_pct': sl_pct, 'tp_pct': tp_pct}
-    
+
     # 2. One-shot signal detection
     sig_result = detect_all_signals_v11(ohlcv, params=params, tf='daily')
     all_signals = sig_result['all']
-    
+
     if not all_signals or len(all_signals) < 5:
         return {'trades': [], 'n_signals': len(all_signals) if all_signals else 0, 'phase': phase}
-    
+
     # 3. Rolling: check entry at each bar in range
     trades = []
     entered_bar = -999  # cooldown: don't re-enter within 20 bars of last entry
     cooldown = 20
-    
+
     for i in range(ROLL_START, roll_end):
         if i - entered_bar < cooldown:
             continue
-        
+
+        # 分块刷新参数: 每 PARAM_REFRESH_BARS 根 bar 用**过去前缀**重算一次
+        if i % PARAM_REFRESH_BARS == 0 and i >= PARAM_REFRESH_BARS:
+            prefix = ohlcv[:i]
+            phase = detect_market_phase(prefix)
+            base_params = calc_stock_params(prefix, symbol, phase=phase, tf='daily')
+            params = {**base_params, 'sl_pct': sl_pct, 'tp_pct': tp_pct}
+
         entry_info = analyze_at_point(ohlcv, all_signals, i, params)
         if not entry_info:
             continue
