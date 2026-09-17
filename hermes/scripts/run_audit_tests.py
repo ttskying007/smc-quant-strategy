@@ -36,6 +36,7 @@ TESTS = [
     "tests_audit_multi_tf.py",              # §6.1/6.2 多周期
     "tests_audit_strategy_contract.py",     # §5.2 合同
     "tests_audit_replay_chain.py",          # §5.1/5.3 端到端
+    "tests_audit_research_gate.py",         # §10.3 研究门槛
 ]
 
 # 本轮新建/修改的核心模块编译检查
