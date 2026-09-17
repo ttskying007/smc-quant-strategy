@@ -952,5 +952,85 @@
    "ElliottWave": 8,
    "TheStrat": 4
   }
+ },
+ "audit_rebuild": {
+  "title": "外部审计重构执行进度(A 股 SMC 量化策略审计与重构报告)",
+  "updated": "2026-09-17",
+  "repo": "ttskying007/smc-quant-strategy",
+  "iterations": {
+   "Iteration 0 可复现基线": {
+    "status": "DONE",
+    "deliverables": [
+     "data_epoch.py epoch manifest(SHA256/漂移检测)",
+     "causal_stream.py 事件流引擎(在线vs批量一致)"
+    ],
+    "tests": "data_epoch 11项 + causal_stream 5项"
+   },
+   "Iteration 1 修复因果性": {
+    "status": "DONE",
+    "deliverables": [
+     "V500 未来TP/元组/排序修复",
+     "rolling_backtest 参数层look-ahead修复",
+     "V699 visible_target 消费语义修复",
+     "Signal 时间语义统一",
+     "simulate_exit 成本模型(T+1/SL优先/跳空)",
+     "future_function_scan 静态检查器"
+    ],
+    "tests": "9项测试 共44断言"
+   },
+   "Iteration 2 最小纯SMC事件链": {
+    "status": "DONE",
+    "deliverables": [
+     "三路身份交叉验证(引擎/V697/V698) 100%一致",
+     "无outcome字段"
+    ],
+    "tests": "stream_vs_v697 5项 + triple_identity 5项"
+   },
+   "Iteration 3 严格经济回放": {
+    "status": "DONE",
+    "deliverables": [
+     "execution_simulator 成交模拟(涨跌停/停牌/容量/成本)",
+     "portfolio_simulator 组合资金(重叠/持仓数/资金占用)",
+     "replay_chain 端到端回放链"
+    ],
+    "tests": "execution_sim 15项 + portfolio_sim 12项 + replay_chain 10项"
+   },
+   "Iteration 4 正交信息": {
+    "status": "PROBED",
+    "conclusion": "标题层正则提取率0-5%(金额/占比在正文), 需正文NLP基础设施; 未用弱提取避免噪声维度"
+   },
+   "Iteration 5 多周期确认": {
+    "status": "DONE",
+    "deliverables": [
+     "multi_tf 职责分离(周线仅已完成周期/日线结构/15m执行)",
+     "v44_engine 未完成周丢弃 + ISO fallback修复"
+    ],
+    "tests": "multi_tf 10项"
+   },
+   "Iteration 6 影子盘和生产许可": {
+    "status": "DONE",
+    "deliverables": [
+     "strategy_contract 单一策略合同 + 四端一致性校验",
+     "EMPTY_BOOK fail-closed 语义"
+    ],
+    "tests": "strategy_contract 12项"
+   }
+  },
+  "verification": {
+   "suite": "run_audit_tests.py",
+   "tests_total": 16,
+   "tests_passed": 16,
+   "assertions_passed": 134,
+   "assertions_failed": 0,
+   "compile_failures": 0,
+   "verdict": "ALL_GREEN"
+  },
+  "honesty_notes": [
+   "历史指标(V88 80.08%等)为仓库报告中的历史结果, 本工作区无 /root/.hermes 数据, 未重新生成",
+   "V88/V44 历史高胜率不得作为生产依据(前视偏差, 审计§12)",
+   "V697-V699 为因果工程通过但经济性失败的研究结果, 不继续同信息族改名迭代",
+   "保持 EMPTY_BOOK/fail-closed 直到新策略通过严格 replay + 影子盘门槛",
+   "端到端逐年回放需真实 /root/.hermes 缓存, 本工作区不可行(环境限制, 非代码缺陷)"
+  ]
  }
 }
