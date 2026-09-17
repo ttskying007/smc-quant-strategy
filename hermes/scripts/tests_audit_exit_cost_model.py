@@ -95,5 +95,10 @@ ok("FEE_PCT = 0.20 已定义", FEE_PCT == 0.20, FEE_PCT)
 ok("源码含 fee 扣减", "fee" in src and "FEE_PCT" in src)
 ok("源码含 exit_reason 记录", "'exit_reason'" in src)
 
+print("== 7. §6.3 参数状态写入交易记录 ==")
+ok("trades 含 params_snapshot", "'params_snapshot':" in src)
+ok("params_snapshot 含 sl_pct/tp_pct", "params.get('sl_pct', 0)" in src
+   and "params.get('tp_pct', 0)" in src)
+
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

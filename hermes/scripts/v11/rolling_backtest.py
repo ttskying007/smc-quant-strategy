@@ -237,6 +237,14 @@ def run_backtest(ohlcv, symbol, sl_pct, tp_pct, verbose=False):
             'confidence': entry_info['confidence'],
             'phase': phase,
             'hold_bars': exit_idx - i,
+            # 审计修复(§6.3): 参数状态写入交易记录 —— 复盘时可知当时
+            # 实际使用的参数(市场阶段/自适应参数/SL/TP), 而非事后回填.
+            'params_snapshot': {
+                'phase': phase,
+                'sl_pct': round(params.get('sl_pct', 0), 4),
+                'tp_pct': round(params.get('tp_pct', 0), 4),
+                'entry_bar': i,
+            },
         })
         
         entered_bar = i
