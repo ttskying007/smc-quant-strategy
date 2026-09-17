@@ -1,5 +1,5 @@
 {
- "updated": "2026-09-16 15:17:55",
+ "updated": "2026-09-17 11:15:25",
  "backtest": {
   "base": {
    "n": 1527,
@@ -706,6 +706,18 @@
     "detail": "paper_ledger含rank_score字段(140条)代码在跑; 记录signal_date均早于今日09:24激活, rank_score=1/2的58条为历史回填非门槛失效; 门槛尚无真实新信号可过滤 -> 待办非缺陷"
    },
    {
+    "id": "WIRE-E2E-FINAL",
+    "name": "daily端到端验证(09-17)",
+    "result": "门槛无事可做非失效",
+    "detail": "09-17 00:00 daily选股完成: 38公告->16正事件->stage拒3->adx拒2->orders_created=0。 无任何信号通过stage+ADX走到rank评估阶段 -> 门槛(位于其后)无事可做 -> 无RANK_LT记录属正常, 与事件腿alpha窄带一致(扩池三连否已证)。 端到端最终状态: 代码在跑(paper_ledger含rank_score) + 配置生效(EVENT_RANK_GATE_MIN=3) + 门槛已就位"
+   },
+   {
+    "id": "AUDIT-R39",
+    "name": "外部审计修复(2026-09)",
+    "result": "P0/P1已修复+回归锁",
+    "detail": "外部审计关键发现经独立核实全部属实并修复: (1)编译阻断(run_v11_full截断+validate_skills 6处f-string)->compileall全绿; (2)V500未来函数TP->仅入场前可见结构(行为验证通过); (3)元组索引bug(c[3]->c[2])+排序(x[2]->x[3])。 回归锁tests_audit_v500_causality.py 9项全绿。 V11旧研究链不影响生产事件腿。 其余P0/P1(一次性全量检测/自适应参数look-ahead)属事件流架构重构, 记为后续"
+   },
+   {
     "id": "R38-CONVERGE",
     "name": "R38 迭代收敛(最终)",
     "result": "两处改进 + 一处口径修正",
@@ -912,6 +924,11 @@
     "round": "R38as",
     "commit": "-",
     "content": "入场择时维度否决(短动量IS/OOS方向相反 + 深度超跌交互2024占82%单事件); 第6维度勘探完毕"
+   },
+   {
+    "round": "R39",
+    "commit": "6aac8dc/8b61ac6",
+    "content": "daily端到端验证最终结论(门槛无事可做非失效) + 外部审计P0/P1修复(编译阻断/V500未来函数/元组bug) + 回归锁9项"
    },
    {
     "round": "R38at/au",
