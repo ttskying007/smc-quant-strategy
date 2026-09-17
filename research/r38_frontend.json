@@ -1014,16 +1014,63 @@
      "EMPTY_BOOK fail-closed 语义"
     ],
     "tests": "strategy_contract 12项"
+   },
+   "§4.2/§4.3 FVG/OB事件": {
+    "status": "DONE",
+    "deliverables": [
+     "fvg_ob_events.py: FVG三根可见/ATR宽度归一化/MITIGATED-INVALIDATED状态机",
+     "OB BOS位移证据 + 回测/失效穿越计数"
+    ],
+    "tests": "15项"
+   },
+   "§7.2/§7.3 结构SL/TP": {
+    "status": "DONE",
+    "deliverables": [
+     "structural_sl_tp.py: 结构失败位SL + 入场前可见未消费swing high TP",
+     "ATR/R fallback 比例统计, SL/TP 携带 source+visible_at"
+    ],
+    "tests": "16项"
+   },
+   "§8.1/§8.2 漏斗诊断": {
+    "status": "DONE",
+    "deliverables": [
+     "funnel_diagnostic.py: 7层漏斗报告 + 拒绝原因分组 + 零候选定位语义"
+    ],
+    "tests": "17项"
+   },
+   "§10.3 研究门槛": {
+    "status": "DONE",
+    "deliverables": [
+     "research_gate.py: 门槛固化代码 + 逐年/月度完整区间/T+1/前视/oracle"
+    ],
+    "tests": "14项"
+   },
+   "§11 编译验收": {
+    "status": "DONE",
+    "deliverables": [
+     "compileall -q hermes/scripts exit=0(阻断项已修复)"
+    ],
+    "tests": "套件1b步骤"
+   },
+   "§13 证据交叉核对": {
+    "status": "DONE",
+    "deliverables": [
+     "evidence_crosscheck.py: 审计证据20项核对 FIXED=8/PRESENT=12"
+    ],
+    "tests": "静态核对"
    }
   },
   "verification": {
    "suite": "run_audit_tests.py",
-   "tests_total": 16,
-   "tests_passed": 16,
-   "assertions_passed": 134,
+   "tests_total": 20,
+   "tests_passed": 20,
+   "assertions_passed": 196,
    "assertions_failed": 0,
    "compile_failures": 0,
-   "verdict": "ALL_GREEN"
+   "compileall": "hermes/scripts 全量 exit=0",
+   "evidence_crosscheck": "§13 20项: FIXED=8 / PRESENT=12 / ABSENT=0",
+   "verdict": "ALL_GREEN",
+   "updated": "2026-09-17"
   },
   "honesty_notes": [
    "历史指标(V88 80.08%等)为仓库报告中的历史结果, 本工作区无 /root/.hermes 数据, 未重新生成",
@@ -1031,6 +1078,14 @@
    "V697-V699 为因果工程通过但经济性失败的研究结果, 不继续同信息族改名迭代",
    "保持 EMPTY_BOOK/fail-closed 直到新策略通过严格 replay + 影子盘门槛",
    "端到端逐年回放需真实 /root/.hermes 缓存, 本工作区不可行(环境限制, 非代码缺陷)"
-  ]
+  ],
+  "end_to_end_chain": {
+   "status": "DONE",
+   "deliverables": [
+    "replay_chain 端到端: 事件流->结构SL/TP->成交/组合->台账->研究门槛",
+    "fallback 比例统计 + KEEP_RESEARCH/STAY_CLOSED 判定"
+   ],
+   "note": "真实缓存上逐年逐月回放需 /root/.hermes(环境依赖)"
+  }
  }
 }
