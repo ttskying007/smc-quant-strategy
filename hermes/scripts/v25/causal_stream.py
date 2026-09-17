@@ -65,14 +65,17 @@ class CausalEventEngine:
             self._visible_swings.append(
                 {"idx": j, "low": low, "visible_at": idx, "consumed": False})
 
-    def _check_sweep_response(self, idx: int) -> None:
-        """idx 到达时检查: 上一 bar(idx-1)为 sweep + 本 bar(idx)为 response."""
+    def _check_sweep_response(self, idx: int) -> bool:
+        """idx 到达时检查: 上一 bar(idx-1)为 sweep + 本 bar(idx)为 response.
+
+        Returns: True 若触发事件(idx-1 是 sweep 序列, 其穿透由 sweep 利用).
+        """
         if idx < 2:
-            return
+            return False
         sweep = self._bars[idx - 1]
         response = self._bars[idx]
         if not (response["c"] > sweep["h"]):
-            return
+            return False
         # 找最近的未消费已确认摆动低(在 sweep 前确认)
         anchor = None
         for sw in reversed(self._visible_swings):
@@ -84,11 +87,12 @@ class CausalEventEngine:
                 anchor = sw
                 break
         if anchor is None:
-            return
+            return False
         if str(sweep["t"])[:4] not in YEARS:
-            return
+            return False
         self._events.add((self.symbol, self._bars[anchor["idx"]]["t"],
                           sweep["t"], response["t"]))
+        return True
 
     def step(self, bar: Dict[str, Any]) -> None:
         """推进一根 bar(只前向, 不可回退)."""
@@ -97,22 +101,22 @@ class CausalEventEngine:
             return
         self._bars.append(b)
         idx = len(self._bars) - 1
-        # 顺序(审计修正): 先注册新确认的摆动低 -> 再检查本 bar 是否构成
-        # sweep+response 事件 -> **最后**才标记本 bar 的穿透为消费。
-        # 关键: sweep 动作本身是"利用未消费流动性"(触发事件), 不是先消费再触发;
-        # 本 bar 的 low 只应消费**更早**已形成的 swing, 且不能因本 bar 是 sweep
-        # 而把自己要利用的 swing 先标为 consumed(V697 语义: 仅排除 sweep 之前
-        # 的穿透, 见 canonical_swept_swing_low L94 range(.., sweep_idx))。
+        # 顺序(审计修正, round 18): 先注册新确认的摆动低 -> 再检查本 bar 是否
+        # 构成 sweep+response 事件 -> 最后标记**前一根**(idx-1)的穿透为消费。
+        # 关键语义(与 V697 canonical_swept_swing_low 一致):
+        #   - sweep 动作(穿透+收盘回收)是**利用**流动性触发事件, 不消费 anchor;
+        #   - 若 idx-1 是 sweep(本 bar 触发事件), 其穿透由 sweep 利用, 不消费;
+        #   - 否则 idx-1 是普通穿透(未成 sweep), 立即消费(在 sweep 之前)。
+        # 用 idx-1 而非 idx 的穿透: 因为本 bar 可能是 response, 其自身穿透
+        # 应在后续确认; 且 idx-1 的穿透在 V697 的检查范围(.., sweep_idx)内。
         self._register_new_swings(idx)
-        self._check_sweep_response(idx)
-        # 当前 bar 穿透: 消费**该 bar 之前已确认**的 swing。
-        # 条件 sw.visible_at < idx-1: 排除"本 bar 或前一根(sweep)刚确认/利用的
-        # swing" —— sweep 动作是**利用**未消费流动性触发事件, 不消费自身 anchor
-        # (与 V697 canonical_swept_swing_low 一致: 仅排除 sweep **之前**的穿透)。
-        for sw in self._visible_swings:
-            if (not sw["consumed"] and sw["visible_at"] < idx - 1
-                    and b["l"] <= sw["low"]):
-                sw["consumed"] = True
+        triggered = self._check_sweep_response(idx)
+        if not triggered and idx >= 1:
+            prev = self._bars[idx - 1]
+            for sw in self._visible_swings:
+                if (not sw["consumed"] and sw["visible_at"] < idx - 1
+                        and prev["l"] <= sw["low"]):
+                    sw["consumed"] = True
 
     def event_ids(self) -> Set[Tuple[str, str, str, str]]:
         return set(self._events)
