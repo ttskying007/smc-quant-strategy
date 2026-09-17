@@ -220,8 +220,14 @@ def synthesize_weekly(ohlcv_daily):
                     return 'iso:%d-%d' % (_iso[0], _iso[1])
                 except Exception:
                     pass
-            return str(b.get('date') or '')[:6]
+            # 审计修复(§6.2): 不再回退 date[:6](同月恒等会破坏分组);
+            # 非法日期返回 None, 调用方跳过该 bar(绝不产生恒定分组键).
+            return None
         k0 = _wk_key(ohlcv_daily[week_start])
+        if k0 is None:
+            # 非法日期 bar: 跳过(不参与分组, 避免恒定键)
+            i += 1
+            continue
         while i < len(ohlcv_daily) and _wk_key(ohlcv_daily[i]) == k0:
             i += 1
         seg = ohlcv_daily[week_start:i]
