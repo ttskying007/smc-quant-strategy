@@ -1,75 +1,75 @@
 {
   "latest": {
-    "generated_at": "2026-09-11 19:02:38",
+    "generated_at": "2026-09-14 18:09:20",
     "sample": 467,
     "funnel": {
       "universe": 465,
       "bars_scanned": 13950,
       "L1_liquidity": 13950,
-      "L2_sweep": 1596,
-      "L3_reclaim": 276,
-      "L4_displacement": 218,
-      "L5_shift": 190,
-      "L6_poi": 190,
-      "L7_retest": 159
+      "L2_sweep": 1741,
+      "L3_reclaim": 305,
+      "L4_displacement": 245,
+      "L5_shift": 215,
+      "L6_poi": 215,
+      "L7_retest": 0
     },
     "drop_reasons": {
-      "reject_BREAK_DOWN_BEFORE_SWEEP": 9774,
-      "reject_BREAK_AFTER_SWEEP": 608,
-      "reject_INVALIDATED_BEFORE_RETEST": 6,
-      "reject_NO_RETEST_IN_WINDOW": 25
+      "reject_BREAK_DOWN_BEFORE_SWEEP": 9595,
+      "reject_BREAK_AFTER_SWEEP": 698,
+      "reject_INVALIDATED_BEFORE_RETEST": 9,
+      "reject_NO_RETEST_IN_WINDOW": 36
     },
     "lost_candidate_forward_return": {
       "L3_lost_fwd5": {
-        "n": 9811,
-        "avg": 0.935,
-        "median": 0.413,
-        "pct_pos": 53.2
+        "n": 9676,
+        "avg": 0.621,
+        "median": 0.202,
+        "pct_pos": 51.3
       },
       "L3_lost_fwd10": {
-        "n": 7747,
-        "avg": 1.332,
-        "median": 0.659,
-        "pct_pos": 54.1
+        "n": 7624,
+        "avg": 0.902,
+        "median": 0.374,
+        "pct_pos": 52.2
       },
       "L4_lost_fwd5": {
-        "n": 1108,
-        "avg": 0.084,
-        "median": -0.355,
-        "pct_pos": 46.7
-      },
-      "L5_lost_fwd5": {
-        "n": 52,
-        "avg": 0.882,
-        "median": 1.1,
-        "pct_pos": 53.8
-      },
-      "L5_lost_fwd10": {
-        "n": 48,
-        "avg": 0.834,
-        "median": 1.249,
-        "pct_pos": 60.4
+        "n": 1221,
+        "avg": 0.139,
+        "median": -0.367,
+        "pct_pos": 46.4
       },
       "L4_lost_fwd10": {
-        "n": 879,
-        "avg": 0.173,
-        "median": -0.409,
-        "pct_pos": 45.6
+        "n": 986,
+        "avg": -0.356,
+        "median": -0.653,
+        "pct_pos": 44.3
+      },
+      "L5_lost_fwd5": {
+        "n": 49,
+        "avg": 1.607,
+        "median": 0.916,
+        "pct_pos": 53.1
+      },
+      "L5_lost_fwd10": {
+        "n": 44,
+        "avg": 1.426,
+        "median": 1.538,
+        "pct_pos": 61.4
       },
       "L6_lost_fwd5": {
-        "n": 22,
-        "avg": 2.798,
-        "median": 2.251,
-        "pct_pos": 54.5
+        "n": 27,
+        "avg": 1.669,
+        "median": 0.119,
+        "pct_pos": 51.9
       },
       "L6_lost_fwd10": {
-        "n": 21,
-        "avg": 1.273,
+        "n": 25,
+        "avg": -0.083,
         "median": -2.315,
-        "pct_pos": 42.9
+        "pct_pos": 36.0
       }
     },
-    "ready_per_day": 159
+    "ready_per_day": 0
   },
   "history": [
     {
@@ -215,6 +215,78 @@
         }
       },
       "ready_per_day": 159
+    },
+    {
+      "generated_at": "2026-09-14 18:09:20",
+      "sample": 467,
+      "funnel": {
+        "universe": 465,
+        "bars_scanned": 13950,
+        "L1_liquidity": 13950,
+        "L2_sweep": 1741,
+        "L3_reclaim": 305,
+        "L4_displacement": 245,
+        "L5_shift": 215,
+        "L6_poi": 215,
+        "L7_retest": 0
+      },
+      "drop_reasons": {
+        "reject_BREAK_DOWN_BEFORE_SWEEP": 9595,
+        "reject_BREAK_AFTER_SWEEP": 698,
+        "reject_INVALIDATED_BEFORE_RETEST": 9,
+        "reject_NO_RETEST_IN_WINDOW": 36
+      },
+      "lost_candidate_forward_return": {
+        "L3_lost_fwd5": {
+          "n": 9676,
+          "avg": 0.621,
+          "median": 0.202,
+          "pct_pos": 51.3
+        },
+        "L3_lost_fwd10": {
+          "n": 7624,
+          "avg": 0.902,
+          "median": 0.374,
+          "pct_pos": 52.2
+        },
+        "L4_lost_fwd5": {
+          "n": 1221,
+          "avg": 0.139,
+          "median": -0.367,
+          "pct_pos": 46.4
+        },
+        "L4_lost_fwd10": {
+          "n": 986,
+          "avg": -0.356,
+          "median": -0.653,
+          "pct_pos": 44.3
+        },
+        "L5_lost_fwd5": {
+          "n": 49,
+          "avg": 1.607,
+          "median": 0.916,
+          "pct_pos": 53.1
+        },
+        "L5_lost_fwd10": {
+          "n": 44,
+          "avg": 1.426,
+          "median": 1.538,
+          "pct_pos": 61.4
+        },
+        "L6_lost_fwd5": {
+          "n": 27,
+          "avg": 1.669,
+          "median": 0.119,
+          "pct_pos": 51.9
+        },
+        "L6_lost_fwd10": {
+          "n": 25,
+          "avg": -0.083,
+          "median": -2.315,
+          "pct_pos": 36.0
+        }
+      },
+      "ready_per_day": 0
     }
   ]
 }

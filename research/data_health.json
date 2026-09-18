@@ -1,5 +1,5 @@
 {
-  "ts": "2026-09-11 15:30:23",
+  "ts": "2026-09-17 15:30:20",
   "sources": {
     "sina": {
       "ok": true,
@@ -22,9 +22,7 @@
       "detail": "<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occur"
     }
   },
-  "coverage": 39.5,
-  "latest": "20260910",
-  "alerts": [
-    "数据覆盖率低 39.5%"
-  ]
+  "coverage": 97.7,
+  "latest": "20260914",
+  "alerts": []
 }

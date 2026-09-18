@@ -148,25 +148,25 @@
       "code": "603768",
       "date": "20260907",
       "reason": "阶段=UPTREND(非ACCUM/DOWNTREND)",
-      "fwd5": null,
+      "fwd5": -2.3,
       "fwd10": null,
-      "filled": false
+      "filled": true
     },
     {
       "code": "301336",
       "date": "20260907",
       "reason": "阶段=UPTREND(非ACCUM/DOWNTREND)",
-      "fwd5": null,
+      "fwd5": -2.85,
       "fwd10": null,
-      "filled": false
+      "filled": true
     },
     {
       "code": "300926",
       "date": "20260907",
       "reason": "ADX=0.33003300330025626<20",
-      "fwd5": null,
+      "fwd5": -7.81,
       "fwd10": null,
-      "filled": false
+      "filled": true
     },
     {
       "code": "300925",
@@ -191,9 +191,43 @@
       "fwd5": null,
       "fwd10": null,
       "filled": false
+    },
+    {
+      "code": "600031",
+      "date": "20260914",
+      "reason": "阶段=UPTREND(非ACCUM/DOWNTREND)",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "300616",
+      "date": "20260914",
+      "reason": "无K线数据",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "605208",
+      "date": "20260914",
+      "reason": "无K线数据",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
     }
   ],
   "summary": {
+    "阶段=UPTREND(非ACCUM/DOWNTR": {
+      "n": 2,
+      "avg_fwd5": -2.58,
+      "avg_fwd10": null
+    },
+    "ADX=0.33003300330025626<": {
+      "n": 1,
+      "avg_fwd5": -7.81,
+      "avg_fwd10": null
+    },
     "ADX=5.777777777777741<20": {
       "n": 1,
       "avg_fwd5": -7.26,
@@ -205,5 +239,5 @@
       "avg_fwd10": null
     }
   },
-  "days_accum": 3
+  "days_accum": 4
 }

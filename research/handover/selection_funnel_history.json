@@ -1,5 +1,5 @@
 {
-  "days": 2,
+  "days": 3,
   "history": [
     {
       "day": "2026-09-10",
@@ -28,6 +28,21 @@
         "stage": 2,
         "adx": 3,
         "nodata": 3,
+        "dup": 4
+      }
+    },
+    {
+      "day": "2026-09-14",
+      "raw": 28,
+      "positive": 12,
+      "orders": 0,
+      "reject": {
+        "event_filter_hard": 0,
+        "event_filter_soft": 7,
+        "event_filter_soft_with_delta_research": 2,
+        "stage": 3,
+        "adx": 1,
+        "nodata": 4,
         "dup": 4
       }
     }

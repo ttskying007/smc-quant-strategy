@@ -1,19 +1,6 @@
 {
   "days": [
     {
-      "d8": "20260622",
-      "e": 0.3279,
-      "f1": 0.0972,
-      "f2": -0.005,
-      "f3": 0.0122,
-      "mid_proxy": "512100",
-      "mid_stale_days": 0,
-      "asof_stale": false,
-      "exposure_coef": 0.3,
-      "recorded_at": "2026-09-10 23:36:50",
-      "backfilled": true
-    },
-    {
       "d8": "20260623",
       "e": 0.2643,
       "f1": 0.0624,
@@ -780,6 +767,19 @@
       "backfilled": true,
       "f1_coverage": 0.993,
       "asof_note": "mid_stale_days=1 是 fqkline 501 窗口的正确表现: 主链指数文件更新于 09-10 23:17(含 0910 收盘), 0911 盘前决策用最近可得收盘=0910(无未来函数); stale 检测捕获并降 coef 0.75 —— 机制按设计工作"
+    },
+    {
+      "d8": "20260914",
+      "e": 0.515,
+      "f1": 0.0431,
+      "f2": -0.1548,
+      "f3": -0.0244,
+      "mid_proxy": "512100",
+      "mid_stale_days": 0,
+      "asof_stale": false,
+      "exposure_coef": 0.75,
+      "recorded_at": "2026-09-14 18:09:50",
+      "backfilled": true
     }
   ],
   "version": "escore_v1"
