@@ -1,8 +1,8 @@
 {
-  "asof": "2026-09-09 08:26:41",
+  "asof": "2026-09-18 23:51:47",
   "total": 16,
-  "done": 7,
-  "partial": 5,
+  "done": 8,
+  "partial": 4,
   "open": 4,
   "items": [
     {
@@ -68,8 +68,8 @@
     {
       "id": "R11",
       "req": "AI助手基线同步纯净口径",
-      "status": "PARTIAL",
-      "evidence": "动态JSON已自动继承(d10f106); 注释行212仍引用n=3552旧数→本轮修"
+      "status": "DONE",
+      "evidence": "动态JSON自动继承(d10f106); ai_assistant.py 注释已同步重基线口径(冻结2026-09-16: n=1527/avg3.77/PF3.63, OOS n=336/+4.27/PF4.03), 旧数3552已注销"
     },
     {
       "id": "R12",
