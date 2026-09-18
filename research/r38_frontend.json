@@ -1,5 +1,5 @@
 {
- "updated": "2026-09-18 13:52:32",
+ "updated": "2026-09-18 16:36:05",
  "backtest": {
   "base": {
    "n": 1527,
@@ -730,6 +730,12 @@
     "detail": "Iter1c(bf1a570) 用 pivot高<sweep_low 判定消费, 但合约要求 response收盘突破sweep高点 => minimum_target>=response_high>sweep_high>sweep_low 恒成立 => 条件永假 => visible_target 恒None => 18291种子 0 成交(NO_VISIBLE_UPSIDE_TARGET=18281)。 旧属性测试用了违反源合约的合成几何(sweep低点>pivot高)故测试通过而生产全拒。 正确语义: 摆动高点只在价格向上穿越(>=)时被消费; sweep低点穿透是SSL扫荡本身。 修复后重跑: n=17469(与历史17600高度一致, 差异=消费检查排除272 vs 176 + 缓存刷新)。 教训: 属性测试fixture必须满足源合约, 否则测试通过≠生产正确"
    },
    {
+    "id": "V700-CONSIST",
+    "name": "V700 扫描器四端一致 + 当前漏斗诊断(Iter6)",
+    "result": "语义对齐+漏斗确认(维持fail-closed)",
+    "detail": "v700 target 原实现只查 pivot>minimum, 未验证消费 —— 与修正后 V699 语义不一致 (扫描器可能放行回放会拒的候选, 准入语义分裂)。已对齐(向上穿越>= = 消费) + 回归锁 tests_audit_v700_target.py 6/6。 承诺epoch 20260814 当前漏斗: 4889→4888→108→20→20→2→2, full_current_setup=2, buy_valid=0 = 第六层经济门槛正确生效(release_blocker=V699 promotion gate), 非信号设计过严 —— §8'选股量少'诊断: 结构层产出2个完整候选, 大幅下降层为 ssl_breach(4888→108) 与 sweep_reclaim(108→20)。维持 fail-closed"
+   },
+   {
     "id": "R38-CONVERGE",
     "name": "R38 迭代收敛(最终)",
     "result": "两处改进 + 一处口径修正",
@@ -1061,6 +1067,43 @@
   ],
   "note": "本块为 V697-V699 研究链严格回放, 与 backtest 块(R38 EVENT 腿, canonical 生产策略回测)是两条不同管线; 前端须区分展示, 不得混用口径"
  },
+ "v700_scanner": {
+  "title": "V700 生产扫描器 承诺epoch当前漏斗(诊断用途, 非可交易订单)",
+  "label": "审计§8: 当前漏斗逐层计数; partial 行为 outcome-blind 诊断, 不得作为订单",
+  "generated_at": "2026-09-18T15:56:18",
+  "epoch_id": "20260814T181009_175399",
+  "market_date": "20260814",
+  "files_seen": 4905,
+  "files_on_committed_date": 4889,
+  "admission_eligible": false,
+  "pending_next_open_count": 2,
+  "buy_valid_count": 0,
+  "funnel": {
+   "fresh_on_committed_epoch": 4889,
+   "confirmed_swing_low": 4888,
+   "ssl_breach": 108,
+   "sweep_reclaim": 20,
+   "high_volume_sweep_reclaim": 20,
+   "response_break": 2,
+   "full_current_setup": 2
+  },
+  "full_current_setup_count": 2,
+  "release_blocker": "V699_FROZEN_REPLAY_PROMOTION_GATE_FAILED",
+  "blocked_by": {
+   "v697_support_gate": true,
+   "v698_independent_oracle": true,
+   "v699_frozen_replay_promotion_gate": false,
+   "committed_epoch": true
+  },
+  "decision": "V700_CURRENT_CANDIDATES_BLOCKED_BY_RESEARCH_GATE__NO_PRODUCTION_WRITE",
+  "invariants": {
+   "all_rows_response_on_market_date": true,
+   "all_partial_rows_response_on_market_date": true,
+   "no_historical_trade_source": true,
+   "no_outcome_fields": true,
+   "all_production_writes_false": true
+  }
+ },
  "audit_rebuild": {
   "title": "外部审计重构执行进度(A 股 SMC 量化策略审计与重构报告)",
   "updated": "2026-09-17",
@@ -1178,19 +1221,31 @@
      "发现并修复 Iter1c visible_target 回归(恒False条件), 回归锁重写 6/6"
     ],
     "tests": "tests_audit_v699_visible_target 6项(修订版, 合约一致fixture)"
+   },
+   "V700生产扫描器四端一致+当前漏斗": {
+    "status": "DONE",
+    "deliverables": [
+     "v700 target 消费语义对齐V699(四端一致, 扫描器不再放行回放会拒的候选)",
+     "tests_audit_v700_target.py 回归锁 6/6(合约一致fixture)",
+     "承诺epoch 20260814 当前漏斗: 4889→4888→108→20→20→2→2",
+     "buy_valid=0 = 第六层经济门槛正确生效(非信号设计过严); release_blocker=V699promotion_gate",
+     "§8选股量少诊断: 大幅下降层=ssl_breach(4888→108)与sweep_reclaim(108→20)"
+    ],
+    "tests": "tests_audit_v700_target 6项"
    }
   },
   "verification": {
    "suite": "run_audit_tests.py",
-   "tests_total": 21,
-   "tests_passed": 21,
-   "assertions_passed": 213,
+   "tests_total": 22,
+   "tests_passed": 22,
+   "assertions_passed": 219,
    "assertions_failed": 0,
    "compile_failures": 0,
    "compileall": "hermes/scripts 全量 exit=0",
    "evidence_crosscheck": "§13 20项: FIXED=8 / PRESENT=12 / ABSENT=0",
    "v699_real_replay": "真实数据 V697→V698→V699: 18291种子/oracle一致/n=17469/WR52.65%/promotion_gate_pass=false(维持fail-closed)",
    "v699_iter1c_regression": "Iter1c 恒False条件回归已修复(2026-09-18), 回归锁重写 6/6",
+   "v700_four_endpoint": "v700扫描器target消费语义对齐V699(四端一致) + 承诺epoch当前漏斗 2 full_setup/buy_valid=0(经济门槛正确生效)",
    "verdict": "ALL_GREEN",
    "updated": "2026-09-18"
   },
@@ -1209,6 +1264,6 @@
    ],
    "note": "已在真实缓存上完成逐年逐月回放(2026-09-18, V697→V698→V699 生产链)"
   },
-  "frontend_synced": "2026-09-18 13:52:32"
+  "frontend_synced": "2026-09-18 16:28:07"
  }
 }

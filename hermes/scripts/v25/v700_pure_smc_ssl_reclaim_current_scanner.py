@@ -59,8 +59,15 @@ def pivot_high(b,j):
 def target(b,sweep,minimum):
     # The first prior confirmed high still above the completed response is the
     # nearest unconsumed structural upside objective.
+    # 审计修复(2026-09, §3.7/Iteration6四端一致性): 与 V699 修正后的消费语义对齐 ——
+    # 摆动高点的流动性只在价格向上穿越(>=)它时被消费; pivot 确认后至 response 前
+    # 有任何 bar 高点 >= pivot 高 => 已消费, 不得作目标。sweep 低点穿透 pivot 高度
+    # 是 SSL 扫荡本身的一部分, 不是消费。v700 几何: response = sweep+1, 故扫描
+    # 覆盖 pivot 确认后至 sweep(含); response bar 自身由 minimum 覆盖。
     for j in range(sweep-RIGHT-1,LEFT-1,-1):
-        if pivot_high(b,j) and b[j]['h']>minimum:return j,b[j]['h']
+        if pivot_high(b,j) and b[j]['h']>minimum:
+            if not any(b[k]['h']>=b[j]['h'] for k in range(j+RIGHT+1,sweep+1)):
+                return j,b[j]['h']
     return None
 def candidate(sym,b,market_date):
     # response must be final completed bar, so all source data is known at scan time.

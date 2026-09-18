@@ -163,6 +163,38 @@ def v699_block():
 
 v699b = v699_block()
 
+# ---------- V700 生产扫描器(承诺 epoch 当前漏斗) ----------
+V700_LATEST = r"E:\root\.hermes\smc_audit\v700_pure_smc_ssl_reclaim_current_scanner_latest.json"
+
+def v700_block():
+    try:
+        r7 = json.load(open(V700_LATEST, encoding="utf-8"))
+    except Exception as e:
+        print(f"V700 latest 不可用({e}) -> v700_scanner 块省略(fail-closed)")
+        return None
+    fun = (r7.get("diagnostic_funnel") or {}).get("counts") or {}
+    dfun = r7.get("diagnostic_funnel") or {}
+    return {
+        "title": "V700 生产扫描器 承诺epoch当前漏斗(诊断用途, 非可交易订单)",
+        "label": "审计§8: 当前漏斗逐层计数; partial 行为 outcome-blind 诊断, 不得作为订单",
+        "generated_at": r7.get("generated_at"),
+        "epoch_id": r7.get("epoch_id"),
+        "market_date": r7.get("market_date"),
+        "files_seen": r7.get("files_seen"),
+        "files_on_committed_date": r7.get("files_on_committed_date"),
+        "admission_eligible": r7.get("admission_eligible"),
+        "pending_next_open_count": r7.get("pending_next_open_count"),
+        "buy_valid_count": r7.get("buy_valid_count"),
+        "funnel": fun,
+        "full_current_setup_count": dfun.get("full_current_setup_count"),
+        "release_blocker": dfun.get("release_blocker"),
+        "blocked_by": r7.get("blocked_by") or {},
+        "decision": r7.get("decision"),
+        "invariants": r7.get("invariants") or {},
+    }
+
+v700b = v700_block()
+
 # ---------- 复盘(迭代日志, 每轮研究后更新) ----------
 review = {
     "verdicts": [
@@ -401,6 +433,14 @@ review = {
                     "正确语义: 摆动高点只在价格向上穿越(>=)时被消费; sweep低点穿透是SSL扫荡本身。 "
                     "修复后重跑: n=17469(与历史17600高度一致, 差异=消费检查排除272 vs 176 + 缓存刷新)。 "
                     "教训: 属性测试fixture必须满足源合约, 否则测试通过≠生产正确"},
+         {"id": "V700-CONSIST", "name": "V700 扫描器四端一致 + 当前漏斗诊断(Iter6)", "result": "语义对齐+漏斗确认(维持fail-closed)",
+          "detail": "v700 target 原实现只查 pivot>minimum, 未验证消费 —— 与修正后 V699 语义不一致 "
+                    "(扫描器可能放行回放会拒的候选, 准入语义分裂)。已对齐(向上穿越>= = 消费) "
+                    "+ 回归锁 tests_audit_v700_target.py 6/6。 "
+                    "承诺epoch 20260814 当前漏斗: 4889→4888→108→20→20→2→2, full_current_setup=2, "
+                    "buy_valid=0 = 第六层经济门槛正确生效(release_blocker=V699 promotion gate), "
+                    "非信号设计过严 —— §8'选股量少'诊断: 结构层产出2个完整候选, "
+                    "大幅下降层为 ssl_breach(4888→108) 与 sweep_reclaim(108→20)。维持 fail-closed"},
         {"id": "R38-CONVERGE", "name": "R38 迭代收敛(最终)", "result": "两处改进 + 一处口径修正",
          "detail": "18轮 12+ 假设测试完毕。真实改进: (1)ACCUM×2 温和加权(PF3.21→3.29) (2)Wilder+h12 合并重基线(PF3.08→3.72, MDD -629→-448) —— 后者性质是修正回测与生产的口径分叉。扩池三连否 + stage/rank/退出全部验证现状; 最高价值工作 = P1-7+P1-8 合并重基线(走审计)"},
     ],
@@ -472,6 +512,7 @@ review = {
 data = {"updated": __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "backtest": bt, "selection": sel, "merged": merged, "review": review}
 if v699b: data["v699_replay"] = v699b
+if v700b: data["v700_scanner"] = v700b
 # audit_rebuild 块为手工同步内容(非本脚本生成), 重生成时必须保留, 不得丢失
 try:
     prev = json.load(open(OUT, encoding="utf-8"))
