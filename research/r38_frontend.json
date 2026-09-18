@@ -1256,12 +1256,12 @@
    "compile_failures": 0,
    "compileall": "hermes/scripts 全量 exit=0",
    "evidence_crosscheck": "§13 20项: FIXED=8 / PRESENT=12 / ABSENT=0",
-   "v699_real_replay": "真实数据 V697→V698→V699(含涨跌停建模): 18291种子/oracle一致/n=17433/WR52.62%/avg+1.22%/PF1.390/LIMIT_UP_OPEN_UNTRADABLE=43/LIMIT_DOWN_STUCK=3/promotion_gate_pass=false(维持fail-closed)",
+   "v699_real_replay": "真实数据 V697->V698->V699(含涨跌停建模): 18291种子/oracle一致/n=17433/WR52.62%/avg+1.22%/PF1.390/LIMIT_UP_OPEN_UNTRADABLE=43/LIMIT_DOWN_STUCK=3/promotion_gate_pass=false(维持fail-closed)",
    "v699_iter1c_regression": "Iter1c 恒False条件回归已修复(2026-09-18), 回归锁重写 6/6",
    "v700_four_endpoint": "v700扫描器target消费语义对齐V699(四端一致) + 承诺epoch当前漏斗 2 full_setup/buy_valid=0(经济门槛正确生效)",
    "verdict": "ALL_GREEN",
    "updated": "2026-09-18",
-   "v699_limit_model": "Iteration3 kernel现实性: 涨停开盘拒绝/跌停顺延/TIME20跌停→OPEN_DATA; 影响小且可解释(-36笔, 退出略差符合保守方向), 经济结论不变"
+   "v699_limit_model": "Iteration3 kernel现实性完成: 涨停拒绝/跌停顺延/TIME20跌停->OPEN_DATA; 影响小(-36笔)且可解释(崩盘退出略差符合保守), 逐年 negative 年份(2023/2026)仍负, 结论不变"
   },
   "honesty_notes": [
    "历史指标(V88 80.08%等)为仓库报告中的历史结果; 此前'本工作区无 /root/.hermes 数据'的判断错误, 已修正(2026-09-18): /root/.hermes 解析为 E:\\root\\.hermes = 工作区 hermes 目录(4905 个 daily_750), 真实数据可用",
@@ -1278,6 +1278,6 @@
    ],
    "note": "已在真实缓存上完成逐年逐月回放(2026-09-18, V697→V698→V699 生产链)"
   },
-  "frontend_synced": "2026-09-18 18:33:41"
+  "frontend_synced": "2026-09-18 20:14:24"
  }
 }
