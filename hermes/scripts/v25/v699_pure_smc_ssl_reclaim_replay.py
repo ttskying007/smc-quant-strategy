@@ -74,15 +74,20 @@ def visible_target(b:list[dict[str,Any]], sweep_idx:int, response_idx:int, entry
     # A pivot is visible by sweep time only if all RIGHT bars were completed before sweep.
     # Its liquidity must also remain unbroken through the response bar; an already
     # consumed swing high is not an upside structural target.
-    # 审计修复(2026-09, §3.7): 原实现只检查 pivot > response_high, 未验证
-    # 「未被消费」语义 —— 若 sweep bar 的低点已穿透(≤) pivot 高度, 说明该
-    # 流动性已被扫掉/消费(sweep 正是向下扫荡上方止损单的动作), 不得再作目标。
-    # 判定: sweep 低点 > pivot 高 => 未消费(可作目标); <= => 已消费(排除)。
+    # 审计修复(2026-09, §3.7 修订): 前一版(Iter1c/bf1a570)用 pivot高<sweep_low 判定
+    # 「已消费」, 但源合约要求 response 收盘突破 sweep 高点 => minimum_target>=
+    # response_high>sweep_high>sweep_low 恒成立, 候选 pivot 高点必然高于 sweep 全程
+    # => pivot高<sweep_low 永假 => visible_target 恒返回 None
+    # (20260918 全市场回放 18291 种子 0 成交 NO_VISIBLE_UPSIDE_TARGET 的根因)。
+    # 正确的「未被消费」语义: 摆动高点的流动性只在价格向上穿越它时被消费;
+    # sweep 低点穿透 pivot 高度是 SSL 扫荡本身的一部分, 不是消费。
+    # 判定: pivot 确认后至 response 前无任何 bar 高点 >= pivot 高 => 未消费(可作目标);
+    # 同 bar 高点相等(==)视为已触及(消费)。
     minimum_target = max(entry, b[response_idx]['h'])
-    sweep_low = b[sweep_idx]['l']
     for j in range(sweep_idx-RIGHT-1, LEFT-1, -1):
-        if high_pivot(b,j) and b[j]['h']>minimum_target and b[j]['h'] < sweep_low:
-            return j,b[j]['h']
+        if high_pivot(b,j) and b[j]['h']>minimum_target:
+            if not any(b[k]['h']>=b[j]['h'] for k in range(j+RIGHT+1,response_idx)):
+                return j,b[j]['h']
     return None
 
 def pct(x:float,base:float)->float:return (x/base-1.0)*100.0

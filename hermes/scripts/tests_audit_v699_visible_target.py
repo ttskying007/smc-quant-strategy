@@ -1,20 +1,25 @@
 # -*- coding: utf-8 -*-
-"""tests_audit_v699_visible_target.py —— V699 visible_target「未被消费」语义属性测试.
+"""tests_audit_v699_visible_target.py —— V699 visible_target「未被消费」语义属性测试(修订版).
 
 审计 §3.7 P1: "visible_target() 中的'未被消费'语义和上下文需要作为独立属性测试验证"
 
-审计关切: visible_target 注释声称 "an already consumed swing high is not an
-upside structural target"（已被消费的摆动高点不能作为上行目标），但实现(L77-80)
-只检查 pivot 高度 > max(entry, response_high)，**没有验证该 pivot 是否在 sweep
-时已被穿透** —— 若 sweep 低点已经打到/穿透 pivot 高度，说明该流动性已被扫掉
-（消费），不应再作为目标。
+历史教训(20260918 发现, 修订本测试的原因):
+  Iter1c(bf1a570) 曾用 pivot高<sweep_low 判定「已消费」。但源合约要求 response
+  收盘突破 sweep 高点 => minimum_target>=response_high>sweep_high>sweep_low 恒成立,
+  候选 pivot 高点必然高于 sweep 全程 => pivot高<sweep_low 永假 => visible_target
+  恒返回 None => 20260918 全市场回放 18291 种子 0 成交(NO_VISIBLE_UPSIDE_TARGET)。
+  旧版属性测试用了违反源合约的合成几何(sweep低点>pivot高), 故测试通过而生产全拒。
 
-本测试:
-  ① 构造: pivot 在 sweep 时被穿透(消费) 但仍被返回 -> 证明缺陷
-  ② 构造: pivot 未被消费 -> 应正常返回
-  ③ 修复后: 已消费 pivot 必须被排除
+正确的 SMC 语义(预注册):
+  摆动高点的流动性只在价格向上穿越它时被消费; sweep 低点穿透 pivot 高度是
+  SSL 扫荡本身的一部分, 不是消费。pivot 确认后至 response 前无任何 bar 高点
+  >= pivot 高 => 未消费(可作目标); bar 高点相等(==)视为已触及(消费)。
 
-判据(预注册): 已消费(被 sweep 穿透)的 pivot 不得作为目标。
+判据(预注册):
+  ① 未消费 pivot 必须被返回 —— 含真实几何回归锁(sweep 低点 < pivot 高)
+  ② 已消费 pivot(确认后至 response 前有 bar 高点 > pivot 高)必须被排除
+  ③ 边界: bar 高点 == pivot 高点 视为已消费(排除)
+  ④ 全部 fixture 满足源合约: response 收盘 > sweep 高点
 """
 import importlib.util
 import io
@@ -55,62 +60,75 @@ extracted = "".join(m.group(1) for m in FUNC_RE.finditer(src))
 exec(compile(extracted, "v699_funcs", "exec"))
 
 
-def make_bars(prices):
-    """构造 OHLCV bars: prices=[(o,h,l,c)...]"""
+def make_bars(rows):
+    """构造 OHLC bars: rows=[(o,h,l,c)...], 索引即 idx."""
     return [{"t": "2024%02d%02d" % (i // 22 + 1, i % 22 + 1),
              "o": o, "h": h, "l": l, "c": c}
-            for i, (o, h, l, c) in enumerate(prices)]
+            for i, (o, h, l, c) in enumerate(rows)]
 
 
-print("== 1. 缺陷验证: 已消费 pivot 被返回(审计关切) ==")
-# 构造: sweep_idx=10, response_idx=11, entry=100
-#   - pivot 在 idx=6 (high=115) —— 需 LEFT=3 前/ RIGHT=3 后确认
-#   - sweep bar(idx=10) 低点 = 112(未穿透 pivot 115) -> 未消费 -> 应返回
-#   反向: sweep 低点 = 113?? 不对, 需低于115才算穿透。
-#   设计两组对照:
-#   A(未消费): sweep low=113 < 115? 113<115 穿透了! 重新设计.
-#   B(已消费): sweep low=110 < pivot 115 -> 穿透
-#   关键: 若实现不检查消费, 两组都返回 pivot -> 缺陷成立
-# 用简单价格序列(每根 o=h=l=c 近似, 仅 pivot 处特殊)
+def base_fixture(spike_high, spike_at=11):
+    """真实几何 fixture(满足源合约):
 
-def test_case(consume):
-    """consume=True 时 sweep 低点穿透 pivot."""
-    bars = []
+      idx0-5   : 100.0..100.5 平台(o=h=l=c)
+      idx6     : pivot, high=115(左3根/右3根确认)
+      idx7-9   : 100.6..100.8 回落(pivot 右侧确认窗内, 高点<=115)
+      idx10    : sweep bar: 向下扫荡, o=101 h=102 l=90 c=95
+                 —— 全程(高/低)低于 pivot 115。真实种子里必如此:
+                    minimum_target>=response_high>sweep_high>sweep_low。
+      idx11    : spike/grab bar: high=spike_high, 收盘 101 < sweep 高 102
+                 (不构成 response; spike 位于 pivot 确认后、response 前)
+      idx12    : response bar: o=101 h=104 l=100 c=103 —— 收盘 103 > sweep 高 102
+                 (源合约满足); response 高 104 < pivot 115(pivot 为候选)
+      minimum_target = max(entry=100, response_high=104) = 104 < 115
+    """
+    rows = []
     px = 100.0
     for i in range(18):
         o = h = l = c = px
         if i == 6:
-            # pivot: 高点 115 (响应高点112之下, 因此成为候选)
-            o = h = l = c = 115.0
+            o, h, l, c = 110.0, 115.0, 109.0, 111.0
         elif i == 10:
-            # sweep bar: 低点 110(穿透 pivot 115) 或 118(未穿透)
-            o = h = l = c = 118.0 if not consume else 110.0
-        elif i == 11:
-            # response bar: 高 112 (高于 entry 100, 低于 pivot 115)
-            o = h = l = c = 112.0
+            o, h, l, c = 101.0, 102.0, 90.0, 95.0
+        elif i == spike_at:
+            o, h, l, c = 100.0, spike_high, 99.0, 101.0
         elif i == 12:
-            o = h = l = c = 117.0
-        bars.append({"t": "2024%02d%02d" % (i // 22 + 1, i % 22 + 1),
-                     "o": o, "h": h, "l": l, "c": c})
+            o, h, l, c = 101.0, 104.0, 100.0, 103.0
+        rows.append((o, h, l, c))
         px += 0.1
-    return bars
+    return make_bars(rows)
 
-# 未消费: sweep 低=118 > pivot高115? 118>115 未穿透 -> 未消费
-# 响应高=112 < pivot115 -> pivot 是候选; minimum_target=max(100,112)=112 <115
-bars_a = test_case(consume=False)
-ta = visible_target(bars_a, sweep_idx=10, response_idx=11, entry=100.0)
+
+def contract_ok(bars):
+    """源合约断言: response(idx=12) 收盘 > sweep(idx=10) 高点。"""
+    return bars[12]["c"] > bars[10]["h"]
+
+
+print("== 0. fixture 源合约一致性 ==")
+fixtures = [("未消费", base_fixture(104.0)),
+            ("已消费(spike>pivot)", base_fixture(116.0)),
+            ("边界(spike==pivot)", base_fixture(115.0))]
+for name, fx in fixtures:
+    ok("合约: %s fixture response收盘>sweep高点" % name, contract_ok(fx))
+
+print("\n== 1. 未消费 pivot 被返回(真实几何回归锁: sweep低点90 < pivot高115) ==")
+bars_a = base_fixture(104.0)
+ta = visible_target(bars_a, sweep_idx=10, response_idx=12, entry=100.0)
 print("  未消费场景 visible_target =", ta)
-ok("未消费 pivot 被返回(基线正确)", ta is not None and ta[1] > 100, ta)
+ok("未消费 pivot 被返回(回归锁: Iter1c 曾因此全拒)",
+   ta is not None and ta[0] == 6 and ta[1] == 115.0, ta)
 
-# 已消费: sweep 低=110 < pivot高115 -> 穿透(流动性被扫掉)
-bars_b = test_case(consume=True)
-tb = visible_target(bars_b, sweep_idx=10, response_idx=11, entry=100.0)
+print("\n== 2. 已消费 pivot 被排除(spike 高点 116 > pivot 115) ==")
+bars_b = base_fixture(116.0)
+tb = visible_target(bars_b, sweep_idx=10, response_idx=12, entry=100.0)
 print("  已消费场景 visible_target =", tb)
-# 审计关切: 已消费 pivot 不应是目标。当前实现(L77-80)只查 pivot>response_high,
-# 未检查 sweep 是否穿透 -> 大概率仍返回 pivot -> 缺陷
-ok("已消费 pivot 应被排除(修复目标)", tb is None, tb)
+ok("已消费 pivot 被排除(向上穿越=消费)", tb is None, tb)
+
+print("\n== 3. 边界: bar 高点 == pivot 高点 视为已消费 ==")
+bars_c = base_fixture(115.0)
+tc = visible_target(bars_c, sweep_idx=10, response_idx=12, entry=100.0)
+print("  边界场景 visible_target =", tc)
+ok("边界(==)视为消费被排除", tc is None, tc)
 
 print("\n结果: PASS=%d FAIL=%d" % (PASS, FAIL))
-print("\n注: 若 '已消费 pivot 应被排除' 失败 => 证实审计§3.7关切(注释与实现不一致),")
-print("    需修复 visible_target 加入消费检查(sweep 前穿透则跳过)。")
 sys.exit(1 if FAIL else 0)

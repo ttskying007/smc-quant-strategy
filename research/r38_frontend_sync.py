@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""r38_frontend_sync.py —— R38 研究结果前端同步生成器.
+r"""r38_frontend_sync.py —— R38 研究结果前端同步生成器.
 聚合 回测/选股/复盘 三类结果 → 紧凑 JSON(E:\test\smc_project\research\r38_frontend.json),
 由 web_server /api/r38 端点提供给前端面板(轮询实时同步)。
 - 事件腿聚合: 从 combo_v20f_trades.csv 现算(快, ~2000行)
@@ -124,6 +124,44 @@ mreg = defaultdict(list)
 for r in ev: mreg[regime(r.get("entry_date") or "")].append(f(r["net_pnl_pct"]))
 for t in tech: mreg[regime(t["d"])].append(t["p"])
 merged["regime"] = {k: stats(ps) for k, ps in sorted(mreg.items())}
+
+# ---------- V699 冻结回放(研究链, 独立于生产回测块) ----------
+V699_LATEST = r"E:\root\.hermes\smc_audit\v699_pure_smc_ssl_reclaim_replay_latest.json"
+
+def v699_block():
+    try:
+        r6 = json.load(open(V699_LATEST, encoding="utf-8"))
+    except Exception as e:
+        print(f"V699 latest 不可用({e}) -> v699_replay 块省略(fail-closed)")
+        return None
+    def st(d):
+        if not d: return {"n": 0, "avg": 0.0, "wr": 0.0, "pf": 0.0, "sum": 0}
+        return {"n": d.get("n", 0), "avg": d.get("avg_net_pnl_pct", 0.0),
+                "wr": d.get("gross_wr_pct", 0.0), "pf": d.get("profit_factor", 0.0),
+                "sum": d.get("total_net_pnl_pct", 0)}
+    ov = r6.get("overall") or {}
+    mtg = r6.get("monthly_trade_count_gate") or {}
+    return {
+        "title": "V699 纯SMC SSL扫荡回收 冻结线 T+1 严格回放(研究链)",
+        "label": "研究链结果: 因果工程通过(oracle身份一致/不变量全绿)但经济性失败 -> fail-closed(审计§12)",
+        "decision": r6.get("decision"),
+        "promotion_gate_pass": r6.get("promotion_gate_pass"),
+        "production_write": r6.get("production_write"),
+        "generated_at": r6.get("generated_at"),
+        "seed_count": r6.get("seed_count"),
+        "closed_trade_count": r6.get("closed_trade_count"),
+        "contract": r6.get("frozen_execution_contract"),
+        "base": st(ov),
+        "yearly": {y: st(d) for y, d in sorted((r6.get("yearly") or {}).items())},
+        "exits": ov.get("exit_counts") or {},
+        "skip_counts": r6.get("nontradable_or_serial_skip_counts") or {},
+        "gate_checks": r6.get("promotion_checks") or {},
+        "invariants": r6.get("invariants") or {},
+        "monthly_gate_failed_months": mtg.get("failed_months_n<=4") or [],
+        "note": "本块为 V697-V699 研究链严格回放, 与 backtest 块(R38 EVENT 腿, canonical 生产策略回测)是两条不同管线; 前端须区分展示, 不得混用口径",
+    }
+
+v699b = v699_block()
 
 # ---------- 复盘(迭代日志, 每轮研究后更新) ----------
 review = {
@@ -349,6 +387,20 @@ review = {
           "detail": "09-17 00:00 daily选股完成: 38公告->16正事件->stage拒3->adx拒2->orders_created=0。 无任何信号通过stage+ADX走到rank评估阶段 -> 门槛(位于其后)无事可做 -> 无RANK_LT记录属正常, 与事件腿alpha窄带一致(扩池三连否已证)。 端到端最终状态: 代码在跑(paper_ledger含rank_score) + 配置生效(EVENT_RANK_GATE_MIN=3) + 门槛已就位"},
          {"id": "AUDIT-R39", "name": "外部审计修复(2026-09)", "result": "P0/P1已修复+回归锁",
           "detail": "外部审计关键发现经独立核实全部属实并修复: (1)编译阻断(run_v11_full截断+validate_skills 6处f-string)->compileall全绿; (2)V500未来函数TP->仅入场前可见结构(行为验证通过); (3)元组索引bug(c[3]->c[2])+排序(x[2]->x[3])。 回归锁tests_audit_v500_causality.py 9项全绿。 V11旧研究链不影响生产事件腿。 其余P0/P1(一次性全量检测/自适应参数look-ahead)属事件流架构重构, 记为后续"},
+         {"id": "V699-REPLAY", "name": "V699 真实数据冻结回放(生产链重跑)", "result": "因果通过/经济失败(维持fail-closed)",
+          "detail": "真实数据端到端: V697 18291种子(support_gate_pass) -> V698 oracle身份一致(18291==18291) -> "
+                    "V699 冻结T+1严格回放 n=17469/WR52.65%/avg+1.24%/PF1.40。 "
+                    "逐年: 2023 -1.05%(负) | 2024 +0.71% | 2025 +3.56% | 2026 -1.74%(负); "
+                    "月度门槛失败(202304/05/06/07 n=1/2/1/4); promotion_gate_pass=false "
+                    "-> 审计结论被真实数据再次确认: 保持 EMPTY_BOOK/fail-closed, 不做变体"},
+         {"id": "V699-REGRESS", "name": "V699 Iter1c 回归发现与修复(重要)", "result": "回归已修复+回归锁6/6",
+          "detail": "Iter1c(bf1a570) 用 pivot高<sweep_low 判定消费, 但合约要求 response收盘突破sweep高点 => "
+                    "minimum_target>=response_high>sweep_high>sweep_low 恒成立 => 条件永假 => "
+                    "visible_target 恒None => 18291种子 0 成交(NO_VISIBLE_UPSIDE_TARGET=18281)。 "
+                    "旧属性测试用了违反源合约的合成几何(sweep低点>pivot高)故测试通过而生产全拒。 "
+                    "正确语义: 摆动高点只在价格向上穿越(>=)时被消费; sweep低点穿透是SSL扫荡本身。 "
+                    "修复后重跑: n=17469(与历史17600高度一致, 差异=消费检查排除272 vs 176 + 缓存刷新)。 "
+                    "教训: 属性测试fixture必须满足源合约, 否则测试通过≠生产正确"},
         {"id": "R38-CONVERGE", "name": "R38 迭代收敛(最终)", "result": "两处改进 + 一处口径修正",
          "detail": "18轮 12+ 假设测试完毕。真实改进: (1)ACCUM×2 温和加权(PF3.21→3.29) (2)Wilder+h12 合并重基线(PF3.08→3.72, MDD -629→-448) —— 后者性质是修正回测与生产的口径分叉。扩池三连否 + stage/rank/退出全部验证现状; 最高价值工作 = P1-7+P1-8 合并重基线(走审计)"},
     ],
@@ -410,6 +462,8 @@ review = {
         {"round": "R39", "commit": "6aac8dc/8b61ac6", "content": "daily端到端验证最终结论(门槛无事可做非失效) + 外部审计P0/P1修复(编译阻断/V500未来函数/元组bug) + 回归锁9项"},
         {"round": "R38at/au", "commit": "47947ae/6a7fd0f", "content": "综合报告38轮收敛已出; 生产接线端到端核查通过(代码在跑配置生效), 门槛尚无真实新信号(daily待办)"},
         {"round": "R38ap", "commit": "-", "content": "行业维度date-shuffle安慰剂: 层内增量p=0.06不显著(实为全市场择时代理); 覆盖率极端不均(2024 40% vs 2025 4%) -> 否决; 沉淀置换null纪律"},
+        {"round": "R40a", "commit": "-", "content": "V697/V698 真实数据重跑: 18291种子/oracle身份一致; V699首跑0成交 -> 发现Iter1c回归(恒False条件)"},
+        {"round": "R40b", "commit": "-", "content": "V699 visible_target 回归修复(正确消费语义: 向上穿越=消费) + 回归锁重写6/6 + 重跑 n=17469 逐年逐月 -> 维持fail-closed; 前端新增v699_replay块"},
     ],
     "schools": {"ICT/SMC": 1250, "PriceAction": 229, "ChanLun缠论": 110, "Indicator": 214,
                 "OrderFlow": 34, "Volume/VSA": 10, "Wyckoff": 5, "ElliottWave": 8, "TheStrat": 4},
@@ -417,6 +471,14 @@ review = {
 
 data = {"updated": __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "backtest": bt, "selection": sel, "merged": merged, "review": review}
+if v699b: data["v699_replay"] = v699b
+# audit_rebuild 块为手工同步内容(非本脚本生成), 重生成时必须保留, 不得丢失
+try:
+    prev = json.load(open(OUT, encoding="utf-8"))
+    if isinstance(prev, dict) and "audit_rebuild" in prev:
+        data["audit_rebuild"] = prev["audit_rebuild"]
+except Exception:
+    pass
 json.dump(data, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 print(f"→ {OUT} ({os.path.getsize(OUT)} bytes)")
 print(f"  事件腿 n={bt['base']['n']} PF={bt['base']['pf']} | 技术腿 n={sel['tech_v2']['n']} PF={sel['tech_v2']['pf']}")

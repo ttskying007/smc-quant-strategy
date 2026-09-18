@@ -1,5 +1,5 @@
 {
- "updated": "2026-09-17 20:44:07",
+ "updated": "2026-09-18 13:52:32",
  "backtest": {
   "base": {
    "n": 1527,
@@ -718,6 +718,18 @@
     "detail": "外部审计关键发现经独立核实全部属实并修复: (1)编译阻断(run_v11_full截断+validate_skills 6处f-string)->compileall全绿; (2)V500未来函数TP->仅入场前可见结构(行为验证通过); (3)元组索引bug(c[3]->c[2])+排序(x[2]->x[3])。 回归锁tests_audit_v500_causality.py 9项全绿。 V11旧研究链不影响生产事件腿。 其余P0/P1(一次性全量检测/自适应参数look-ahead)属事件流架构重构, 记为后续"
    },
    {
+    "id": "V699-REPLAY",
+    "name": "V699 真实数据冻结回放(生产链重跑)",
+    "result": "因果通过/经济失败(维持fail-closed)",
+    "detail": "真实数据端到端: V697 18291种子(support_gate_pass) -> V698 oracle身份一致(18291==18291) -> V699 冻结T+1严格回放 n=17469/WR52.65%/avg+1.24%/PF1.40。 逐年: 2023 -1.05%(负) | 2024 +0.71% | 2025 +3.56% | 2026 -1.74%(负); 月度门槛失败(202304/05/06/07 n=1/2/1/4); promotion_gate_pass=false -> 审计结论被真实数据再次确认: 保持 EMPTY_BOOK/fail-closed, 不做变体"
+   },
+   {
+    "id": "V699-REGRESS",
+    "name": "V699 Iter1c 回归发现与修复(重要)",
+    "result": "回归已修复+回归锁6/6",
+    "detail": "Iter1c(bf1a570) 用 pivot高<sweep_low 判定消费, 但合约要求 response收盘突破sweep高点 => minimum_target>=response_high>sweep_high>sweep_low 恒成立 => 条件永假 => visible_target 恒None => 18291种子 0 成交(NO_VISIBLE_UPSIDE_TARGET=18281)。 旧属性测试用了违反源合约的合成几何(sweep低点>pivot高)故测试通过而生产全拒。 正确语义: 摆动高点只在价格向上穿越(>=)时被消费; sweep低点穿透是SSL扫荡本身。 修复后重跑: n=17469(与历史17600高度一致, 差异=消费检查排除272 vs 176 + 缓存刷新)。 教训: 属性测试fixture必须满足源合约, 否则测试通过≠生产正确"
+   },
+   {
     "id": "R38-CONVERGE",
     "name": "R38 迭代收敛(最终)",
     "result": "两处改进 + 一处口径修正",
@@ -939,6 +951,16 @@
     "round": "R38ap",
     "commit": "-",
     "content": "行业维度date-shuffle安慰剂: 层内增量p=0.06不显著(实为全市场择时代理); 覆盖率极端不均(2024 40% vs 2025 4%) -> 否决; 沉淀置换null纪律"
+   },
+   {
+    "round": "R40a",
+    "commit": "-",
+    "content": "V697/V698 真实数据重跑: 18291种子/oracle身份一致; V699首跑0成交 -> 发现Iter1c回归(恒False条件)"
+   },
+   {
+    "round": "R40b",
+    "commit": "-",
+    "content": "V699 visible_target 回归修复(正确消费语义: 向上穿越=消费) + 回归锁重写6/6 + 重跑 n=17469 逐年逐月 -> 维持fail-closed; 前端新增v699_replay块"
    }
   ],
   "schools": {
@@ -952,6 +974,92 @@
    "ElliottWave": 8,
    "TheStrat": 4
   }
+ },
+ "v699_replay": {
+  "title": "V699 纯SMC SSL扫荡回收 冻结线 T+1 严格回放(研究链)",
+  "label": "研究链结果: 因果工程通过(oracle身份一致/不变量全绿)但经济性失败 -> fail-closed(审计§12)",
+  "decision": "V699_FROZEN_REPLAY_FAIL__CLOSE_ONTOLOGY__NO_VARIANTS",
+  "promotion_gate_pass": false,
+  "production_write": false,
+  "generated_at": "2026-09-18T12:57:50",
+  "seed_count": 18291,
+  "closed_trade_count": 17469,
+  "contract": "eligible-day open; stop=sweep low*0.99; nearest prior visible confirmed swing high target; exits begin following session; SL-first collision; time20; round-trip fee0.20%; serial one-position-per-symbol",
+  "base": {
+   "n": 17469,
+   "avg": 1.2356,
+   "wr": 52.6533,
+   "pf": 1.3974,
+   "sum": 21584.5264
+  },
+  "yearly": {
+   "2023": {
+    "n": 1411,
+    "avg": -1.0521,
+    "wr": 39.3338,
+    "pf": 0.6691,
+    "sum": -1484.554
+   },
+   "2024": {
+    "n": 5131,
+    "avg": 0.7119,
+    "wr": 51.0232,
+    "pf": 1.2194,
+    "sum": 3652.9134
+   },
+   "2025": {
+    "n": 7252,
+    "avg": 3.5601,
+    "wr": 65.0441,
+    "pf": 2.6393,
+    "sum": 25817.9598
+   },
+   "2026": {
+    "n": 3675,
+    "avg": -1.742,
+    "wr": 35.5918,
+    "pf": 0.6326,
+    "sum": -6401.7929
+   }
+  },
+  "exits": {
+   "TIME20": 3108,
+   "TP_STRUCTURAL": 6848,
+   "SL": 6593,
+   "GAP_SL": 920
+  },
+  "skip_counts": {
+   "NO_VISIBLE_UPSIDE_TARGET": 272,
+   "SYMBOL_ALREADY_OPEN": 395,
+   "INVALID_STRUCTURAL_STOP": 10,
+   "INSUFFICIENT_FORWARD_BARS": 144,
+   "NO_POST_ENTRY_BAR": 1
+  },
+  "gate_checks": {
+   "n>=300": true,
+   "each_year_n>=300": true,
+   "each_year_avg_net>0": false,
+   "each_month_n>4": false,
+   "gross_wr>=55": false,
+   "avg_net>=0.5": true,
+   "pf>=1.15": true,
+   "payoff>=0.7": true,
+   "t1_violations==0": true
+  },
+  "invariants": {
+   "seed_count_matches_oracle": true,
+   "all_entries_strictly_after_response": true,
+   "t1_violations": 0,
+   "all_structural_targets_prior_to_sweep": true,
+   "all_production_writes_false": true
+  },
+  "monthly_gate_failed_months": [
+   "202304",
+   "202305",
+   "202306",
+   "202307"
+  ],
+  "note": "本块为 V697-V699 研究链严格回放, 与 backtest 块(R38 EVENT 腿, canonical 生产策略回测)是两条不同管线; 前端须区分展示, 不得混用口径"
  },
  "audit_rebuild": {
   "title": "外部审计重构执行进度(A 股 SMC 量化策略审计与重构报告)",
@@ -1058,26 +1166,40 @@
      "evidence_crosscheck.py: 审计证据20项核对 FIXED=8/PRESENT=12"
     ],
     "tests": "静态核对"
+   },
+   "真实数据端到端回放(V697→V698→V699)": {
+    "status": "DONE",
+    "deliverables": [
+     "V697 全市场种子 18291(support_gate_pass=true)",
+     "V698 独立 oracle 身份一致 18291==18291(oracle_pass=true)",
+     "V699 冻结T+1严格回放 n=17469/WR52.65%/avg+1.24%/PF1.40",
+     "逐年: 2023 净-1.05%(负) / 2024 +0.71% / 2025 +3.56% / 2026 净-1.74%(负)",
+     "月度门槛失败(202304/05/06/07 n<=4); promotion_gate_pass=false",
+     "发现并修复 Iter1c visible_target 回归(恒False条件), 回归锁重写 6/6"
+    ],
+    "tests": "tests_audit_v699_visible_target 6项(修订版, 合约一致fixture)"
    }
   },
   "verification": {
    "suite": "run_audit_tests.py",
-   "tests_total": 20,
-   "tests_passed": 20,
-   "assertions_passed": 196,
+   "tests_total": 21,
+   "tests_passed": 21,
+   "assertions_passed": 213,
    "assertions_failed": 0,
    "compile_failures": 0,
    "compileall": "hermes/scripts 全量 exit=0",
    "evidence_crosscheck": "§13 20项: FIXED=8 / PRESENT=12 / ABSENT=0",
+   "v699_real_replay": "真实数据 V697→V698→V699: 18291种子/oracle一致/n=17469/WR52.65%/promotion_gate_pass=false(维持fail-closed)",
+   "v699_iter1c_regression": "Iter1c 恒False条件回归已修复(2026-09-18), 回归锁重写 6/6",
    "verdict": "ALL_GREEN",
-   "updated": "2026-09-17"
+   "updated": "2026-09-18"
   },
   "honesty_notes": [
-   "历史指标(V88 80.08%等)为仓库报告中的历史结果, 本工作区无 /root/.hermes 数据, 未重新生成",
+   "历史指标(V88 80.08%等)为仓库报告中的历史结果; 此前'本工作区无 /root/.hermes 数据'的判断错误, 已修正(2026-09-18): /root/.hermes 解析为 E:\\root\\.hermes = 工作区 hermes 目录(4905 个 daily_750), 真实数据可用",
    "V88/V44 历史高胜率不得作为生产依据(前视偏差, 审计§12)",
    "V697-V699 为因果工程通过但经济性失败的研究结果, 不继续同信息族改名迭代",
    "保持 EMPTY_BOOK/fail-closed 直到新策略通过严格 replay + 影子盘门槛",
-   "端到端逐年回放需真实 /root/.hermes 缓存, 本工作区不可行(环境限制, 非代码缺陷)"
+   "此前'端到端逐年回放本工作区不可行'的判断错误, 已修正(2026-09-18): 已用生产链 V697→V698→V699 在真实数据上完成逐年逐月冻结回放(18291 种子, 17469 笔)"
   ],
   "end_to_end_chain": {
    "status": "DONE",
@@ -1085,8 +1207,8 @@
     "replay_chain 端到端: 事件流->结构SL/TP->成交/组合->台账->研究门槛",
     "fallback 比例统计 + KEEP_RESEARCH/STAY_CLOSED 判定"
    ],
-   "note": "真实缓存上逐年逐月回放需 /root/.hermes(环境依赖)"
+   "note": "已在真实缓存上完成逐年逐月回放(2026-09-18, V697→V698→V699 生产链)"
   },
-  "frontend_synced": "2026-09-17 20:44:07"
+  "frontend_synced": "2026-09-18 13:52:32"
  }
 }
