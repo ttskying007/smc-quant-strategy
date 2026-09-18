@@ -143,7 +143,7 @@ def v699_block():
     mtg = r6.get("monthly_trade_count_gate") or {}
     return {
         "title": "V699 纯SMC SSL扫荡回收 冻结线 T+1 严格回放(研究链)",
-        "label": "研究链结果: 因果工程通过(oracle身份一致/不变量全绿)但经济性失败 -> fail-closed(审计§12)",
+        "label": "研究链结果: 因果工程通过(oracle身份一致/不变量全绿)但经济性失败 -> fail-closed(审计§12); 含涨跌停可成交性建模(审计§7.4/Iteration3: 涨停开盘拒绝/跌停顺延/TIME20跌停->OPEN_DATA)",
         "decision": r6.get("decision"),
         "promotion_gate_pass": r6.get("promotion_gate_pass"),
         "production_write": r6.get("production_write"),

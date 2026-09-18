@@ -1,5 +1,5 @@
 {
- "updated": "2026-09-18 16:36:05",
+ "updated": "2026-09-18 18:10:31",
  "backtest": {
   "base": {
    "n": 1527,
@@ -983,62 +983,64 @@
  },
  "v699_replay": {
   "title": "V699 纯SMC SSL扫荡回收 冻结线 T+1 严格回放(研究链)",
-  "label": "研究链结果: 因果工程通过(oracle身份一致/不变量全绿)但经济性失败 -> fail-closed(审计§12)",
+  "label": "研究链结果: 因果工程通过(oracle身份一致/不变量全绿)但经济性失败 -> fail-closed(审计§12); 含涨跌停可成交性建模(审计§7.4/Iteration3: 涨停开盘拒绝/跌停顺延/TIME20跌停->OPEN_DATA)",
   "decision": "V699_FROZEN_REPLAY_FAIL__CLOSE_ONTOLOGY__NO_VARIANTS",
   "promotion_gate_pass": false,
   "production_write": false,
-  "generated_at": "2026-09-18T12:57:50",
+  "generated_at": "2026-09-18T18:00:01",
   "seed_count": 18291,
-  "closed_trade_count": 17469,
+  "closed_trade_count": 17433,
   "contract": "eligible-day open; stop=sweep low*0.99; nearest prior visible confirmed swing high target; exits begin following session; SL-first collision; time20; round-trip fee0.20%; serial one-position-per-symbol",
   "base": {
-   "n": 17469,
-   "avg": 1.2356,
-   "wr": 52.6533,
-   "pf": 1.3974,
-   "sum": 21584.5264
+   "n": 17433,
+   "avg": 1.2182,
+   "wr": 52.6243,
+   "pf": 1.3896,
+   "sum": 21236.4801
   },
   "yearly": {
    "2023": {
     "n": 1411,
-    "avg": -1.0521,
+    "avg": -1.0555,
     "wr": 39.3338,
-    "pf": 0.6691,
-    "sum": -1484.554
+    "pf": 0.6684,
+    "sum": -1489.3098
    },
    "2024": {
-    "n": 5131,
-    "avg": 0.7119,
-    "wr": 51.0232,
-    "pf": 1.2194,
-    "sum": 3652.9134
+    "n": 5120,
+    "avg": 0.7072,
+    "wr": 50.9961,
+    "pf": 1.2178,
+    "sum": 3620.9582
    },
    "2025": {
-    "n": 7252,
-    "avg": 3.5601,
-    "wr": 65.0441,
-    "pf": 2.6393,
-    "sum": 25817.9598
+    "n": 7233,
+    "avg": 3.5424,
+    "wr": 65.0353,
+    "pf": 2.6139,
+    "sum": 25622.1403
    },
    "2026": {
-    "n": 3675,
-    "avg": -1.742,
-    "wr": 35.5918,
-    "pf": 0.6326,
-    "sum": -6401.7929
+    "n": 3669,
+    "avg": -1.7763,
+    "wr": 35.541,
+    "pf": 0.6279,
+    "sum": -6517.3086
    }
   },
   "exits": {
-   "TIME20": 3108,
-   "TP_STRUCTURAL": 6848,
-   "SL": 6593,
-   "GAP_SL": 920
+   "TIME20": 3104,
+   "TP_STRUCTURAL": 6824,
+   "SL": 6590,
+   "GAP_SL": 915
   },
   "skip_counts": {
-   "NO_VISIBLE_UPSIDE_TARGET": 272,
-   "SYMBOL_ALREADY_OPEN": 395,
+   "NO_VISIBLE_UPSIDE_TARGET": 261,
+   "SYMBOL_ALREADY_OPEN": 397,
    "INVALID_STRUCTURAL_STOP": 10,
-   "INSUFFICIENT_FORWARD_BARS": 144,
+   "LIMIT_UP_OPEN_UNTRADABLE": 43,
+   "LIMIT_DOWN_STUCK_AT_DATA_END": 3,
+   "INSUFFICIENT_FORWARD_BARS": 143,
    "NO_POST_ENTRY_BAR": 1
   },
   "gate_checks": {
@@ -1232,22 +1234,34 @@
      "§8选股量少诊断: 大幅下降层=ssl_breach(4888→108)与sweep_reclaim(108→20)"
     ],
     "tests": "tests_audit_v700_target 6项"
+   },
+   "V699涨跌停可成交性建模(Iteration3 kernel现实性)": {
+    "status": "DONE",
+    "deliverables": [
+     "数据源核实: refresh_daily_750.py:184 腾讯fqkline qfq(前复权) -> 数据确为前复权; qfq同段内相邻日比率守恒, 涨跌停判定用调整价近似正确(除权日参考价≈调整后前收盘)",
+     "涨停开盘: 买单不可成交 -> 拒绝(LIMIT_UP_OPEN_UNTRADABLE); 板块判定 688/689+300/301/302 ±20%/BJ ±30%/主板 ±10%",
+     "跌停开盘: 卖出申报进排队 -> 整个bar退出不可成交(保守), 持仓顺延至下一个可成交bar",
+     "TIME20 收盘在跌停 -> 持仓未平 -> OPEN_DATA(LIMIT_DOWN_STUCK_AT_DATA_END, 不记TIME20成交)",
+     "tests_audit_v699_limit_model.py 回归锁 9/9(涨停拒绝/正常放行/跌停顺延88→87/连续跌停卡死/基线TP/SL回归锁)"
+    ],
+    "tests": "tests_audit_v699_limit_model 9项"
    }
   },
   "verification": {
    "suite": "run_audit_tests.py",
-   "tests_total": 22,
-   "tests_passed": 22,
-   "assertions_passed": 219,
+   "tests_total": 23,
+   "tests_passed": 23,
+   "assertions_passed": 228,
    "assertions_failed": 0,
    "compile_failures": 0,
    "compileall": "hermes/scripts 全量 exit=0",
    "evidence_crosscheck": "§13 20项: FIXED=8 / PRESENT=12 / ABSENT=0",
-   "v699_real_replay": "真实数据 V697→V698→V699: 18291种子/oracle一致/n=17469/WR52.65%/promotion_gate_pass=false(维持fail-closed)",
+   "v699_real_replay": "真实数据 V697→V698→V699(含涨跌停建模): 18291种子/oracle一致/n=17433/WR52.62%/avg+1.22%/PF1.390/LIMIT_UP_OPEN_UNTRADABLE=43/LIMIT_DOWN_STUCK=3/promotion_gate_pass=false(维持fail-closed)",
    "v699_iter1c_regression": "Iter1c 恒False条件回归已修复(2026-09-18), 回归锁重写 6/6",
    "v700_four_endpoint": "v700扫描器target消费语义对齐V699(四端一致) + 承诺epoch当前漏斗 2 full_setup/buy_valid=0(经济门槛正确生效)",
    "verdict": "ALL_GREEN",
-   "updated": "2026-09-18"
+   "updated": "2026-09-18",
+   "v699_limit_model": "Iteration3 kernel现实性: 涨停开盘拒绝/跌停顺延/TIME20跌停→OPEN_DATA; 影响小且可解释(-36笔, 退出略差符合保守方向), 经济结论不变"
   },
   "honesty_notes": [
    "历史指标(V88 80.08%等)为仓库报告中的历史结果; 此前'本工作区无 /root/.hermes 数据'的判断错误, 已修正(2026-09-18): /root/.hermes 解析为 E:\\root\\.hermes = 工作区 hermes 目录(4905 个 daily_750), 真实数据可用",
@@ -1264,6 +1278,6 @@
    ],
    "note": "已在真实缓存上完成逐年逐月回放(2026-09-18, V697→V698→V699 生产链)"
   },
-  "frontend_synced": "2026-09-18 16:28:07"
+  "frontend_synced": "2026-09-18 18:33:41"
  }
 }

@@ -25,6 +25,7 @@ TESTS = [
     "tests_audit_v500_causality.py",        # §3.1/3.6 V500 因果性
     "tests_audit_v699_visible_target.py",   # §3.7 V699 消费语义
     "tests_audit_v700_target.py",           # §3.7/Iter6 V700 扫描器消费语义(四端一致)
+    "tests_audit_v699_limit_model.py",      # §7.4/Iter3 V699 涨跌停可成交性建模
     "tests_audit_signal_time_contract.py",  # §3.3 时间语义
     "tests_audit_exit_cost_model.py",       # §3.5 成本模型
     "tests_audit_future_function.py",       # §3.1 静态检查

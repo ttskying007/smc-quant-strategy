@@ -70,6 +70,15 @@ def high_pivot(b:list[dict[str,Any]],j:int)->bool:
     h=b[j]['h']
     return all(h>b[k]['h'] for k in range(j-LEFT,j)) and all(h>=b[k]['h'] for k in range(j+1,j+RIGHT+1))
 
+def limit_ratio(code:str,ex:str)->float:
+    # A股涨跌停幅度按板块(审计§7.4/Iteration3 现实性): 科创板(688/689)与创业板
+    # (300/301/302) ±20%, 北交所 ±30%, 主板 ±10%。ST ±5% 无法从代码识别(需名称
+    # 数据), 近似按主板处理 —— 报告中诚实标注此限制。
+    if code.startswith('688') or code.startswith('689'):return 0.20
+    if code[:3] in ('300','301','302'):return 0.20
+    if ex=='BJ':return 0.30
+    return 0.10
+
 def visible_target(b:list[dict[str,Any]], sweep_idx:int, response_idx:int, entry:float)->tuple[int,float]|None:
     # A pivot is visible by sweep time only if all RIGHT bars were completed before sweep.
     # Its liquidity must also remain unbroken through the response bar; an already
@@ -106,6 +115,12 @@ def replay(row:dict[str,str], b:list[dict[str,Any]])->dict[str,Any]:
         return {'status':'SKIP','reason':'INVALID_SEED_DATE_ORDER'}
     entry=b[idx]['o']; stop=float(row['sweep_low'])*STOP_BUFFER
     if stop>=entry:return {'status':'SKIP','reason':'INVALID_STRUCTURAL_STOP'}
+    # 涨跌停可成交性(审计§7.4/Iteration3): 涨停开盘买单不可成交 -> 拒绝。
+    # qfq 前复权数据同段内相邻日比率守恒, 调整价近似正确(除权日参考价≈调整后前收盘);
+    # epsilon 容忍交易所 0.01 取整与浮点噪声(相对 5bp; 近涨停卖盘薄, 略保守, 诚实标注)。
+    code,ex=row['symbol'].split('.')
+    if entry>=b[idx-1]['c']*(1.0+limit_ratio(code,ex))-max(0.005,b[idx-1]['c']*0.0005):
+        return {'status':'SKIP','reason':'LIMIT_UP_OPEN_UNTRADABLE'}
     target_info=visible_target(b,sweep_idx,idx-1,entry)
     if target_info is None:return {'status':'SKIP','reason':'NO_VISIBLE_UPSIDE_TARGET'}
     target_idx,target=target_info
@@ -114,17 +129,29 @@ def replay(row:dict[str,str], b:list[dict[str,Any]])->dict[str,Any]:
     path=b[idx+1:idx+1+MAX_HOLD] # strict A-share: no entry-session exit.
     if not path:return {'status':'OPEN_DATA','reason':'NO_POST_ENTRY_BAR','entry_date':b[idx]['t'],'entry_price':entry,'stop':stop,'target':target}
     best=max(x['h'] for x in path); worst=min(x['l'] for x in path)
+    prev_c=b[idx]['c']  # 首个可退出 bar 的涨跌停参考 = 入场日收盘
     for hold,bar in enumerate(path,1):
+        if bar['o']<=prev_c*(1.0-limit_ratio(code,ex))+max(0.005,prev_c*0.0005):
+            # 跌停开盘: 卖出申报进排队(卖方队列深) -> 整个bar退出不可成交(保守),
+            # 持仓顺延, 退出发生在下一个可成交 bar。略保守: 若价格盘中脱离跌停,
+            # 高于跌停价的止损卖出本可成交, 此模型忽略(诚实标注)。
+            prev_c=bar['c'];continue
         if bar['o']<=stop:
             exit_price=bar['o']; reason='GAP_SL'; break
         if bar['l']<=stop:
             exit_price=stop; reason='SL'; break
         if bar['h']>=target:
             exit_price=target; reason='TP_STRUCTURAL'; break
+        prev_c=bar['c']
     else:
         if len(path)<MAX_HOLD:
             return {'status':'OPEN_DATA','reason':'INSUFFICIENT_FORWARD_BARS','entry_date':b[idx]['t'],'entry_price':entry,'stop':stop,'target':target,'hold_bars':len(path),'mark_date':path[-1]['t'],'mark_price':path[-1]['c'],'mfe_pct':pct(best,entry),'mae_pct':pct(worst,entry)}
-        bar=path[-1]; hold=MAX_HOLD; exit_price=bar['c']; reason='TIME20'
+        bar=path[-1]
+        # 跌停收盘: 卖出不可成交, 持仓未平 -> OPEN_DATA(不记 TIME20 成交)
+        ref_c=path[-2]['c'] if len(path)>=2 else entry
+        if bar['c']<=ref_c*(1.0-limit_ratio(code,ex))+max(0.005,ref_c*0.0005):
+            return {'status':'OPEN_DATA','reason':'LIMIT_DOWN_STUCK_AT_DATA_END','entry_date':b[idx]['t'],'entry_price':entry,'stop':stop,'target':target,'hold_bars':MAX_HOLD,'mark_date':bar['t'],'mark_price':bar['c'],'mfe_pct':pct(best,entry),'mae_pct':pct(worst,entry)}
+        hold=MAX_HOLD; exit_price=bar['c']; reason='TIME20'
     gross=pct(exit_price,entry); net=gross-FEE_PCT
     return {'status':'CLOSED','reason':reason,'entry_date':b[idx]['t'],'entry_price':round(entry,6),'exit_date':bar['t'],'exit_price':round(exit_price,6),'stop':round(stop,6),'target':round(target,6),'target_swing_idx':target_idx,'target_swing_date':b[target_idx]['t'],'hold_bars':hold,'gross_pnl_pct':round(gross,6),'net_pnl_pct':round(net,6),'mfe_pct':round(pct(best,entry),6),'mae_pct':round(pct(worst,entry),6),'mfe_r':round((best-entry)/risk,6),'mae_r':round((worst-entry)/risk,6),'same_day_exit_violation':b[idx]['t']==bar['t']}
 
