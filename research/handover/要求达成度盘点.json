@@ -1,9 +1,9 @@
 {
-  "asof": "2026-09-18 23:51:47",
+  "asof": "2026-09-19 06:20:37",
   "total": 16,
-  "done": 8,
+  "done": 9,
   "partial": 4,
-  "open": 4,
+  "open": 3,
   "items": [
     {
       "id": "R1",
@@ -62,8 +62,8 @@
     {
       "id": "R10",
       "req": "弱市加权k=2生产决策",
-      "status": "OPEN(证据矛盾)",
-      "evidence": "V1迭代4 WF显示k滚动不稳健(诚实降级研究保留); 但生产CFG仍启用(b4d8e35早于WF证据); 需决策"
+      "status": "DONE",
+      "evidence": "WF 两轮复核一致否决 k=2(纯净8窗 k 选择: k=1×5, k=3×3, k=2×0); config.py 禁用注释完整; paper_sim 生产守卫已置 False 从未生效; tests_audit_r8i.py 锁死 WEAK_MARKET_WEIGHT=False 及守卫存在。"
     },
     {
       "id": "R11",
