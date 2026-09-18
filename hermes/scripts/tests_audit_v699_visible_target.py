@@ -56,7 +56,7 @@ from typing import Any  # noqa: E402
 
 FUNC_RE = re.compile(r"(def (num|day|high_pivot|visible_target)\(.*?(?=\ndef |\Z))",
                      re.S)
-extracted = "".join(m.group(1) for m in FUNC_RE.finditer(src))
+extracted = "\n".join(m.group(1) for m in FUNC_RE.finditer(src))
 exec(compile(extracted, "v699_funcs", "exec"))
 
 

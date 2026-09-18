@@ -1,5 +1,5 @@
 {
-  "ts": "2026-09-17 15:30:20",
+  "ts": "2026-09-18 15:30:23",
   "sources": {
     "sina": {
       "ok": true,
@@ -15,11 +15,11 @@
     },
     "ths_fuyao": {
       "ok": false,
-      "detail": "HTTP Error 429: Too Many Requests"
+      "detail": "<urlopen error _ssl.c:993: The handshake operation timed out"
     },
     "netease": {
       "ok": false,
-      "detail": "<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occur"
+      "detail": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate "
     }
   },
   "coverage": 97.7,
