@@ -54,6 +54,13 @@ research/monitor.pid
 hermes/smc_monitor/*.json
 hermes/smc_monitor/*.bak*
 hermes/smc_monitor/*.txt
+hermes/smc_monitor/daily/
+hermes/smc_monitor/quarantine/
+hermes/smc_monitor/backups/
+hermes/smc_monitor/ops_logs/
+hermes/smc_monitor/kline_epochs/
+# 仓库根运行时镜像(监控运行副本+生产账本, 敏感不入库)
+.hermes/
 
 # ---- 本机环境 / IDE / 敏感脚本 ----
 .idea/

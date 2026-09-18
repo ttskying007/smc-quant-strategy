@@ -1,0 +1,462 @@
+# -*- coding: utf-8 -*-
+"""Daily combo run: update klines (Tencent), scan events + SMC, refresh dashboard JSON.
+Designed for Windows Task Scheduler (see 每日自动化说明.md)."""
+import io, json, os, subprocess, sys, time
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG  # 审计 P1: 统一路径/解释器
+
+if __name__ == "__main__":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+ROOT = CFG.PROJECT_ROOT
+RESEARCH = CFG.RESEARCH_DIR
+WDH = CFG.WDH_DIR
+PY = CFG.PY_PRODUCTION
+KT = CFG.KT_CACHE  # FIX(2026-09-04, 审计 P0/P1): 兜底分支此前引用未定义 KT —— 统一在此定义
+MIRROR_DIRS = CFG.MIRROR_DIRS
+
+def run(script, *args, timeout=1800, cwd=None):
+    script_dir = cwd or RESEARCH
+    cmd = [PY, os.path.join(script_dir, script)] + list(args)
+    print(f"==> {' '.join(cmd[:3])}...", flush=True)
+    t0 = time.time()
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=script_dir, encoding="utf-8", errors="replace")
+    except subprocess.TimeoutExpired:
+        print(f"    TIMEOUT after {timeout}s: {os.path.basename(script)}（已超时终止）", flush=True)
+        return 124  # 超时按失败处理（124 = timeout 惯例），不让流水线崩溃
+    print(f"    exit={r.returncode} ({time.time()-t0:.0f}s)", flush=True)
+    if r.returncode != 0:
+        print("    stderr:", r.stderr[-500:], flush=True)
+    return r.returncode
+
+def _pause_monitor():
+    """FIX(2026-08-22): stop realtime monitor loop during daily run — concurrent Sina polling
+    caused 8/21 scheduled-task failure (Result 1). Restart after run. Uses monitor.pid (reliable)."""
+    pid_file = os.path.join(RESEARCH, "monitor.pid")
+    try:
+        if os.path.exists(pid_file):
+            with open(pid_file) as fh:
+                pid = int(fh.read().strip())
+            subprocess.run(['taskkill', '/PID', str(pid), '/F'], capture_output=True, timeout=30)
+            print(f"暂停实时监控 PID={pid}（避免并发限流）", flush=True)
+            # NOTE: don't remove pid_file — resume overwrites it; deletion may be sandbox-blocked
+    except Exception as e:
+        print(f"暂停监控异常(继续): {e}", flush=True)
+
+def _resume_monitor():
+    try:
+        subprocess.Popen([PY, os.path.join(RESEARCH, "sim_scheduler.py"), "--loop", "--interval", "30"],
+                         cwd=RESEARCH, creationflags=subprocess.CREATE_NO_WINDOW)
+        print("恢复实时监控（30 秒）", flush=True)
+    except Exception as e:
+        print(f"恢复监控异常: {e}", flush=True)
+
+
+def _write_failed_run(run_id, step_status, reason):
+    """Persist an invalid run without allowing downstream stale artifacts to run."""
+    payload = {
+        "run_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "run_id": run_id,
+        "steps": step_status,
+        "data_complete": False,
+        "signal_complete": False,
+        "execution_complete": False,
+        "frontend_complete": False,
+        "production_eligible": False,
+        "manifest_ok": False,
+        "fallback_used": True,
+        "failure_reason": reason,
+    }
+    tmp = os.path.join(RESEARCH, "run_status.json.tmp")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, ensure_ascii=False, indent=2)
+    os.replace(tmp, os.path.join(RESEARCH, "run_status.json"))
+    print(f"[FAIL-CLOSED] {reason} → 跳过选股/发布", flush=True)
+
+
+def _merge_scanner_outputs(run_id):
+    """Merge same-run SMC and CONT artifacts into the single selection input."""
+    scanner_path = os.path.join(RESEARCH, "current_scanner_result.json")
+    cont_path = os.path.join(RESEARCH, "continuation_scanner_result.json")
+    with open(scanner_path, encoding="utf-8") as fh:
+        scanner = json.load(fh)
+    with open(cont_path, encoding="utf-8") as fh:
+        cont = json.load(fh)
+    if scanner.get("run_id") != run_id or cont.get("run_id") != run_id:
+        raise RuntimeError("scanner artifact run_id mismatch")
+    if not scanner.get("latest_date") or scanner.get("latest_date") != cont.get("latest_date"):
+        raise RuntimeError("scanner artifact latest_date mismatch or unavailable")
+    scanner["continuation_candidates"] = cont.get("continuation_candidates") or []
+    scanner["continuation_count"] = cont.get("continuation_count", 0)
+    scanner["continuation_run_id"] = cont.get("run_id")
+    scanner["merged_run_id"] = run_id
+    tmp = scanner_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(scanner, fh, ensure_ascii=False, indent=2)
+    os.replace(tmp, scanner_path)
+    import shutil
+    for d in MIRROR_DIRS:
+        os.makedirs(d, exist_ok=True)
+        shutil.copyfile(scanner_path, os.path.join(d, "current_scanner_result.json"))
+
+def main():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--fallback-only", action="store_true", help="兜底模式：仅检查 run_status，数据未更新时补跑选股+dashboard")
+    args = ap.parse_args()
+    if args.fallback_only:
+        # 8:00 兜底：检查昨天 15:30 的 run_status，若数据未完整更新则补跑选股+dashboard
+        try:
+            _rs = json.load(open(os.path.join(RESEARCH, "run_status.json"), encoding="utf-8"))
+            KT = os.path.join(ROOT, "hermes", "kline_cache_tencent")
+            _days = [x for x in sorted(os.listdir(KT)) if x.endswith("_daily_800.json")]
+            if not _rs.get("data_complete") and _days:
+                print(f"兜底: 数据未完整更新(上次 {_rs.get('data_latest_date')})，补跑选股+dashboard", flush=True)
+                run("sim_scheduler.py", "--daily", timeout=1200)
+                run("finalize_dashboard.py")
+                # 同步镜像（注意：目标是文件路径，不能是目录）
+                import shutil
+                for f in ("combo_dashboard.json", "paper_ledger.json"):
+                    src = os.path.join(RESEARCH, f)
+                    for d in MIRROR_DIRS:
+                        dst = os.path.join(d, f)
+                        os.makedirs(d, exist_ok=True)
+                        shutil.copyfile(src, dst)
+                        print(f"  镜像同步: {src} -> {dst}", flush=True)
+            else:
+                print(f"兜底: 数据已完整更新({_rs.get('data_latest_date')})，无需操作", flush=True)
+        except Exception as e:
+            import traceback
+            print(f"兜底异常: {e}", flush=True)
+            traceback.print_exc()
+        return
+    _pause_monitor()
+    # FIX(2026-09-13, 第八轮审计 6.5): 生产路径存在性检查 —— SMC_DATA_ROOT/
+    # SMC_FRONTEND_ROOT 环境变量解析后绝对路径打印 + 缺失非零退出(fail-closed,
+    # 不带病继续)。审计: "启动时打印解析后的绝对路径并检查存在性; 生产路径
+    # 缺失时必须非零退出"。
+    if not CFG.validate_paths():
+        print("[paths] 生产路径校验失败 → 终止(不暂停在恢复监控后执行任何交易动作)", flush=True)
+        _resume_monitor()
+        sys.exit(2)
+    try:
+        _run_main_steps()
+    except Exception as e:
+        import traceback
+        print(f"主流程异常（尝试恢复监控）: {e}", flush=True)
+        traceback.print_exc()
+    finally:
+        # FIX(2026-09-04, P1): 任何异常/超时都必须恢复实时监控，否则盘中监控静默停止
+        _resume_monitor()
+
+def _run_main_steps():
+    step_status = {}
+    # FIX(2026-09-14, R31 第八轮审计 6.1): 统一 run_id 事务合同 —— 原各阶段
+    # 产出(run_status/manifest/各 json)无统一标识, 下游无法验证"消费的是
+    # 本次 run 的产物"(审计: "每一阶段输出带 run_id/as_of_date/source_hash/
+    # code_version/config_hash, 下游只接受上游 manifest 通过且 run_id 完全
+    # 匹配的输入")。R31 落地第一步: run 顶部生成 run_id 一次, 全程传播——
+    # ①run_transaction.json(本次 run 的输出索引, 记录各阶段产物+run_id+
+    #   code_version+config_hash+as_of); ②经 SMC_RUN_ID 环境变量传各阶段;
+    # ③run_status.json/manifest 携带同 run_id; ④尾部校验一致才 eligible。
+    import hashlib as _hl
+    _run_id = "daily-" + time.strftime("%Y%m%d-%H%M%S")
+    _code_ver = ""
+    try:
+        with open(os.path.join(RESEARCH, "paper_sim.py"), "rb") as _f:
+            _code_ver = _hl.sha256(_f.read()).hexdigest()[:12]
+    except Exception:
+        pass
+    _cfg_hash = ""
+    try:
+        with open(os.path.join(RESEARCH, "config.py"), "rb") as _f:
+            _cfg_hash = _hl.sha256(_f.read()).hexdigest()[:12]
+    except Exception:
+        pass
+    os.environ["SMC_RUN_ID"] = _run_id
+    print(f"[run_id] {_run_id} | code_version={_code_ver} | config_hash={_cfg_hash}", flush=True)
+    # FIX(2026-08-22) P1-3: 数据源健康检查（失败告警）
+    try:
+        hc = subprocess.run([PY, os.path.join(RESEARCH, "data_health_check.py")], capture_output=True, timeout=120, cwd=RESEARCH)
+        print(f"数据源健康检查: exit={hc.returncode}", flush=True)
+    except Exception as e:
+        print(f"健康检查异常(继续): {e}", flush=True)
+    # 0a. pull daily announcements (fix 8-14 lag: announcements must be fresh before selection)
+    rc0a = run("pull_announce_daily.py", cwd=WDH, timeout=600)
+    step_status["announce"] = rc0a
+    # 0. FIX(2026-08-22): incremental full-market refresh (datalen=10 append, 3 workers ~1/s)
+    #    replaces slow 600/day batch — full market (~4657) done in ~75 min, coverage 4.8%->100%
+    rc0 = run("incremental_refresh.py", "--workers", "3", cwd=WDH, timeout=10800)
+    step_status["refresh"] = rc0
+    # 0b. 数据新鲜度治理(2026-09-12): 腾讯源双源复核 —— 只补新浪没刷上的(末bar<今日),
+    #     kline 端点+append+11%跳变守卫; 幂等(已最新文件自动跳过). 09-12 实战: 覆盖 39.5%→99.3%
+    rc0b = run(r"pull_tencent_incremental.py", cwd=WDH, timeout=3600)
+    step_status["kline_incremental"] = rc0b
+    # 0c. 数据新鲜度治理(2026-09-13, §50): 60min 缓存刷新 —— m60 接口 ifzq.gtimg.cn
+    #     (rc0/rc0b 只刷日频; 60min 曾断供 5 交易日, F7 armB VALIDATION 被阻塞)
+    #     全量 9119 只 ~25min(0.15s/只限速), 幂等(接口每次全量覆盖 count=500)
+    _refresh60 = os.path.join(RESEARCH, "refresh_60min_full.py")
+    if os.path.exists(_refresh60):
+        rc0c = run("refresh_60min_full.py", timeout=3600)
+    else:
+        # This optional feed is not part of the checked-in production chain.
+        # Do not turn a missing research-only data source into a false hard failure.
+        print("60min 刷新脚本不存在，跳过可选数据源", flush=True)
+        rc0c = 0
+    step_status["refresh_60min"] = rc0c
+    # 1. refresh key stocks (holdings + recent events) from Sina
+    rc = run("refresh_holdings_sina.py", cwd=WDH, timeout=1200)
+    step_status["holdings"] = rc
+    # Fail closed before any candidate/ledger-producing step.  A scanner can
+    # safely inspect data only after all mandatory upstream refreshes returned
+    # successfully; otherwise it would publish stale or partially refreshed
+    # signals as if they were current.
+    _upstream = {k: step_status.get(k, 0) for k in
+                 ("announce", "refresh", "kline_incremental", "holdings")}
+    if any(v != 0 for v in _upstream.values()):
+        _reason = "mandatory upstream failed: " + ", ".join(
+            f"{k}={v}" for k, v in _upstream.items() if v != 0)
+        print(f"[FAIL-CLOSED] {_reason} → 跳过扫描/选股/发布", flush=True)
+        json.dump({"run_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                   "run_id": _run_id, "steps": step_status,
+                   "data_complete": False, "production_eligible": False,
+                   "manifest_ok": False, "fallback_used": True,
+                   "note": _reason},
+                  open(os.path.join(RESEARCH, "run_status.json"), "w", encoding="utf-8"),
+                  ensure_ascii=False, indent=2)
+        return
+    # 2. scan current with freshness gate (only latest-data signals)
+    # FIX(2026-09-13, 第八轮审计 6.2): 传 --production —— 该分支含 freshness/artifact
+    # 硬门禁(缺失即硬失败), 生产链必须走生产模式而非研究默认(审计 §6.2:
+    # "生产入口存在"与"生产入口实际使用"不一致)。
+    rc2 = run("current_scanner.py", "--refresh", "--production", timeout=2400)
+    step_status["scanner"] = rc2
+    # 2b. continuation scanner (MARKUP structure support, v20c leg)
+    rc2b = run("continuation_scanner.py", timeout=1800)
+    step_status["continuation"] = rc2b
+    # Both scanners must succeed before selection may consume scanner output.
+    # CONT writes a separate artifact; never let a failed stage fall through to
+    # an older current_scanner_result.json.
+    if rc2 != 0 or rc2b != 0:
+        _write_failed_run(_run_id, step_status,
+                          "scanner stage failed: " + ", ".join(
+                              f"{k}={step_status[k]}" for k in ("scanner", "continuation")
+                              if step_status.get(k) != 0))
+        return
+    try:
+        _merge_scanner_outputs(_run_id)
+    except Exception as _scan_merge_error:
+        step_status["scanner_merge"] = 1
+        _write_failed_run(_run_id, step_status, f"scanner artifact merge failed: {_scan_merge_error}")
+        return
+    # 3. sim trading: selection (new pending orders) + mark-to-market + TP/SL
+    #    FIX(2026-08-22): 兜底逻辑 —— 即使前面步骤失败（数据未更新完），仍用最后更新完的数据选股，标注数据日期
+    rc3 = run("sim_scheduler.py", "--daily", timeout=1200)
+    step_status["selection"] = rc3
+    # 4. rebuild combo dashboard JSON + copy to mirror
+    rc4 = run("finalize_dashboard.py")
+    step_status["dashboard"] = rc4
+    import shutil
+    for f in ("combo_dashboard.json", "paper_ledger.json"):
+        for d in MIRROR_DIRS:
+            os.makedirs(d, exist_ok=True)
+            shutil.copyfile(os.path.join(RESEARCH, f), os.path.join(d, f))
+    # FIX(2026-09-06, Shadow 生产化): 每日 Shadow 运行 —— 事件腿受控 shadow + 对账 + kill switch
+    # FIX(2026-09-13, 第八轮审计 6.3): shadow_sim.py 改名 shadow_replay.py ——
+    # 该脚本是历史 CSV 回放压力指标(审计: 不等同于实时 SHADOW), 文件名与
+    # status.replay_mode=true 落地诚实定位; 真实实时 shadow 由 --monitor 前向运行。
+    rc5 = run("shadow_replay.py", timeout=600)
+    step_status["shadow"] = rc5
+    if rc5 == 0:
+        try:
+            _st = json.load(open(os.path.join(RESEARCH, "shadow_status.json"), encoding="utf-8"))
+            if _st.get("kill_switch_triggered"):
+                print("!! SHADOW KILL SWITCH TRIGGERED — 事件腿暂停, 需人工审查", flush=True)
+            else:
+                print(f"shadow OK: {_st.get('trades')}笔 PF={_st.get('pf')} MDD={_st.get('max_drawdown')}%", flush=True)
+        except Exception as _e:
+            print(f"shadow 状态读取失败: {_e}", flush=True)
+    # 每日对账（账本 vs simulate 重放）
+    rc6 = run("reconcile.py", timeout=600)
+    step_status["reconcile"] = rc6
+    # FIX(2026-09-08): AI 助手每日决策画像（--day 生成 ai/ai_decision.json，失败不阻断生产）
+    rc7 = run("ai_assistant.py", "--day", timeout=600)
+    step_status["ai_decision"] = rc7
+    if rc7 == 0:
+        try:
+            import shutil as _sh
+            for _d in MIRROR_DIRS:
+                try:
+                    _sh.copyfile(os.path.join(RESEARCH, "ai", "ai_decision.json"), os.path.join(_d, "ai_decision.json"))
+                except Exception as _e:
+                    print(f"AI 决策镜像同步警告 {_d}: {_e}", flush=True)
+        except Exception as _e:
+            print(f"AI 决策同步异常(继续): {_e}", flush=True)
+    # FIX(2026-09-08, 审计方向7): 漏斗监控 —— 记录当日漏斗到历史 + ±2σ 报警（≥8天基线后生效）
+    rc8 = run("funnel_monitor.py", timeout=120)
+    step_status["funnel_monitor"] = rc8
+    # FIX(2026-09-10, V3 P0-3/PAPER 累积): 三个 V3 累积器接入每日调度
+    #   structure_funnel_daily —— 结构引擎层漏斗(含丢失候选前向收益, Phase B)
+    #   funnel_history_accum —— selection_funnel 60日历史(±2σ 基线)
+    #   setup_engine_paper  —— 统一 Setup Engine PAPER 台账(SAMPLED, 七道门)
+    # 三者均 best-effort(失败不阻断生产链, 只记录状态) —— 累积器性质=证据采集, 不影响生产资格
+    rc9 = run("structure_funnel_daily.py", timeout=1800)
+    step_status["structure_funnel"] = rc9
+    rc10 = run("funnel_history_accum.py", timeout=300)
+    step_status["funnel_accum"] = rc10
+    # FIX(2026-09-13, 第八轮审计 5.7): E-score 数据链前置 —— 原顺序先跑
+    # setup_engine_paper(184)再刷新指数+escore_daily(193/196), 当日新 Setup 读的是
+    # 旧 E-score 快照, 只在下一次运行才补到新快照。正确顺序: 指数刷新 →
+    # E-score 快照 → Setup/Selection 消费(审计 §5.7 "决策时点环境分数")。
+    # V4 D1: E-score 前置——指数日线刷新(wdh/pull_index_daily, 权益 F2/F3 数据源)
+    rc13 = run(r"..\wdh\pull_index_daily.py", timeout=300)
+    step_status["index_refresh"] = rc13
+    # V4 D1: E-score 每日快照(SHADOW 双臂前置, 供 PAPER/组合层单源读取)
+    rc14 = run("escore_daily.py", timeout=900)
+    step_status["escore_daily"] = rc14
+    rc11 = run("setup_engine_paper.py", timeout=1800)
+    step_status["setup_paper"] = rc11
+    # V4 第十轮审计: L2 被拒事件前向收益追踪(每日跑, 事件走完后自动积累对照)
+    rc12 = run("v4_l2_reject_tracker.py", timeout=600)
+    step_status["l2_reject_tracker"] = rc12
+    # V3-C 升级: 全漏斗被拒候选身份+前向收益(每类拒绝放走多少收益)
+    rc16 = run("funnel_reject_detail.py", timeout=600)
+    step_status["funnel_reject_detail"] = rc16
+    # PAPER 周期报告(观察期监控: 里程碑/E分布/家族分布/异常预警)
+    rc15 = run("paper_weekly_report.py", timeout=300)
+    step_status["paper_weekly_report"] = rc15
+    # FIX(2026-08-22): 运行状态记录（每步成功/失败 + 数据日期 + 兜底标注）
+    _data_date = ""
+    try:
+        _scan = json.load(open(os.path.join(RESEARCH, "current_scanner_result.json"), encoding="utf-8"))
+        _data_date = _scan.get("latest_date", "")
+    except Exception:
+        pass
+    _failed = [k for k, v in step_status.items() if v != 0]
+    # FIX(2026-09-08, 审计 P1-3): 运行状态四层分层判定。
+    # 原 `data_complete = rc0 and rc2 and rc3` 未含公告/continuation/dashboard/shadow/reconcile，
+    # 公告没拉到或延续腿失败等仍会误标完整（前端显示旧数据）。现按责任域分层：
+    _data_complete = all(step_status.get(k, 1) == 0 for k in
+                         ("announce", "refresh", "kline_incremental", "holdings",
+                          "scanner", "continuation", "selection"))
+    _signal_complete = all(step_status.get(k, 1) == 0 for k in
+                           ("announce", "refresh", "holdings", "scanner", "continuation",
+                            "selection", "funnel_monitor"))
+    _execution_complete = all(step_status.get(k, 1) == 0 for k in ("shadow", "reconcile"))
+    _frontend_complete = step_status.get("dashboard", 1) == 0
+    _production_eligible = _data_complete and _signal_complete and _execution_complete and _frontend_complete
+    json.dump({"run_at": time.strftime("%Y-%m-%d %H:%M:%S"), "steps": step_status,
+               # R31(第八轮 6.1): run_status 携带统一 run_id(与 manifest 同源)
+               "run_id": _run_id, "code_version": _code_ver, "config_hash": _cfg_hash,
+               "data_latest_date": _data_date,
+               "data_complete": _data_complete,
+               "signal_complete": _signal_complete,
+               "execution_complete": _execution_complete,
+               "frontend_complete": _frontend_complete,
+               "production_eligible": _production_eligible,
+               # FIX(2026-09-13, 第八轮审计 P0-3): manifest 哈希生命周期 —— 原顺序
+               # "写 run_status → manifest 哈希该文件 → 再回写 manifest_ok/production_eligible
+               # 到同一文件"使 manifest 记录的 hash 与磁盘最终文件不一致, 下次
+               # validate_artifacts() 必然不匹配(审计 §3 P0-3)。
+               # 修复: run_status 首写即含 manifest_ok=False 初值; manifest finalize
+               # 成功后**不再回写本文件**(状态经 manifest 本体+run_manifest.json 传播);
+               # finalize 失败路径只写 manifest_error(此时本 run 已判 INVALID, 不再有
+               # "哈希有效的 manifest"可被破坏)。artifact 进入冻结生命周期。
+               "manifest_ok": False,
+               "fallback_used": bool(_failed) or not _production_eligible,
+               "note": ("任一域未完整，需兜底补跑" if not _production_eligible else "数据/信号/执行/前端四层全部完整")},
+              open(os.path.join(RESEARCH, "run_status.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    # FIX(2026-09-05, 蓝图迭代二): daily_combo_run 生成 run_manifest（版本合同+数据血缘）
+    # FIX(2026-09-08, 复审 P0-1 fail-closed): manifest/artifact 验证失败 → 生产资格降级,
+    # 禁止发布候选（任何 artifact 缺失/空/哈希不符 = INVALID = production blocked）。
+    _manifest_ok = False
+    try:
+        import core.manifest as _CM
+        _m = _CM.build_manifest(
+            run_id=_run_id,  # R31(6.1): 统一 run_id(顶部生成, 全程传播)
+            strategy_id="smc_combined", strategy_version="v20f",
+            params={"steps": step_status},
+            data_asof=_data_date, data_snapshot_id="kline_tencent_" + _data_date,
+            artifact_paths=[os.path.join(RESEARCH, "combo_dashboard.json"),
+                             os.path.join(RESEARCH, "run_status.json"),
+                             os.path.join(RESEARCH, "current_scanner_result.json"),
+                             os.path.join(RESEARCH, "continuation_scanner_result.json")],
+            status="production" if _data_complete else "degraded",
+            extra={"data_complete": _data_complete, "fallback_used": bool(_failed)})
+        # 生产模式 fail-closed: 先验证 artifact 再写（finalize 内含原子写+复核）
+        _mp, _manifest_ok = _CM.finalize_manifest(
+            _m, [os.path.join(RESEARCH, "combo_dashboard.json"),
+                 os.path.join(RESEARCH, "run_status.json"),
+                 os.path.join(RESEARCH, "current_scanner_result.json"),
+                 os.path.join(RESEARCH, "continuation_scanner_result.json")],
+            os.path.join(RESEARCH, "run_manifests"))
+        for _d in MIRROR_DIRS:
+            try:
+                os.makedirs(_d, exist_ok=True)
+                shutil.copyfile(_mp, os.path.join(_d, "run_manifest.json"))
+            except Exception as _e:
+                print(f"manifest 前端同步警告 {_d}: {_e}", flush=True)
+        print(f"manifest: {_mp} (status={_m['status']} ok={_manifest_ok})", flush=True)
+    except Exception as _e:
+        # manifest 失败/artifact 无效 → 生产资格阻断（fail-closed, 不允许 DEGRADED 继续）
+        print(f"manifest 验证失败(FAIL-CLOSED): {_e}", flush=True)
+        _manifest_ok = False
+        try:
+            _rs_p = os.path.join(RESEARCH, "run_status.json")
+            _rs = json.load(open(_rs_p, encoding="utf-8")) if os.path.exists(_rs_p) else {}
+            _rs["manifest_ok"] = False
+            _rs["manifest_error"] = str(_e)
+            json.dump(_rs, open(_rs_p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+    # FIX(2026-09-08, 复审 P0-1 fail-closed): 生产资格必须含 manifest/artifact 验证通过。
+    # FIX(2026-09-13, 第八轮审计 P0-3): 成功路径不再回写 run_status.json —— manifest
+    # 已对该文件哈希, 回写=自毁哈希。最终判定经 manifest 本体(status/artifacts)与
+    # run_manifest.json 传播; 下游读 manifest_ok 以 run_manifest.json 为准。
+    # (失败路径上方已写 manifest_error, 该 run 已 INVALID, 不存在可破坏的有效哈希。)
+    _production_eligible = _production_eligible and _manifest_ok
+    if not _manifest_ok:
+        try:
+            _rs_p = os.path.join(RESEARCH, "run_status.json")
+            _rs = json.load(open(_rs_p, encoding="utf-8")) if os.path.exists(_rs_p) else {}
+            _rs["production_eligible"] = False
+            json.dump(_rs, open(_rs_p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+    # R31(第八轮审计 6.1): run_transaction.json —— 本次 run 的输出索引+一致性校验。
+    # 下游(监控/发布/前端)消费产物前可校验: run_id 匹配 + manifest_ok + eligible。
+    # 校验规则: run_status 与 manifest 的 run_id 必须一致(顶部生成传播是唯一来源);
+    # 不一致 = 产物跨 run 混装(异常路径), eligible 强制 False。
+    _tx_consistent = True
+    try:
+        _rs_p = os.path.join(RESEARCH, "run_status.json")
+        _rs_tx = json.load(open(_rs_p, encoding="utf-8")) if os.path.exists(_rs_p) else {}
+        _tx_consistent = (_rs_tx.get("run_id") == _run_id)
+    except Exception:
+        _tx_consistent = False
+    if not _tx_consistent:
+        print(f"[run_tx] ⚠ run_id 不一致(run_status={(_rs_tx.get('run_id') if _tx_consistent is False else '?')}) → eligible=False", flush=True)
+        _production_eligible = False
+    _transaction = {
+        "run_id": _run_id,
+        "as_of_date": _data_date,
+        "code_version": _code_ver,
+        "config_hash": _cfg_hash,
+        "code_watch": "R26 mtime 版本守卫(sim_scheduler 7 模块)",
+        "cost_model_version": "COST_V1_FEE_TOTAL_020_SLIP_SIDE_001",
+        "adx_impl_version": "ADX14_WILDER_20260912",
+        "steps": step_status,
+        "manifest_ok": _manifest_ok,
+        "production_eligible": _production_eligible,
+        "run_id_consistent": _tx_consistent,
+        "artifacts": {"run_status": "run_status.json",
+                      "manifest": "run_manifest.json",
+                      "dashboard": "combo_dashboard.json"},
+    }
+    json.dump(_transaction, open(os.path.join(RESEARCH, "run_transaction.json"), "w", encoding="utf-8"),
+              ensure_ascii=False, indent=2)
+    print(f"[run_tx] {_run_id} eligible={_production_eligible} consistent={_tx_consistent} → run_transaction.json", flush=True)
+    print(f"DONE: batch={rc0} refresh={rc} scan={rc2} sim={rc3} dashboard={rc4} manifest_ok={_manifest_ok}", flush=True)
+
+if __name__ == "__main__":
+    main()

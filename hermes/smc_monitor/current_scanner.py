@@ -1,0 +1,260 @@
+# -*- coding: utf-8 -*-
+"""Current-market scanner for the combined strategy (SMC TP2-R20 + insider events).
+Scans latest klines for live candidates:
+A) SMC three-TF signal with TP2-R20 conditions (entry eligible next open)
+B) Recent insider events (增持/回购) in last 5 trading days -> event candidates
+FIX(2026-08-19): freshness gate — only symbols whose kline latest == market latest
+produce candidates (no stale-signal risk); key stocks (holdings + recent events)
+are force-refreshed from Sina before scanning when --refresh is passed.
+Output: candidate list with signal details, all research-only (no BUY)."""
+import io, json, os, sys, subprocess, time
+from collections import defaultdict
+
+if not getattr(sys.stdout, "_smc_utf8", False):
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stdout._smc_utf8 = True
+    except (AttributeError, ValueError):
+        pass
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as CFG  # 审计 P1: 统一路径/解释器（FIX 2026-09-13 R4: 必须先于 WDH_DIR 使用）
+# FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径(WDH_DIR)
+sys.path.insert(0, CFG.WDH_DIR)
+import wdh_engine as we
+
+KT = CFG.KT_CACHE
+OUT = CFG.RESEARCH_DIR
+ANNOUNCE_DB = CFG.ANNOUNCE_DB
+PY = CFG.PY_PRODUCTION
+os.makedirs(OUT, exist_ok=True)
+
+
+def bars(path):
+    try:
+        raw = json.load(open(path, encoding="utf-8"))
+    except Exception:
+        return []
+    out = []
+    for r in raw if isinstance(raw, list) else []:
+        t = "".join(c for c in str(r.get("t") or "") if c.isdigit())[:8]
+        o, h, l, c = we.f(r.get("o")), we.f(r.get("h")), we.f(r.get("l")), we.f(r.get("c"))
+        v = we.f(r.get("v"))
+        if t and o and h and l and c:
+            out.append({"t": t, "o": o, "h": h, "l": l, "c": c, "v": v})
+    out.sort(key=lambda b: b["t"])
+    return out
+
+
+def market_latest():
+    """Determine latest trading date from Sina realtime (authoritative).
+    FIX(2026-09-04, P1): 旧实现请求了 Sina 却丢弃结果、硬编码兜底 20260819。
+    现在解析 hq_str 第 31 个字段（日期）作为权威最新交易日；权威源失败时
+    返回空值，由生产入口 fail-closed，禁止本地旧缓存伪装成新鲜数据。"""
+    import urllib.request
+    UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://finance.sina.com.cn/"}
+    try:
+        req = urllib.request.Request("https://hq.sinajs.cn/list=sh600519", headers=UA)
+        with urllib.request.urlopen(req, timeout=10) as r:
+            b = r.read().decode("gbk", errors="replace")
+        # hq_str_sh600519="贵州茅台,open,prevclose,current,high,low,...,date,time,..."
+        # 第 31 个字段（index 30）为日期 YYYY-MM-DD（部分源无日期，则用最后 4 字段时间推断）
+        m = b.split('"')[1] if '"' in b else ""
+        parts = m.split(",")
+        if len(parts) > 30 and len(parts[30]) == 10 and parts[30][:4].isdigit():
+            date = parts[30].replace("-", "")
+            print(f"市场最新交易日(Sina 权威): {date}", flush=True)
+            return date
+        # 若 Sina 无日期字段，取行情时间字段（第 31 位 YYYY-MM-DD HH:MM:SS 的前半）
+        if len(parts) > 31 and len(parts[31]) >= 10:
+            date = parts[31][:10].replace("-", "")
+            if date[:4].isdigit():
+                print(f"市场最新交易日(Sina 时间字段): {date}", flush=True)
+                return date
+    except Exception as e:
+        print(f"Sina 最新交易日获取失败，生产模式不得使用本地回退: {e}", flush=True)
+    return ""
+
+
+def refresh_key_stocks():
+    """Force-refresh holdings + recent-event stocks from Sina (small set, fast serial)."""
+    try:
+        # FIX(2026-09-13, 第七轮审计 P1-5): 生产硬编码 → config.py 统一路径(WDH_DIR)
+        subprocess.run([PY, os.path.join(CFG.WDH_DIR, "refresh_holdings_sina.py")], timeout=1200, capture_output=True)
+    except Exception as e:
+        print(f"关键股刷新失败(继续): {e}", flush=True)
+
+
+# A) SMC candidates: seeds whose entry_date == next trading day after last bar (i.e., signal just completed)
+import concurrent.futures
+
+def scan_one(p, latest):
+    diag = {"files": 0, "too_short": 0, "stale": 0, "fresh": 0,
+            "seed_total": 0, "not_latest_entry": 0, "r20_reject": 0,
+            "stage_reject": 0, "fvg_reject": 0, "candidates": 0}
+    if not p.endswith("_daily_800.json"):
+        return None, None, diag
+    diag["files"] = 1
+    daily = bars(os.path.join(KT, p))
+    if len(daily) < 400:
+        diag["too_short"] = 1
+        return None, None, diag
+    # freshness gate: last bar must equal market latest trading date (no stale signals)
+    if daily[-1]["t"] != latest:
+        diag["stale"] = 1
+        return None, None, diag
+    diag["fresh"] = 1
+    sym = p.replace("_daily_800.json", "").replace("_", ".", 1)
+    seeds = we.build_seeds(sym, daily)
+    diag["seed_total"] = len(seeds)
+    last = daily[-1]["t"]
+    out = []
+    for sd in seeds:
+        # 当前扫描只允许最新收盘 bar 形成的新信号。历史 entry_idx 追赶会把
+        # seed 中的旧 entry_price 带入下一次开盘，形成不可实现的“迟到成交”。
+        # 迟到信号应进入研究回填，而不是生产候选。
+        entry_idx = int(sd["entry_idx"])
+        if entry_idx != len(daily) - 1:
+            diag["not_latest_entry"] += 1
+            continue
+        r20 = sd.get("r20")
+        if r20 == "" or r20 is None or not (0 <= float(r20) < 0.15):
+            diag["r20_reject"] += 1
+            continue
+        # v17 SMC leg filters: behavior stage UPTREND/MARKUP + bearish FVG
+        if entry_idx < 61:
+            continue
+        # FIX(2026-09-04, 策略层): 旧实现用 ret60>0 代理阶段（注释自认缺量能检查），
+        # 与回测口径 stage_and_deep 不一致。现直接复用 paper_sim.stage_and_deep（含量能 vt 判断）。
+        import paper_sim as _ps
+        _stage, _deep = _ps.stage_and_deep(daily, entry_idx)
+        if _stage not in ("UPTREND", "MARKUP"):
+            diag["stage_reject"] += 1
+            continue
+        has_fvg = any(daily[k]["l"] > daily[k - 2]["h"] for k in range(max(3, entry_idx - 12), entry_idx))
+        if not has_fvg:
+            diag["fvg_reject"] += 1
+            continue
+        fvg_cnt = sum(1 for k in range(max(3, entry_idx - 12), entry_idx) if daily[k]["l"] > daily[k - 2]["h"])
+        out.append({"symbol": sym, "event_date": sd["event_date"], "entry_date": sd["entry_date"],
+                    # FIX(2026-09-05, 蓝图迭代三): 事件状态机时间字段透传（因果链可追溯）
+                    "detected_at": sd.get("detected_at", sd["sweep_date"]),
+                    "confirmed_at": sd.get("confirmed_at", sd["entry_date"]),
+                    "tradable_at": sd.get("tradable_at", sd["entry_date"]),
+                    "zone_low": sd["zone_low"], "zone_high": sd["zone_high"],
+                    "entry_price": sd["entry_price"], "target": sd["target"],
+                    "w_permission": sd["w_permission"], "r20": r20, "last": last,
+                     "stage": _stage, "bull_fvg": True, "fvg_cnt": fvg_cnt,
+                     "catchup": False})
+    diag["candidates"] = len(out)
+    return (out if out else None), last, diag
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--refresh", action="store_true", help="扫描前刷新关键股票（持仓+事件）")
+    # FIX(2026-09-10, V3审计§十二): --production 此前未注册, getattr(args,"production",False) 永远 False → fail-closed 为死代码。补注册。
+    ap.add_argument("--production", action="store_true", help="生产模式: manifest/artifact fail-closed(缺失即硬失败)")
+    args = ap.parse_args()
+    if args.refresh:
+        print("刷新关键股票（持仓+近期事件）...", flush=True)
+        refresh_key_stocks()
+    latest = market_latest()
+    if not latest and args.production:
+        raise RuntimeError("production blocked: authoritative market date unavailable")
+    print(f"市场最新交易日: {latest}", flush=True)
+    files = [f for f in os.listdir(KT) if f.endswith("_daily_800.json")]
+    smc_cands = []
+    fresh_count = 0
+    smc_diag = {"files": 0, "too_short": 0, "stale": 0, "fresh": 0,
+                "seed_total": 0, "not_latest_entry": 0, "r20_reject": 0,
+                "stage_reject": 0, "fvg_reject": 0, "candidates": 0}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+        for cands, last, diag in ex.map(lambda p: scan_one(p, latest), files):
+            if cands:
+                smc_cands.extend(cands)
+            if last == latest:
+                fresh_count += 1
+            for key in smc_diag:
+                smc_diag[key] += diag.get(key, 0)
+    print(f"scanned {len(files)} files, fresh={fresh_count} (数据最新), stale skipped (不产生信号)")
+    print(f"\n=== A) SMC 三周期信号候选（entry 即将触发）: {len(smc_cands)} ===")
+    for c in smc_cands[:15]:
+        print(f"  {c['symbol']}: event={c['event_date']} entry={c['entry_date']} zone=[{c['zone_low']},{c['zone_high']}] entry_price={c['entry_price']} target={c['target']} r20={float(c['r20'])*100:.1f}% W={c['w_permission']}")
+
+    # B) recent insider events: query announce DB for last 5 trading days
+    import sqlite3
+    conn = sqlite3.connect(ANNOUNCE_DB)
+    cur = conn.cursor()
+    rep = None
+    for f in os.listdir(KT):
+        if f.endswith("_daily_800.json"):
+            rep = bars(os.path.join(KT, f))
+            break
+    all_dates = sorted(b["t"] for b in rep) if rep else []
+    last5 = all_dates[-5:]
+    print(f"\n=== B) 最近 5 个交易日: {last5} ===")
+    # FIX(2026-09-04, 策略层): LIKE '%增持%' 会命中"终止增持""增持完毕"等噪声；
+    # 排除含 终止/完毕/解除/计划(仅计划未实施)/调整 等否定词的标题；去掉 LIMIT 10 截断。
+    _neg = ("终止", "完毕", "解除", "取消", "结束", "调整", "变更", "进展", "补充协议", "届满", "减持")
+    for d in last5:
+        dd = f"{d[:4]}-{d[4:6]}-{d[6:8]}"
+        cur.execute("SELECT stock_code, stock_name, title FROM announce WHERE date=? AND (title LIKE '%增持%' OR title LIKE '%回购%')", (dd,))
+        rows = cur.fetchall()
+        rows = [r for r in rows if not any(n in str(r[2]) for n in _neg)]
+        print(f"  {dd}: {len(rows)} 增持/回购事件（已滤除终止/完毕等噪声）")
+        for code, name, title in rows[:5]:
+            print(f"    {code} {name}: {str(title)[:50]}")
+    conn.close()
+
+    # save
+    result = {
+        "run_id": os.environ.get("SMC_RUN_ID") or "scan-" + time.strftime("%Y%m%d-%H%M%S"),
+        "latest_date": latest,
+        "fresh_count": fresh_count,
+        "stale_count": len(files) - fresh_count,
+        "coverage_pct": round(100 * fresh_count / len(files), 1) if files else 0,
+        "smc_candidates": smc_cands,
+        "smc_diagnostics": smc_diag,
+        "timeframe_contract": {"higher": "W1", "direction": "D1", "entry": "D4",
+                               "h_layer_model": "H_PROJECTED_DAILY",
+                               "note": "真实60分钟数据当前未接入WDH种子；不要将结果标记为W-D-60m。"},
+        "note": "research-only, no BUY; freshness gate: only latest-data signals; stale=数据未更新到最新（继续后台刷新中）"
+    }
+    with open(os.path.join(OUT, "current_scanner_result.json"), "w", encoding="utf-8") as fh:
+        json.dump(result, fh, ensure_ascii=False, indent=2)
+    print("\nscanner result saved (freshness gate)")
+
+    # FIX(2026-09-05, 复审 P0-1): manifest/artifact fail-closed —— 生产模式(--production)下
+    # manifest 生成失败或 artifact 缺失即阻断运行（禁止产出无血缘候选）
+    try:
+        import core.manifest as CM
+        _m = CM.build_manifest(
+            run_id=result["run_id"],
+            strategy_id="smc_combined", strategy_version="v20f_scan",
+            params={"freshness": "strict", "min_len": 400},
+            data_asof=latest, data_snapshot_id="kline_tencent_" + latest,
+            artifact_paths=[os.path.join(OUT, "current_scanner_result.json")],
+            status="research", extra={"smc_candidates": len(smc_cands), "fresh": fresh_count})
+        # artifact 校验：缺失/为空 → 生产模式阻断
+        _art_p = os.path.join(OUT, "current_scanner_result.json")
+        if not os.path.exists(_art_p) or os.path.getsize(_art_p) == 0:
+            if getattr(args, "production", False):
+                raise RuntimeError(f"production blocked: artifact missing/empty {_art_p}")
+            print(f"警告: artifact 缺失/为空 {_art_p}（研究模式继续）", flush=True)
+        _mp = CM.save_manifest(_m, os.path.join(OUT, "run_manifests"))
+        print(f"manifest: {_mp}")
+        # 前端同步到配置的镜像目录。
+        import shutil
+        for _d in CFG.MIRROR_DIRS:
+            try:
+                os.makedirs(_d, exist_ok=True)
+                shutil.copyfile(os.path.join(OUT, "current_scanner_result.json"),
+                                os.path.join(_d, "current_scanner_result.json"))
+            except Exception as _e:
+                if getattr(args, "production", False):
+                    raise RuntimeError(f"production degraded: frontend sync failed {_d}: {_e}")
+                print(f"前端同步警告 {_d}: {_e}", flush=True)
+    except Exception as _e:
+        if getattr(args, "production", False):
+            raise  # 生产模式 fail-closed
+        print(f"manifest/同步失败(研究模式不阻断): {_e}", flush=True)
