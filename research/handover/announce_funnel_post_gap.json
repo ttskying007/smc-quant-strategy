@@ -1,0 +1,45 @@
+{
+  "asof": "2026-09-19 21:57:52",
+  "days": {
+    "2026-09-15": {
+      "raw": 199,
+      "buyback": 2,
+      "EVENT": 2,
+      "HARD": 0,
+      "SOFT": 0,
+      "SOFT_delta": 0
+    },
+    "2026-09-16": {
+      "raw": 799,
+      "buyback": 20,
+      "EVENT": 7,
+      "HARD": 0,
+      "SOFT": 5,
+      "SOFT_delta": 1
+    },
+    "2026-09-17": {
+      "raw": 799,
+      "buyback": 18,
+      "EVENT": 6,
+      "HARD": 0,
+      "SOFT": 3,
+      "SOFT_delta": 2
+    },
+    "2026-09-18": {
+      "raw": 1375,
+      "buyback": 42,
+      "EVENT": 15,
+      "HARD": 0,
+      "SOFT": 10,
+      "SOFT_delta": 1
+    },
+    "2026-09-19": {
+      "raw": 1031,
+      "buyback": 34,
+      "EVENT": 7,
+      "HARD": 0,
+      "SOFT": 6,
+      "SOFT_delta": 3
+    }
+  }
+}
