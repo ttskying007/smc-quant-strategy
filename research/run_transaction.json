@@ -1,0 +1,40 @@
+{
+  "run_id": "daily-20260914-153002",
+  "as_of_date": "20260914",
+  "code_version": "55fce1539785",
+  "config_hash": "b5c567438732",
+  "code_watch": "R26 mtime 版本守卫(sim_scheduler 7 模块)",
+  "cost_model_version": "COST_V1_FEE_TOTAL_020_SLIP_SIDE_001",
+  "adx_impl_version": "ADX14_WILDER_20260912",
+  "steps": {
+    "announce": 0,
+    "refresh": 0,
+    "kline_incremental": 0,
+    "refresh_60min": 124,
+    "holdings": 0,
+    "scanner": 0,
+    "continuation": 0,
+    "selection": 0,
+    "dashboard": 0,
+    "shadow": 0,
+    "reconcile": 0,
+    "ai_decision": 0,
+    "funnel_monitor": 0,
+    "structure_funnel": 0,
+    "funnel_accum": 0,
+    "index_refresh": 0,
+    "escore_daily": 0,
+    "setup_paper": 0,
+    "l2_reject_tracker": 0,
+    "funnel_reject_detail": 0,
+    "paper_weekly_report": 0
+  },
+  "manifest_ok": true,
+  "production_eligible": true,
+  "run_id_consistent": true,
+  "artifacts": {
+    "run_status": "run_status.json",
+    "manifest": "run_manifest.json",
+    "dashboard": "combo_dashboard.json"
+  }
+}
