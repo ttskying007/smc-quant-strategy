@@ -1,0 +1,10 @@
+{
+  "n": 1527,
+  "gap_dist": {
+    "0": 1527
+  },
+  "same_day_n": 1527,
+  "neg_n": 0,
+  "semantics": "生成器 gen_v20f2_wilder_h12.py:120 entry_idx=i+1 — entry_date/buy_date 均为披露次日(T+1)成交日; 公告日 i 的计算(stage/adx/disc_close)只用至当日收盘; 回踩限价=0.99*C_disc 用 T+1 的低点判定填充, 静态挂单价无前视",
+  "verdict": "CLEAN: 无 buy<entry; entry_date=buy_date=T+1成交日, T+1 语义完整"
+}
