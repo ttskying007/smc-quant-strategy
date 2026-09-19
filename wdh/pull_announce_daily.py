@@ -16,23 +16,44 @@ def fetch_notices(date):
     rows_all = []
     # FIX(2026-09-05, 审计 G10): 分页到空为止（原 6 页×100=600 条截断，A股日均 2000-6000 条，
     # 财报季漏检 40-80% —— "近月无新股"的原料端根因之一）
-    for page in range(1, 80):
+    # FIX(2026-09-19, 实际超时 A/B): 串行 0.6s×80页 → ~500s/day; daily_combo_run timeout=600s
+    # 完全吃掉 margin, 实测 09-15~19 中断。改用并行 graphdataserver, 目标 <60s/日.
+    # 模式: '首轮' 8页并行快筛; 若未找到短页(<100), 继续逐段并行直到空为止.
+    import concurrent.futures as _cf
+    UA2 = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Referer": "https://data.eastmoney.com/notices/"}
+
+    def _fetch_page(p):
         url = ("https://np-anotice-stock.eastmoney.com/api/security/ann?"
-               f"sr=-1&page_size=100&page_index={page}&ann_type=A&client_source=web&"
+               f"sr=-1&page_size=100&page_index={p}&ann_type=A&client_source=web&"
                f"f_node=0&s_node=0&begin_time={urllib.parse.quote(date + ' 00:00:00')}&end_time={urllib.parse.quote(date + ' 23:59:59')}")
-        req = urllib.request.Request(url, headers=UA)
         try:
-            with urllib.request.urlopen(req, timeout=20) as r:
-                d = json.loads(r.read())
-            data = (d.get("data") or {}).get("list") or []
-            if not data:
-                break
-            rows_all.extend(data)
-            if len(data) < 100:
-                break
+            with urllib.request.urlopen(urllib.request.Request(url, headers=UA2), timeout=15) as r:
+                data = json.loads(r.read())
+            return (data.get("data") or {}).get("list") or []
         except Exception:
+            return []
+
+    page = 1
+    batch = 8
+    while True:
+        with _cf.ThreadPoolExecutor(max_workers=8) as ex:
+            futs = [ex.submit(_fetch_page, p) for p in range(page, page + batch)]
+            results = [f.result() for f in _cf.as_completed(futs)]
+        results.sort(key=len, reverse=True)
+        short = None
+        for rows in results:
+            if not rows:
+                short = True
+                break
+            rows_all.extend(rows)
+            if len(rows) < 100:
+                short = True
+                break
+        if short:
             break
-        time.sleep(0.6)  # FIX(2026-08-22): 1.2s->0.6s sleep (faster; Eastmoney tolerant at low rate)
+        page += batch
+        if page > 200:
+            break  # 上限防御(单日 ~20000 条)
     return rows_all
 
 
