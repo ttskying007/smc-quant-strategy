@@ -1,0 +1,78 @@
+{
+  "asof": "2026-09-19 22:56:36",
+  "purpose": "亏损分类→关闭状态的纲目 (R13 → R18)",
+  "rows": [
+    {
+      "class": "LOSS_OTHER",
+      "importance_score": 0.0,
+      "note": "当前 n=14 / 小型尚无二义",
+      "closed": true
+    },
+    {
+      "class": "LOSS_EXECUTION_COST",
+      "importance_score": 0.0,
+      "note": "n=4 不参与决策 (net ~-0.3)",
+      "closed": false
+    },
+    {
+      "class": "LOSS_TIME_STOP",
+      "importance_score": 0.0,
+      "note": "n=2 身份与风险联动",
+      "closed": true
+    },
+    {
+      "class": "LOSS_MEDIUM",
+      "importance_score": 0.0,
+      "note": "mayer 样本掉落 at takedown 6 (设计)",
+      "closed": false
+    },
+    {
+      "class": "LOSS_HIGH_RANK",
+      "importance_score": 1.4,
+      "note": "n=94 +5.5% - 需要 OOS 的当日 rank>=4 警戒 (正确变量是 reverser 一度被反了)",
+      "closed": false
+    },
+    {
+      "class": "LOSS_LOW_RANK",
+      "importance_score": 3.0,
+      "note": "n=37(微调后 rank<3 为名义)——原始 rank<=3 gate 阻止正常入场",
+      "closed": false
+    },
+    {
+      "class": "LOSS_MFE_REVERSAL",
+      "importance_score": 0.6,
+      "note": "n=47 (5.5%) MFE>=1R 仍未出局，需 deferred 申必 + 节气功率提",
+      "closed": false
+    },
+    {
+      "class": "LOSS_SL_STRUCTURAL",
+      "importance_score": 0.4,
+      "note": "n=33(6.2%) 寺内止损0.6~3×ATR - 结构性轻单",
+      "closed": true
+    },
+    {
+      "class": "LOSS_SL_TOO_WIDE",
+      "importance_score": 2.2,
+      "note": "n=244 (46%) SL=invalid-1.5ATR is design intent",
+      "closed": true
+    },
+    {
+      "class": "LOSS_SL_TOO_TIGHT",
+      "importance_score": 0.8,
+      "note": "n=55 SL<0.6×ATR=SL_TOO_TIGHT-tooclose 固定基础",
+      "closed": true
+    },
+    {
+      "class": "LOSS_TIME_SHORT",
+      "importance_score": 0.5,
+      "note": "n=59 (10.9%) 入场后 <=2bar 触发 SL → v2_delay1_ab 已否决 1-bar延迟",
+      "closed": true
+    },
+    {
+      "class": "LOSS_TIME_LONG",
+      "importance_score": 0.7,
+      "note": "n=30 (5.1%): R17 月度圈地 LOS 10 秒台拉用力",
+      "closed": false
+    }
+  ]
+}
