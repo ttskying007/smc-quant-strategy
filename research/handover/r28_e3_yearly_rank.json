@@ -1,0 +1,94 @@
+{
+  "by_year": [
+    {
+      "year": "2023",
+      "base": {
+        "n": 43,
+        "avg": -0.71,
+        "wr": 30.2,
+        "pf": 0.6
+      },
+      "filtered": {
+        "n": 15,
+        "avg": 0.17,
+        "wr": 46.7,
+        "pf": 1.1
+      },
+      "delta_avg": 0.88,
+      "improved": true
+    },
+    {
+      "year": "2024",
+      "base": {
+        "n": 1016,
+        "avg": 3.93,
+        "wr": 66.8,
+        "pf": 3.64
+      },
+      "filtered": {
+        "n": 872,
+        "avg": 4.43,
+        "wr": 72.5,
+        "pf": 4.21
+      },
+      "delta_avg": 0.5,
+      "improved": true
+    },
+    {
+      "year": "2025",
+      "base": {
+        "n": 188,
+        "avg": 2.26,
+        "wr": 67.0,
+        "pf": 3.19
+      },
+      "filtered": {
+        "n": 120,
+        "avg": 2.81,
+        "wr": 73.3,
+        "pf": 3.65
+      },
+      "delta_avg": 0.55,
+      "improved": true
+    },
+    {
+      "year": "2026",
+      "base": {
+        "n": 280,
+        "avg": 4.87,
+        "wr": 63.9,
+        "pf": 4.41
+      },
+      "filtered": {
+        "n": 228,
+        "avg": 5.01,
+        "wr": 68.4,
+        "pf": 4.48
+      },
+      "delta_avg": 0.14,
+      "improved": true
+    }
+  ],
+  "rank_interaction": {
+    "removed_n": 292,
+    "removed_rank_le3_n": 136,
+    "removed_rank_le3_share": 46.6,
+    "overall_rank_le3_share": 37.5
+  },
+  "yearly_consistency": "4/4",
+  "rank_ge4": {
+    "base": {
+      "n": 954,
+      "avg": 4.39,
+      "wr": 68.9,
+      "pf": 4.31
+    },
+    "filtered": {
+      "n": 798,
+      "avg": 4.76,
+      "wr": 73.9,
+      "pf": 4.84
+    },
+    "delta": 0.37
+  }
+}

@@ -42,3 +42,11 @@ risk_pct 在**入场时刻由 SL 计算得出**，先于任何未来价格 → �
 - [ ] 写 frozen 回测脚本 v_minrisk_ab.py (严格 OOS 切分, 不看结果即冻结参数)
 - [ ] OOS 窗口判定 → 决定是否进入生产 paper_sim gate
 - [ ] 若通过: 在 paper_sim.daily_selection 加 EVENT_MIN_RISK_PCT 常量 + reject_reason='SL_TOO_TIGHT_ENTRY' (注意这是入场拒绝, 与归因类 LOSS_SL_TOO_TIGHT 区分)
+
+## R28 补充证据 (2026-09-20, r28_e3_yearly_rank.json)
+1. **逐年稳健 4/4**: Δavg = 2023:+0.88 / 2024:+0.50 / 2025:+0.55 / 2026:+0.14, PF 每年均升。
+   2026 (近 OOS) 增益收窄到 +0.14 但仍为正 — 需用真实 OOS confirm。
+2. **rank 交互**: 剔除集(n=292)中 rank<=3 占 46.6% vs 全体 37.5% — 与现有 rank gate 有中等重叠,
+   但非冗余: rank≥4 子集内过滤仍增量 avg 4.39→4.76 (+0.37pp), WR 68.9→73.9, PF 4.31→4.84。
+3. 结论: E3 与 rank gate 互补, 都通过则可叠加。
+状态: R27 影子A/B ✓ + R28 逐年/rank ✓ → **下一必备步骤: frozen OOS 回测 (步骤1)**
