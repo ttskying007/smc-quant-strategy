@@ -1,0 +1,22 @@
+{
+  "asof": "2026-09-20",
+  "n_open": 1,
+  "orders": [
+    {
+      "code": "002801",
+      "name": "微光股份",
+      "status": "FILLED",
+      "entry_date": "2026-09-03",
+      "hold_days": 17,
+      "entry": 27.324,
+      "mark": 26.52,
+      "pnl_pct": -2.94,
+      "sl_dist_pct": 5.71,
+      "tp_room_pct": 20.63,
+      "family": "BUYBACK_STRONG"
+    }
+  ],
+  "mark_pnl_sum_pct": -2.94,
+  "underwater_n": 1,
+  "underwater_avg": -2.94
+}
