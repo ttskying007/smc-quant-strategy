@@ -55,6 +55,15 @@ if top_n > len(sigs) * 0.5 and len(sigs) > 10:
 neg = [s for s in closed if (s.get("ret_pct") or 0) < 0]
 if closed and len(neg) / len(closed) > 0.6:
     alerts.append(f"负收益集中: {len(neg)}/{len(closed)} closed 为负")
+# R13 审计接线: 亏损归因 20 类分布(由 paper_sim 写入 loss_attribution 字段)
+attr_dist = Counter(s.get("loss_attribution") for s in neg if s.get("loss_attribution"))
+attr_n = sum(attr_dist.values())
+attr_report = {
+    "n_attributed": attr_n,
+    "n_loss": len(neg),
+    "coverage_pct": round(attr_n / max(1, len(neg)) * 100, 1),
+    "dist": {k: v for k, v in attr_dist.most_common(10)},
+}
 if len(closed) >= 5:
     avg = sum(s["ret_pct"] for s in closed) / len(closed)
     if avg < -1.0:
@@ -69,6 +78,7 @@ report = {"generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
           "milestone": {**milestone, **progress},
           "escore_dist": es_stats,
           "family_dist": dict(fam_c), "exit_dist": dict(exit_c),
+          "loss_attribution": attr_report,   # R13 集成
           "alerts": alerts,
           "raw": {"total": len(sigs), "closed": len(closed), "open": len(open_)}}
 json.dump(report, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
@@ -77,6 +87,10 @@ print(f"  进度: days={days} closed={len(closed)}/30 → {progress['pct_to_30']
 print(f"  E 分布: {es_stats['bands']} avg={es_stats['avg_e']}")
 print(f"  家族: {dict(fam_c)}")
 print(f"  退出: {dict(exit_c)}")
+if attr_report["n_loss"] > 0:
+    print(f"  亏损归因 R13: n={attr_report['n_attributed']}/{attr_report['n_loss']} ({attr_report['coverage_pct']}%)")
+    for k, v in list(attr_report["dist"].items())[:5]:
+        print(f"    {k}: {v} 笔")
 if alerts:
     print(f"  ⚠ 预警: {alerts}")
 else:
