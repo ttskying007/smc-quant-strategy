@@ -1,0 +1,55 @@
+{
+  "n": 1861,
+  "edges": [
+    0.0,
+    0.66,
+    5.66,
+    12.34,
+    27.77,
+    51.9
+  ],
+  "bands": [
+    {
+      "band": "0.0-0.7%",
+      "n": 372,
+      "win_rate": 55.1,
+      "avg_ret": 4.9,
+      "avg_win": 14.1,
+      "avg_loss": -6.38
+    },
+    {
+      "band": "0.7-5.7%",
+      "n": 372,
+      "win_rate": 42.5,
+      "avg_ret": 1.23,
+      "avg_win": 7.47,
+      "avg_loss": -3.37
+    },
+    {
+      "band": "5.7-12.3%",
+      "n": 372,
+      "win_rate": 65.1,
+      "avg_ret": 2.54,
+      "avg_win": 6.9,
+      "avg_loss": -5.57
+    },
+    {
+      "band": "12.3-27.8%",
+      "n": 372,
+      "win_rate": 74.7,
+      "avg_ret": 4.28,
+      "avg_win": 7.5,
+      "avg_loss": -5.24
+    },
+    {
+      "band": "27.8-51.9%",
+      "n": 373,
+      "win_rate": 82.3,
+      "avg_ret": 7.3,
+      "avg_win": 9.54,
+      "avg_loss": -3.11
+    }
+  ],
+  "risk_pct_eq_20_count": 0,
+  "risk_pct_eq_20_share": 0.0
+}
