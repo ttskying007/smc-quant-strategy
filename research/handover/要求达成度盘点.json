@@ -1,8 +1,8 @@
 {
-  "asof": "2026-09-19 08:06:51",
+  "asof": "2026-09-19 08:45:42",
   "total": 16,
-  "done": 10,
-  "partial": 3,
+  "done": 11,
+  "partial": 2,
   "open": 3,
   "items": [
     {
@@ -26,8 +26,8 @@
     {
       "id": "R4",
       "req": "Entry+TP/SL引擎(优先级②)",
-      "status": "PARTIAL",
-      "evidence": "统一execution内核已有(TP1/2/3+SL+追踪); Entry Zone与结构化TP/SL(内/外/HTF流动性)未落地→本轮迭代7/8"
+      "status": "DONE",
+      "evidence": "core/entry.py(entry_zone/fill_in_zone)+core/risk.py(structured_tp_sl: TP1=Internal/TP2=External/TP3=HTF流动性池+无池兜底1/2/3R+EV估算) 已建; 9.8 ITERATION 7/8 25/25 测试; Zone回踩成交率 36%(321/897)——结构不及市价但 WR +9.1pp 诚实结论已出; TP/SL 池化组合层默认关闭, 止损口径(B3宽SL)在 v0/PAPER 双台账锁定"
     },
     {
       "id": "R5",
