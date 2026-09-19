@@ -1,0 +1,48 @@
+{
+  "prereg": {
+    "hypothesis": "delay1 improves OOS avg & PF",
+    "asof": "2026-09-19"
+  },
+  "pairs": 1740,
+  "skipped_delay": 39,
+  "A_immediate": {
+    "IS": {
+      "n": 1355,
+      "avg": 3.573,
+      "wr": 0.631,
+      "pf": 3.12
+    },
+    "OOS": {
+      "n": 385,
+      "avg": 3.764,
+      "wr": 0.603,
+      "pf": 3.63
+    }
+  },
+  "B_delay1": {
+    "IS": {
+      "n": 1355,
+      "avg": 2.199,
+      "wr": 0.592,
+      "pf": 2.04
+    },
+    "OOS": {
+      "n": 385,
+      "avg": 2.202,
+      "wr": 0.553,
+      "pf": 2.19
+    }
+  },
+  "timeshort_subset": {
+    "n": 139,
+    "A_avg": -3.973,
+    "B_avg": -4.757,
+    "B_escaped_loss": 4,
+    "OOS": {
+      "n": 30,
+      "A_avg": -3.905,
+      "B_avg": -4.243
+    }
+  },
+  "verdict_promote": false
+}
