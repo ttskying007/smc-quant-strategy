@@ -1,8 +1,8 @@
 {
-  "asof": "2026-09-19 06:20:37",
+  "asof": "2026-09-19 08:06:51",
   "total": 16,
-  "done": 9,
-  "partial": 4,
+  "done": 10,
+  "partial": 3,
   "open": 3,
   "items": [
     {
@@ -80,8 +80,8 @@
     {
       "id": "R13",
       "req": "亏损归因Loss Attribution",
-      "status": "PARTIAL",
-      "evidence": "SL_GAP最贵亏损(V1迭代3)/RR_exit0.31确认TP偏近(基线冻结); 20类主因标签未建→V2迭代9"
+      "status": "DONE",
+      "evidence": "core/attribution.py 扩展为完整 20 类(原 9 类 + 新增 MFE_REVERSAL/BE_EXIT/TP_GIVEBACK/TIME_LONG/TIME_SHORT/LOW_RANK/HIGH_RANK/RANGE_HOLD/SL_STRUCTURAL/EXECUTION_COST/MEDIUM); 530 笔事件腿归因: 最大损耗=SL_TOO_WIDE 49.3%(老问题), 新分层揭示 TIME_SHORT 10.9%(入场后 <2bar SL_HIT) + RANK 高低原亏损 11.4%(rank 高分仍未避险) + MFE_REVERSAL 5.5%(曾达 1R), 已全部通过 29/29 测试。"
     },
     {
       "id": "R14",

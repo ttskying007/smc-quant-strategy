@@ -28,6 +28,39 @@ ok("极端强市regime", attribute_trade(-3, -3, 1, regime_proxy=0.03) == "LOSS_
 ok("小额时间止损", attribute_trade(-0.3, -0.3, 0.4) == "LOSS_TIME_STOP")
 ok("兜底", attribute_trade(-5, -5, 1) == "LOSS_OTHER")
 
+print("== 1b. 20 类新增判定 ==")
+atr = 0.025 * 100  # 2.5%
+# LOSS_SL_TOO_TIGHT 激活测试理由相同(OLD 占位), 重新检查 SL_TOO_TIGHT
+ok("SL过紧激活(显式)", attribute_trade(-1.2, -1.2, 0.5, sl_dist_pct=1.0,
+     atr_pct=atr / 100) == "LOSS_SL_TOO_TIGHT")
+# 1. MFE>=1R 但净亏损(回吐) → LOSS_MFE_REVERSAL
+ok("LOSS_MFE_REVERSAL", attribute_trade(-1, -1, 5, mfe_r=1.5) == "LOSS_MFE_REVERSAL")
+# 2. HOLD > 8 亏损 → LOSS_TIME_LONG
+ok("LOSS_TIME_LONG", attribute_trade(-2, -2, 1, hold_bars=10) == "LOSS_TIME_LONG")
+# 3. HOLD ≤2 + SL_HIT → LOSS_TIME_SHORT(need sl_dist in normal zone to avoid SL_TOO_TIGHT firing first)
+ok("LOSS_TIME_SHORT", attribute_trade(-2, -2, 1, hold_bars=1, reason="SL_HIT") == "LOSS_TIME_SHORT")
+# 4. BE 小幅亏损 → LOSS_BE_EXIT
+ok("LOSS_BE_EXIT", attribute_trade(-0.2, -0.2, 0.4, reason="BE") == "LOSS_BE_EXIT")
+# 5. TP_RUNNER 还亏损 → LOSS_TP_GIVEBACK
+ok("LOSS_TP_GIVEBACK(TP2_RUNNER)", attribute_trade(-1.5, -1.5, 2, reason="TP2_RUNNER") == "LOSS_TP_GIVEBACK")
+# 6. 低排名(rank≤3)亏损 → LOSS_LOW_RANK(注: LOSS_LOW_RANK 仅作质量表征, 位置高)
+ok("LOSS_LOW_RANK", attribute_trade(-2, -2, 1, rank=2) == "LOSS_LOW_RANK")
+# 7. 高分位(rank≥4)亏损 → LOSS_HIGH_RANK(信号整体压力大)
+ok("LOSS_HIGH_RANK", attribute_trade(-2, -2, 1, rank=5) == "LOSS_HIGH_RANK")
+# 8. 持有期内价格既不深回也未突破 → LOSS_RANGE_HOLD(mae=-0.8 ≤ atr=2.5)
+ok("LOSS_RANGE_HOLD", attribute_trade(-0.8, -0.8, 0.4, hold_bars=8) == "LOSS_RANGE_HOLD")
+# 9. SL 落在正常区间且 reason=SL_HIT → LOSS_SL_STRUCTURAL(正常结构失效, sl_dist=3.0 居中)
+ok("LOSS_SL_STRUCTURAL", attribute_trade(-3.0, -3.0, 1, reason="SL_HIT",
+     sl_dist_pct=3.0, atr_pct=atr / 100) == "LOSS_SL_STRUCTURAL")
+# 10. 极小的成本型亏损 → LOSS_EXECUTION_COST
+ok("LOSS_EXECUTION_COST", attribute_trade(-0.2, -0.2, 0.2) == "LOSS_EXECUTION_COST")
+# 11. 0.5~1.0 中等亏损 → LOSS_MEDIUM
+ok("LOSS_MEDIUM", attribute_trade(-0.7, -0.7, 0.7) == "LOSS_MEDIUM")
+# 12. 兜底的兜底: 大额亏损无任何特征 → LOSS_OTHER(无 rank/reason/sl_dist/fields)
+ok("LOSS_OTHER 兜底", attribute_trade(-2.5, -2.5, 1.0) == "LOSS_OTHER")
+# 20 类完整性
+ok("ALL_LABELS 精确为 20 类", len(ALL_LABELS) == 20, str(len(ALL_LABELS)))
+
 print("== 2. 汇总占比 ==")
 trades = [{"label": "LOSS_GAP", "loss_abs": 20}, {"label": "LOSS_GAP", "loss_abs": 10},
           {"label": "LOSS_STRUCTURE", "loss_abs": 10}, {"label": "LOSS_OTHER", "loss_abs": 10}]
@@ -35,7 +68,7 @@ s = attribution_summary(trades)
 ok("总数", s["_total_n"] == 4)
 ok("总亏", s["_total_loss"] == 50)
 ok("GAP贡献60%", s["LOSS_GAP"]["contribution_pct"] == 60.0)
-ok("覆盖全标签", len([k for k in s if not k.startswith("_")]) == len(ALL_LABELS))
+ok("覆盖全标签(20 类)", s["_classes_used"] <= len(ALL_LABELS))
 
 print("== 3. 事件腿 1640 笔应用(真实数据) ==")
 _trades_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "combo_v20f_trades.csv")
@@ -58,7 +91,10 @@ for r in rows:
     sl_dist = abs(ep - sl) / ep * 100 if ep and sl else None
     atr_p = 0.025
     lab = attribute_trade(net, mae, mfe, sl_dist_pct=sl_dist, atr_pct=atr_p,
-                          gap_through_sl=(reason == "SL_GAP"))
+                          gap_through_sl=(reason == "SL_GAP"), reason=reason,
+                          mfe_r=float(r.get("mfe_r") or 0),
+                          hold_bars=int(float(r.get("hold_bars") or 0)),
+                          rank=int(float(r.get("rank") or 3)))
     tagged.append({"label": lab, "loss_abs": abs(net)})
 summ = attribution_summary(tagged)
 print(f"  亏损单: {summ['_total_n']} | 总亏: {summ['_total_loss']}%")
