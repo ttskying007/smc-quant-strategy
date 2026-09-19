@@ -1,0 +1,78 @@
+{
+  "flip_202502_04": {
+    "all": {
+      "n": 57,
+      "avg": 0.27,
+      "wr": 56.1,
+      "pf": 1.19
+    },
+    "narrow_lt4": {
+      "n": 18,
+      "avg": 1.13,
+      "wr": 55.6,
+      "pf": 2.08
+    },
+    "wide_ge4": {
+      "n": 39,
+      "avg": -0.13,
+      "wr": 56.4,
+      "pf": 0.92
+    },
+    "narrow_rank_dist": {
+      "1": 2,
+      "2": 7,
+      "3": 5,
+      "4": 1,
+      "5": 3
+    },
+    "narrow_reason_dist": {
+      "TP2_RUNNER": 7,
+      "SL_HIT": 2,
+      "BE": 3,
+      "SL_GAP": 4,
+      "TIME_STOP": 2
+    }
+  },
+  "flip_202603_05": {
+    "all": {
+      "n": 19,
+      "avg": -1.94,
+      "wr": 26.3,
+      "pf": 0.4
+    },
+    "narrow_lt4": {
+      "n": 9,
+      "avg": -0.75,
+      "wr": 22.2,
+      "pf": 0.63
+    },
+    "wide_ge4": {
+      "n": 10,
+      "avg": -3.02,
+      "wr": 30.0,
+      "pf": 0.3
+    },
+    "narrow_rank_dist": {
+      "2": 3,
+      "3": 3,
+      "4": 1,
+      "5": 2
+    },
+    "narrow_reason_dist": {
+      "SL_HIT": 7,
+      "TIME_STOP": 1,
+      "TP2_RUNNER": 1
+    }
+  },
+  "narrow_other_months": {
+    "n": 265,
+    "avg": 1.49,
+    "wr": 38.5,
+    "pf": 1.86
+  },
+  "flip_narrow_holdbars": {
+    "n": 27,
+    "median": 3.0,
+    "mean": 4.6
+  }
+}
