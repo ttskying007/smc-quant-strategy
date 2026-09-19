@@ -1,0 +1,34 @@
+{
+  "n_rows": 1861,
+  "n_losses": 671,
+  "rank_col": "rank",
+  "ret_col": "net_pnl_pct",
+  "losses": {
+    "rank>=4": {
+      "n": 297,
+      "avg_ret": -4.259489225589226
+    },
+    "rank<4": {
+      "n": 374,
+      "avg_ret": -5.197287967914439
+    }
+  },
+  "h4_slwidth_on_highrank_losses": {
+    "n": 297,
+    "median": 7.667,
+    "mean": 12.22152861952862,
+    "p25": 3.288,
+    "p75": 17.979
+  },
+  "h4_slwidth_on_highrank_wins": {
+    "n": 657,
+    "median": 22.067,
+    "mean": 20.817738203957383
+  },
+  "h4_verdict": {
+    "loss_sl_mean": 12.222,
+    "win_sl_mean": 20.818,
+    "diff_pct": -41.3,
+    "supports_H4": false
+  }
+}
