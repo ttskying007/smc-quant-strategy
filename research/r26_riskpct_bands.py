@@ -15,7 +15,10 @@ def f(x, d=0.0):
     try: return float(x)
     except Exception: return d
 
-rows = list(csv.DictReader(open(CSV, encoding="utf-8")))
+rows_all = list(csv.DictReader(open(CSV, encoding="utf-8")))
+# 剔除 src=CONT 占位行(buy/sl/tp/reason 全空 = 未成交continuation占位)
+rows = [r for r in rows_all if (r.get("buy_price") or "").strip()]
+print(f"剔除CONT占位后: {len(rows)}/{len(rows_all)} 条有效成交腿")
 n = len(rows)
 rps = [f(r["risk_pct"]) for r in rows]
 
