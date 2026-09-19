@@ -1486,6 +1486,12 @@ def realtime_monitor():
                     "trigger": t.get("trigger", "T+1开盘/回踩"), "pnl_pct": None,
                 })
         elif t["status"] == "FILLED":
+            # FIX(2026-09-19, R13 生产化): 每笔持仓累计 MFE/MAE, 无视 suspend/limit-up(反映价格轨迹)
+            _ep0 = t["filled_price"] or t["entry_price"]
+            if cur_px > (t.get("mfe_px") or _ep0):
+                t["mfe_px"] = cur_px
+            if cur_px < (t.get("mae_px") or _ep0):
+                t["mae_px"] = cur_px
             # FIX(2026-09-04, 审计 P2): 停牌无法卖出（量=0，跳过平仓判定）
             if _is_suspended(_info):
                 continue
@@ -1577,6 +1583,27 @@ def realtime_monitor():
                     else:
                         _rem = 0.7 if t.get("tp1_hit") else 1.0
                         t["pnl_pct"] = round((t.get("realized_pnl", 0) or 0) + _rem * (_xr["price"] / ep - 1) * 100 - FEE * _rem, 4)
+                    # R13 生产化: 亏损单的 20 类归因(归因在平仓 vol 点后执行不外溢)
+                    if t["pnl_pct"] is not None and t["pnl_pct"] < 0:
+                        try:
+                            from core.attribution import attribute_trade as _attr
+                            _ep = t.get("filled_price") or t.get("entry_price") or 0
+                            _sl1 = t.get("sl1") or t.get("sl_price") or 0
+                            _sl_d = (abs(_ep - _sl1) / _ep * 100) if _ep and _sl1 else None
+                            _mfe_pct = round((t.get("mfe_px", _ep) / _ep - 1) * 100, 4) if _ep else None
+                            _mae_pct = round((_ep - t.get("mae_px", _ep)) / _ep * 100, 4) if _ep else None
+                            # 用 MFE 反推 R(mfe 距离 / 风险距离)
+                            _mfe_r = None
+                            if _sl_d and _sl_d > 0 and _mfe_pct is not None:
+                                _mfe_r = round(_mfe_pct / _sl_d, 2)
+                            t["loss_attribution"] = _attr(
+                                tr=t["pnl_pct"], mae_pct=_mae_pct,
+                                mfe_pct=_mfe_pct, sl_dist_pct=_sl_d,
+                                mfe_r=_mfe_r, hold_bars=_bars_sf,
+                                reason=t.get("exit_reason"), rank=t.get("rank_score"),
+                            )
+                        except Exception:
+                            pass  # R13 软失败: 归因失败不影响卖出订单
                     n_close += 1
                 elif _xr.get("partial") == "TP1" and not t.get("tp1_hit"):
                     # TP1 部分平仓（与回测合同一致：30%平，SL移保本）
