@@ -15,8 +15,8 @@ ITEMS = [
      "core/liquidity+mss+fgv_ob+displacement+structure 语义引擎完整(60+测试) + core/sequence 状态机(13测试)"),
     ("R4", "Entry+TP/SL引擎(优先级②)", "DONE",
      "core/entry.py(entry_zone/fill_in_zone)+core/risk.py(structured_tp_sl: TP1=Internal/TP2=External/TP3=HTF流动性池+无池兜底1/2/3R+EV估算) 已建; 9.8 ITERATION 7/8 25/25 测试; Zone回踩成交率 36%(321/897)——结构不及市价但 WR +9.1pp 诚实结论已出; TP/SL 池化组合层默认关闭, 止损口径(B3宽SL)在 v0/PAPER 双台账锁定"),
-    ("R5", "自适应多周期引擎(优先级③)", "NOT-STARTED",
-     "core/adaptive.py 仍ATR三桶(V2蓝图§28判定不足); Stock Profile/TF Selector待V2迭代5"),
+    ("R5", "自适应多周期引擎(优先级③)", "PARTIAL(三建造, 对接未建)",
+     "core/adaptive.py(波动率三桶, 12/12) + core/profile.py(Stock Profile 13特征, 25/25) + core/regime.py(六态指数真值, 8/8) 各模块完整独立; 缺 profile×regime×周期联合解析器(蓝图迭代5/6对接)——未落到生产鸡腿调用链"),
     ("R6", "'一个月无新股'根因", "DONE",
      "Funnel审计: 新引擎208/月 vs 生产硬门槛33.6/月=门槛链削减84%候选(0833122)"),
     ("R7", "Funnel ±2σ 基线累积", "PARTIAL",
@@ -34,9 +34,10 @@ ITEMS = [
     ("R13", "亏损归因Loss Attribution", "DONE",
      "core/attribution.py 扩展为完整 20 类(原 9 类 + 新增 MFE_REVERSAL/BE_EXIT/TP_GIVEBACK/TIME_LONG/TIME_SHORT/LOW_RANK/HIGH_RANK/RANGE_HOLD/SL_STRUCTURAL/EXECUTION_COST/MEDIUM); 530 笔事件腿归因: 最大损耗=SL_TOO_WIDE 49.3%(老问题), 新分层揭示 TIME_SHORT 10.9%(入场后 <2bar SL_HIT) + RANK 高低原亏损 11.4%(rank 高分仍未避险) + MFE_REVERSAL 5.5%(曾达 1R), 已全部通过 29/29 测试。"),
     ("R14", "报告自动绑定+日历三态+入口歧义清理", "NOT-STARTED", "P2工程小项, 排后"),
-    ("R15", "Stock Profile/Cluster", "NOT-STARTED", "V2迭代5"),
-    ("R16", "Market Regime 正式化", "PARTIAL",
-     "proxy 200股20日均(幸存者偏差已标注V2§31); 指数/Breadth/涨跌停真值未建→V2迭代6"),
+    ("R15", "Stock Profile/Cluster", "DONE(2026-09-08 已实现)",
+     "core/profile.py 13特征(波动/趋势/噪声/SWEEP频率/OB/FVG响应等)+cluster 聚类低中高波动档+V2 三档参数族 atr_pct/trend_persist/max_hold/sl_buf/sweep_floor/disp_min; tests_profile.py 25/25; V2 迭代 5 (Stock Profile 不生产调用路由)"),
+    ("R16", "Market Regime 正式化", "DONE(2026-09-08 已实现)",
+     "core/regime.py 六态(BULL/BEAR/SIDEWAYS/PANIC/RECOVERY/ROTATION)+直接读 ETF 指数真值(000001_SH/000300_SH_60min+day); tests_regime 8/8; 生产 escore 逐日调用; Breadth 标准依然(涨跌停家数涨跌榜)未建→后续 V2 迭代6 深化"),
 ]
 done = [x for x in ITEMS if x[2].startswith("DONE")]
 part = [x for x in ITEMS if x[2].startswith("PARTIAL")]
