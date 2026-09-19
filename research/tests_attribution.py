@@ -43,8 +43,10 @@ ok("LOSS_TIME_SHORT", attribute_trade(-2, -2, 1, hold_bars=1, reason="SL_HIT") =
 ok("LOSS_BE_EXIT", attribute_trade(-0.2, -0.2, 0.4, reason="BE") == "LOSS_BE_EXIT")
 # 5. TP_RUNNER 还亏损 → LOSS_TP_GIVEBACK
 ok("LOSS_TP_GIVEBACK(TP2_RUNNER)", attribute_trade(-1.5, -1.5, 2, reason="TP2_RUNNER") == "LOSS_TP_GIVEBACK")
-# 6. 低排名(rank≤3)亏损 → LOSS_LOW_RANK(注: LOSS_LOW_RANK 仅作质量表征, 位置高)
+# 6. 低排名(rank<3)亏损 → LOSS_LOW_RANK(注: LOSS_LOW_RANK 仅作质量表征, 位置高)
 ok("LOSS_LOW_RANK", attribute_trade(-2, -2, 1, rank=2) == "LOSS_LOW_RANK")
+ok("LOSS_LOW_RANK rank=1 仍触发", attribute_trade(-2, -2, 1, rank=1) == "LOSS_LOW_RANK")
+ok("rank=3 不再算 LOW_RANK", attribute_trade(-2, -2, 1, rank=3) != "LOSS_LOW_RANK")
 # 7. 高分位(rank≥4)亏损 → LOSS_HIGH_RANK(信号整体压力大)
 ok("LOSS_HIGH_RANK", attribute_trade(-2, -2, 1, rank=5) == "LOSS_HIGH_RANK")
 # 8. 持有期内价格既不深回也未突破 → LOSS_RANGE_HOLD(mae=-0.8 ≤ atr=2.5)

@@ -86,7 +86,10 @@ def attribute_trade(tr, mae_pct, mfe_pct, sl_dist_pct=None, tp1_ret_pct=None,
         return "LOSS_STRUCTURE"
     if regime_proxy is not None and regime_proxy > 0.02:
         return "LOSS_REGIME"
-    if rank is not None and rank <= 3:
+    if rank is not None and rank < 3:
+        # R13 微调(2026-09-19): rank<=3 -> rank<3. rank=3 是生产 gate 通过线, 占样本
+        # 54%(paper_ledger 中 rank=3 占 58/140), 若仍归入 LOSS_LOW_RANK 会把"完全符合
+        # gate 的正常单"标为低分位, 语义反直觉. 阈值收紧后 rank=3 单恢复到结构归因.
         return "LOSS_LOW_RANK"
     if rank is not None and rank >= 4:
         return "LOSS_HIGH_RANK"
