@@ -1,0 +1,49 @@
+{
+  "TIME_STOP": {
+    "n": 793,
+    "avg_pnl": 6.32,
+    "avg_mfe": 13.05,
+    "med_mfe": 11.5,
+    "avg_mae": -3.0,
+    "giveback_pts": 6.73
+  },
+  "TP2_RUNNER": {
+    "n": 241,
+    "avg_pnl": 8.86,
+    "avg_mfe": 15.08,
+    "med_mfe": 12.36,
+    "avg_mae": -0.22,
+    "giveback_pts": 6.22
+  },
+  "BE": {
+    "n": 129,
+    "avg_pnl": 0.88,
+    "avg_mfe": 7.19,
+    "med_mfe": 5.73,
+    "avg_mae": -2.33,
+    "giveback_pts": 6.31
+  },
+  "SL_GAP": {
+    "n": 132,
+    "avg_pnl": -2.49,
+    "avg_mfe": 2.92,
+    "med_mfe": 2.17,
+    "avg_mae": -5.26,
+    "giveback_pts": 5.42
+  },
+  "SL_HIT": {
+    "n": 232,
+    "avg_pnl": -5.08,
+    "avg_mfe": 1.43,
+    "med_mfe": 1.22,
+    "avg_mae": -6.48,
+    "giveback_pts": 6.52
+  },
+  "time_stop_big_giveback": {
+    "n": 456,
+    "share": 57.5,
+    "avg_mfe": 15.6,
+    "avg_pnl": 6.2
+  },
+  "note_tp2_unanswerable": "TP2_RUNNER 的 mfe 截断在退出点, 无法从CSV估计继续持有收益; 需 bar 级 replay"
+}
