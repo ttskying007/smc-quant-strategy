@@ -1,0 +1,17 @@
+{
+  "asof": "2026-09-20",
+  "date": "2026-09-19",
+  "raw_buyback_announcements": 34,
+  "classifier_breakdown": {
+    "INERT_REJECT": 18,
+    "EVENT": 7,
+    "PROGRESS_WITH_DELTA": 3,
+    "SOFT_REJECT": 6
+  },
+  "interpret": {
+    "INERT_REJECT_note": "回购进展/注销/律师事务所意见 — 不产生事件信号",
+    "EVENT_count": 7,
+    "new_signal_stream": "EVENT 是这个 classifier 的核心产出，候选足够用于选股",
+    "implication": "原始 raw=34 但 EVENT=7，转化比 ~21%（合规）; INERT_REJECT 由语义分类或真实性判断终止"
+  }
+}
