@@ -1,0 +1,101 @@
+{
+  "baseline": {
+    "n": 1527,
+    "avg": 3.77,
+    "wr": 65.3,
+    "pf": 3.63,
+    "total": 5751.6
+  },
+  "scenarios": [
+    {
+      "min_risk_pct": 2.0,
+      "kept": {
+        "n": 1395,
+        "avg": 4.0,
+        "wr": 68.0,
+        "pf": 3.78,
+        "total": 5573.7
+      },
+      "removed": {
+        "n": 132,
+        "avg": 1.35,
+        "wr": 37.1,
+        "pf": 2.0,
+        "total": 178.0
+      },
+      "delta_avg_vs_base": 0.23
+    },
+    {
+      "min_risk_pct": 3.0,
+      "kept": {
+        "n": 1321,
+        "avg": 4.21,
+        "wr": 69.9,
+        "pf": 3.99,
+        "total": 5562.1
+      },
+      "removed": {
+        "n": 206,
+        "avg": 0.92,
+        "wr": 35.9,
+        "pf": 1.59,
+        "total": 189.6
+      },
+      "delta_avg_vs_base": 0.44
+    },
+    {
+      "min_risk_pct": 4.0,
+      "kept": {
+        "n": 1235,
+        "avg": 4.33,
+        "wr": 71.5,
+        "pf": 4.17,
+        "total": 5342.1
+      },
+      "removed": {
+        "n": 292,
+        "avg": 1.4,
+        "wr": 39.0,
+        "pf": 1.82,
+        "total": 409.6
+      },
+      "delta_avg_vs_base": 0.56
+    },
+    {
+      "min_risk_pct": 5.0,
+      "kept": {
+        "n": 1158,
+        "avg": 4.61,
+        "wr": 73.4,
+        "pf": 4.58,
+        "total": 5338.8
+      },
+      "removed": {
+        "n": 369,
+        "avg": 1.12,
+        "wr": 39.8,
+        "pf": 1.6,
+        "total": 412.8
+      },
+      "delta_avg_vs_base": 0.84
+    },
+    {
+      "min_risk_pct": 6.0,
+      "kept": {
+        "n": 1092,
+        "avg": 4.78,
+        "wr": 74.4,
+        "pf": 4.8,
+        "total": 5223.9
+      },
+      "removed": {
+        "n": 435,
+        "avg": 1.21,
+        "wr": 42.5,
+        "pf": 1.65,
+        "total": 527.7
+      },
+      "delta_avg_vs_base": 1.01
+    }
+  ]
+}
