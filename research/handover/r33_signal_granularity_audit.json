@@ -1,0 +1,34 @@
+{
+  "n": 1527,
+  "signal_chain_dist": {
+    "insider-event": 1527
+  },
+  "src_dist": {
+    "EVENT": 1527
+  },
+  "columns": [
+    "symbol",
+    "entry_date",
+    "src",
+    "net_pnl_pct",
+    "rank",
+    "buy_date",
+    "buy_price",
+    "sell_date",
+    "sell_price",
+    "reason",
+    "hold_bars",
+    "tp",
+    "sl",
+    "risk_pct",
+    "mfe_pct",
+    "mae_pct",
+    "mfe_r",
+    "mae_r",
+    "rr_exit",
+    "signal_chain",
+    "r20"
+  ],
+  "conclusion": "canonical CSV 无子信号粒度; 组合级分析需新字段, 冻结期内不可行",
+  "paper_ledger_alternative": "paper_ledger.sub_signals 存在但样本<150, 暂不足统计"
+}
