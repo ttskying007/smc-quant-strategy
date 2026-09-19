@@ -41,6 +41,6 @@ KB 案例卡: "黄金 15m→5m FVG 逐级缩小止损" — 即多周期确认而
 
 ## 下轮行动清单 (只读/预注册, 不动生产)
 1. [ ] r25_highrank_slwidth.py: HIGH_RANK ∩ SL_WIDE 交叉统计 (530 笔 EVENT)
-2. [ ] grep paper_sim.py: TP1 触发后是否移动 SL→BE (MFE_REVERSAL 修复前置检查)
+2. [x] grep paper_sim.py: TP1 触发后是否移动 SL→BE — **已存在** (paper_sim.py:1616 `sl_reason="TP1_MOVE_TO_BE"`, tp1_hit 分支)。MFE_REVERSAL 不能靠 BE 修复, 需另查(剩余 47 笔是 TP1 未达即回撤)。
 3. [ ] E2 min-R:R gate 写入 research/handover/preregister_E2_minrr.md (假设+样本+判定阈值, 冻结后才可回测)
 4. [ ] 等 09-22 daily run 验证 announce self-heal + R13 attribution 首笔 CLOSED 落账
