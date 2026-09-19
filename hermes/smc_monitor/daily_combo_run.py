@@ -184,6 +184,23 @@ def _run_main_steps():
     # 0a. pull daily announcements (fix 8-14 lag: announcements must be fresh before selection)
     rc0a = run("pull_announce_daily.py", cwd=WDH, timeout=600)
     step_status["announce"] = rc0a
+    # R7 self-heal (2026-09-19): 如拉取因超时/网络中断导致 MAX(date) 滞后, 自动调用
+    # announce_gap_refill.py 补回最大日期 (幂等, 不会重复插入)
+    try:
+        import sqlite3 as _sq3
+        from datetime import date as _dd, timedelta as _td
+        _con = _sq3.connect(os.path.join(RESEARCH, '..', 'announce', 'smc_announce.db'))
+        _max = _con.execute("SELECT MAX(date) FROM announce").fetchone()[0]
+        _con.close()
+        # 期望今天距 MAX(date) 不超过 1 个工作日(宽容公回)
+        _gap = (_dd.fromisoformat(_max) - _dd.today()).days if _max else -900
+        if _gap < -1:  # MAX(date) 落后超过 1 天 → 触发自动补
+            _tgt = (_dd.today() - _td(days=1)).strftime("%Y-%m-%d")
+            rc0b = run("announce_gap_refill.py", _max, _tgt, cwd=RESEARCH, timeout=1800)
+            step_status["announce_refill"] = rc0b
+            print(f"[self-heal] announce MAX(date)={_max} 落后 1+ 天, 已触发补拉 {_max}->{_tgt}")
+    except Exception as _e:
+        print(f"[self-heal] announce gap auto-check failed (never block): {_e}", flush=True)
     # 0. FIX(2026-08-22): incremental full-market refresh (datalen=10 append, 3 workers ~1/s)
     #    replaces slow 600/day batch — full market (~4657) done in ~75 min, coverage 4.8%->100%
     rc0 = run("incremental_refresh.py", "--workers", "3", cwd=WDH, timeout=10800)
