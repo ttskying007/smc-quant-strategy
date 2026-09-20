@@ -725,13 +725,24 @@ def daily_selection():
                 continue
             dates = [b["t"] for b in bs]
             if d8 not in dates:
-                _sel_stats["skipped_nodata"] += 1
-                _data_missing += 1
-                _mark_funnel(_key, "DATA_MISSING")
-                _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": "K线无此日期"})
-                _reject_records.append({"code": code, "name": name, "date": dd, "stage": "DATA_MISSING", "title": title[:80]})
-                continue
-            i = dates.index(d8)
+                # FIX(2026-09-20, R45): 公告日=周末/节假日时 d8 不在 dates
+                # 旧行为: 当无数据丢弃(14/44 中 31.8% 是由此而来)
+                # 改为: 顺延到 d8 之前的最近交易日(盘面未开, 该收盘状态就是决策态),
+                # 以 T+1=下个交易日的开盘为 entry。正确时序, 无前视。
+                import bisect as _bisect
+                _i0 = _bisect.bisect_left(dates, d8)  # 首个 >= d8 的位置
+                if _i0 >= 1:
+                    i = _i0 - 1  # 公告日之前的最后交易日 = 信号日
+                    _sel_stats["rolled_weekend"] = _sel_stats.get("rolled_weekend", 0) + 1
+                else:
+                    _sel_stats["skipped_nodata"] += 1
+                    _data_missing += 1
+                    _mark_funnel(_key, "DATA_MISSING")
+                    _skipped_detail.append({"code": code, "name": name, "date": dd, "reason": "K线无此日期(及之前)"})
+                    _reject_records.append({"code": code, "name": name, "date": dd, "stage": "DATA_MISSING", "title": title[:80]})
+                    continue
+            else:
+                i = dates.index(d8)
             # FIX(2026-08-22 audit): apply backtest-consistent quality filter
             # (ACCUM/DOWNTREND stage + ADX>=20 — combo-level test: ADX30 no combo gain, keep 20 for more samples)
             st, deep = stage_and_deep(bs, i)
@@ -762,8 +773,9 @@ def daily_selection():
             entry_idx = i + 1
             adx_v = adx14_of(bs, i) or 0
             tp1, tp2, tp3, tp4, sl1, sl2, anchor_note = structural_sltp(code, d8, src='EVENT', stage=st, adx=adx_v)
-            # FIX(2026-08-25): tp4/sl2 可能 None（结构不足，ACCUM/DOWNTREND 非强趋势时）—— 回退
-            if tp1 is None or sl1 is None or tp4 is None or tp4 <= close_px or sl2 is None:
+            # FIX(2026-09-20, R52): 回退条件补 tp2/tp3 — ACCUM/DOWNTREND 分支在
+            # len(highs)<=2 时 tp2/tp3=None, 旧守卫只查 tp1/tp4/sl1/sl2 → 到 round(tp3,3) 崩
+            if tp1 is None or tp2 is None or tp3 is None or tp4 is None or sl1 is None or tp4 <= close_px or sl2 is None:
                 tp1 = round(close_px * 1.03, 3)
                 tp2 = round(close_px * 1.06, 3)
                 tp3 = round(close_px * 1.10, 3)
