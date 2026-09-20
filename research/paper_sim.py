@@ -351,6 +351,15 @@ from core.structure import (is_swing_high as _csh, is_swing_low as _csl,
                             weekly_trend_of as _cwt)
 
 
+def _chain_of(bs, i):
+    """R60: 信号链快照(软失败置空, 绝不阻断选股) — 单源 core/chain.build_chain"""
+    try:
+        from core.chain import build_chain as _bc
+        return _bc(bs, i)
+    except Exception:
+        return {}
+
+
 def is_swing_high(bs, j):
     return _csh(bs, j, PIVOT)
 
@@ -898,6 +907,8 @@ def daily_selection():
                 "created_at": cn_now("%Y-%m-%d"), "pick_date": cn_now("%Y-%m-%d"),
                 "sub_signals": subs, "stage": st, "v_ratio": v_ratio, "rank_score": rank_score,
                 "stage_span": _stage_span, "adx_span": _adx_span, "weekly_trend": _wt,
+                # R60(用户指令: 选股挂单带完整 SMC 信号链): 单源 core/chain, 信号日因果
+                "chain": _chain_of(bs, i),
                 "insider_amount_wan": _amt, "insider_pct": _pct, "insider_hint": _mag_hint,
                 "position_pct": _position_pct, "risk_dist_pct": round(_risk_dist / limit_px * 100, 2) if _risk_dist else None,
                 "filled_price": None, "filled_at": None,
@@ -992,6 +1003,7 @@ def daily_selection():
                 "status": "PENDING_ORDER", "paper": True, "source": "CONT",
                 "created_at": cn_now("%Y-%m-%d"), "pick_date": cn_now("%Y-%m-%d"),
                 "sub_signals": subs2, "entry_mode": "next_open",
+                "chain": _chain_of(bs2, dates2.index(sig_d8)) if (bs2 and sig_d8 in [x["t"] for x in bs2]) else {},
                 "filled_price": None,
                 "filled_at": None,
                 "exit_reason": None, "pnl_pct": None, "hold": 10,

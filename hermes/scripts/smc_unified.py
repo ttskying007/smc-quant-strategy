@@ -2045,6 +2045,57 @@ function loadKline(){
             var condBox=document.getElementById('sim-cond');
             if(condBox&&window._simMarkers.conditions)condBox.innerHTML='<div class="card" style="border-left:3px solid #d29922"><h3>🎯 模拟交易信号标注（买入原因 / TP / SL / 顺序）</h3><p style="color:#8b949e">'+window._simMarkers.conditions+'</p><p style="color:#8b949e;font-size:12px">🔵 ①信号点=事件/信号发生日（含策略原因）②买入点=成交日 ③卖出点=平仓日；🟡入场线 🟢TP线 🔴SL线（悬停彩线查看 TP/SL 条件）。点击图中标记查看详情。</p></div>';
         }
+        // R60: SMC 信号链叠加(单源 core/chain) — BSL/SSL线、FVG/OB框、BOS/CHoCH点、突破线、回踩点
+        if(d.smc_chain && chart){
+            var sc=d.smc_chain, endX=dates[dates.length-1];
+            var ovML=[], ovMA=[], ovMP=[];
+            (sc.bsl||[]).forEach(function(s){ if(!s.x)return;
+                ovML.push([{coord:[s.x,s.price],lineStyle:{color:'#58a6ff',type:'dashed',width:1},label:{formatter:'BSL '+s.price+(s.swept?'(已扫)':''),fontSize:9,color:'#58a6ff',position:'insideEndTop'}},{coord:[endX,s.price]}]);
+            });
+            (sc.ssl||[]).forEach(function(s){ if(!s.x)return;
+                ovML.push([{coord:[s.x,s.price],lineStyle:{color:'#f85149',type:'dashed',width:1},label:{formatter:'SSL '+s.price+(s.swept?'(已扫)':''),fontSize:9,color:'#f85149',position:'insideEndBottom'}},{coord:[endX,s.price]}]);
+            });
+            (sc.fvg_bull||[]).forEach(function(f){ if(!f.x)return;
+                ovMA.push([{name:(f.ifvg?'IFVG+':'FVG+'),xAxis:f.x,yAxis:f.low,itemStyle:{color:f.ifvg?'rgba(188,140,255,0.20)':'rgba(63,185,80,0.13)',borderColor:f.ifvg?'#bc8cff':'#3fb950',borderWidth:1}},{xAxis:endX,yAxis:f.high}]);
+            });
+            (sc.fvg_bear||[]).forEach(function(f){ if(!f.x)return;
+                ovMA.push([{name:(f.ifvg?'IFVG-':'FVG-'),xAxis:f.x,yAxis:f.low,itemStyle:{color:f.ifvg?'rgba(188,140,255,0.20)':'rgba(248,81,73,0.13)',borderColor:f.ifvg?'#bc8cff':'#f85149',borderWidth:1}},{xAxis:endX,yAxis:f.high}]);
+            });
+            (sc.ob||[]).forEach(function(o){ if(!o.x)return;
+                var isD=(o.side||'').indexOf('demand')>=0;
+                ovMA.push([{name:o.side,xAxis:o.x,yAxis:o.low,itemStyle:{color:isD?'rgba(46,160,67,0.28)':'rgba(240,136,62,0.28)',borderColor:isD?'#2ea043':'#f0883e',borderWidth:1.5}},{xAxis:endX,yAxis:o.high}]);
+            });
+            (sc.events_tail||[]).forEach(function(e){ if(!e.x)return;
+                var up=e.kind.indexOf('↑')>=0, cho=e.kind.indexOf('CHoCH')>=0;
+                ovMP.push({coord:[e.x,e.level],value:e.kind,symbol:cho?'diamond':'triangle',symbolSize:cho?13:10,symbolRotate:up?0:180,itemStyle:{color:cho?'#f0883e':'#d29922'},label:{show:true,fontSize:9,color:'#fff',formatter:e.kind}});
+            });
+            if(sc.breakout&&sc.breakout.x&&sc.breakout.price){
+                ovML.push([{coord:[sc.breakout.x,sc.breakout.price],lineStyle:{color:'#e3b341',type:'solid',width:1.5},label:{formatter:'突破 '+(sc.breakout.kind||'')+' @'+sc.breakout.price,fontSize:9,color:'#e3b341',position:'insideEndTop'}},{coord:[endX,sc.breakout.price]}]);
+            }
+            var rt=sc.retrace||{};
+            if(rt.price){
+                var okC=rt.state==='retrace_ok'?'#3fb950':(rt.state==='retrace_fail'?'#f85149':'#8b949e');
+                ovMP.push({coord:[endX,rt.price],value:rt.state,symbol:'circle',symbolSize:10,itemStyle:{color:okC},label:{show:true,fontSize:9,color:okC,formatter:rt.signal||rt.state}});
+            }
+            chart.setOption({series:[{name:'SMC链',type:'line',data:[],z:5,
+                markLine:{silent:true,symbol:['none','none'],data:ovML},
+                markArea:{silent:true,data:ovMA},
+                markPoint:{silent:true,data:ovMP}}]});
+            var hp=[], hc=document.getElementById('smc-chain');
+            hp.push('<div class="card" style="border-left:3px solid #bc8cff"><h2>🧬 SMC 信号链(当前)</h2>');
+            hp.push('<p>趋势: <b style="color:'+(sc.trend_state==='up'?'#3fb950':'#f85149')+'">'+(sc.trend_state||'-')+'</b> | 现价 '+sc.current_price+'</p>');
+            hp.push('<table><thead><tr><th>环节</th><th>时间</th><th>价格</th><th>类型/信号</th></tr></thead><tbody>');
+            (sc.events_tail||[]).forEach(function(e){hp.push('<tr><td>结构事件</td><td class=mono>'+e.date+'</td><td class=mono>'+e.level+'</td><td>'+e.kind+'</td></tr>');});
+            (sc.bsl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前高(BSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.swept?'已被扫(假突破回收)':'未扫')+'</td></tr>');});
+            (sc.ssl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前低(SSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.swept?'已被扫(诱空回收)':'未扫')+'</td></tr>');});
+            (sc.ob||[]).slice(-2).forEach(function(o){hp.push('<tr><td>订单块</td><td class=mono>'+o.t+'</td><td class=mono>'+o.low+'~'+o.high+'</td><td>'+o.side+' → '+o.broke_kind+' @'+o.broke_at+'</td></tr>');});
+            var nf=(sc.fvg_bull||[]).length, nb=(sc.fvg_bear||[]).length, nfvg=(sc.fvg_bull||[]).concat(sc.fvg_bear||[]).filter(function(f){return f.ifvg;}).length;
+            hp.push('<tr><td>缺口</td><td class=mono>近30日</td><td class=mono>FVG多 '+nf+' / 空 '+nb+'</td><td>其中 IFVG(逆缺口) '+nfvg+'</td></tr>');
+            if(sc.breakout&&sc.breakout.date) hp.push('<tr><td><b>最近突破</b></td><td class=mono>'+sc.breakout.date+'</td><td class=mono><b>'+sc.breakout.price+'</b></td><td>'+sc.breakout.kind+'</td></tr>');
+            hp.push('<tr><td><b>回踩状态</b></td><td class=mono>当前</td><td class=mono>'+(rt.price||'-')+'</td><td style="color:'+((sc.retrace||{}).state==='retrace_ok'?'#3fb950':'#f85149')+'">'+(rt.signal||'-')+'</td></tr>');
+            hp.push('</tbody></table></div>');
+            if(hc)hc.innerHTML=hp.join('');
+        }
         renderSignalsTable(d.signals_list);
         renderTradesTable(d.trades);
         renderSwingsTable(d.swings);
@@ -2430,7 +2481,7 @@ def build_kline(symbol='600519.SH', version=None):
 <button style="padding:2px 8px;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:3px;cursor:pointer;font-size:10px" onclick="toggleAllSignals(true)">全开</button>
 <button style="padding:2px 8px;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:3px;cursor:pointer;font-size:10px" onclick="toggleAllSignals(false)">全关</button>
 </div>
-<div id="chart" class="chart-container"></div><div id="sim-cond"></div></div>
+<div id="chart" class="chart-container"></div><div id="sim-cond"></div><div id="smc-chain"></div></div>
 
 <div class="flex">
 <div class="card"><h2>🔷 HH/HL/LL/LH 摆动点</h2><div id="swing-tbl"></div></div>
@@ -7898,12 +7949,47 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
+            # R60(用户指令): SMC 信号链叠加 — 单源 core/chain.build_chain, 展示层只读
+            smc_chain = {}
+            try:
+                import sys as _s2
+                if r'E:\test\smc_project\research' not in _s2.path:
+                    _s2.path.insert(0, r'E:\test\smc_project\research')
+                from core.chain import build_chain as _bc60
+                _bsc = [{'t': str(k['date'])[:10].replace('-', ''), 'o': float(k['o']), 'h': float(k['h']),
+                         'l': float(k['l']), 'c': float(k['c']), 'v': 0.0} for k in klines]
+                if len(_bsc) >= 30 and tf == 'daily':
+                    _ch = _bc60(_bsc, len(_bsc) - 1)
+                    _dates = [str(k['date'])[:10] for k in klines]
+                    _ddi = {str(k['date'])[:10].replace('-', ''): idx2 for idx2, k in enumerate(klines)}
+                    def _at60(d8):
+                        return _dates[_ddi[d8]] if d8 in _ddi else None
+                    def _lvl60(lst):
+                        out = []
+                        for it in lst:
+                            x = _at60(str(it.get('t') or it.get('date') or ''))
+                            if x:
+                                out.append({**it, 'x': x})
+                        return out
+                    smc_chain = {
+                        'trend_state': _ch['trend_state'], 'current_price': _ch['current_price'],
+                        'events_tail': [{'date': e['date'], 'x': _at60(e['date']), 'kind': e['kind'], 'level': e['level']}
+                                        for e in _ch['events_tail']],
+                        'bsl': _lvl60(_ch['bsl_levels']), 'ssl': _lvl60(_ch['ssl_levels']),
+                        'ob': _lvl60(_ch['ob']),
+                        'fvg_bull': _lvl60(_ch['fvg_bull']), 'fvg_bear': _lvl60(_ch['fvg_bear']),
+                        'breakout': {**_ch['breakout'], 'x': _at60(str(_ch['breakout'].get('date') or ''))},
+                        'retrace': _ch['retrace'],
+                    }
+            except Exception:
+                smc_chain = {}
+
             self._json({
                 'klines': klines, 'count': len(klines),
                 'signals_list': signals_list, 'signal_count': len(signals_list),
                 'swings': swings_list, 'wave_swings': wave_swings_list, 'swing_count': len(swings_list),
                 'trades': trade_list, 'trade_count': len(trade_list),
-                'sim_markers': sim_markers,
+                'sim_markers': sim_markers, 'smc_chain': smc_chain,
                 'highlight': highlight, 'seq': seq_raw,
                 'symbol': symbol, 'tf': tf, 'version': ver, 'frontend_version': FRONTEND_VERSION
             })
@@ -7912,7 +7998,7 @@ class Handler(BaseHTTPRequestHandler):
                 'signals_list': signals_list, 'signal_count': len(signals_list),
                 'swings': swings_list, 'wave_swings': wave_swings_list, 'swing_count': len(swings_list),
                 'trades': trade_list, 'trade_count': len(trade_list),
-                'sim_markers': sim_markers,
+                'sim_markers': sim_markers, 'smc_chain': smc_chain,
                 'highlight': highlight, 'seq': seq_raw,
                 'symbol': symbol, 'tf': tf, 'version': ver, 'frontend_version': FRONTEND_VERSION
             }
