@@ -2006,6 +2006,8 @@ function fmtDate(d){
     if(s.length==8)return s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8);
     return s.slice(0,10)||s;
 }
+// R60b: 页面打开自动渲染图表 + 自动加载 — 原行为是只有点"加载"按钮才画, 易误以为图表坏了
+if(typeof window!=='undefined'){window.__autoKlineInit=true;}
 function loadKline(){
     var sym=document.getElementById('sym').value;
     var tf=document.getElementById('tf').value;
@@ -2046,7 +2048,7 @@ function loadKline(){
             if(condBox&&window._simMarkers.conditions)condBox.innerHTML='<div class="card" style="border-left:3px solid #d29922"><h3>🎯 模拟交易信号标注（买入原因 / TP / SL / 顺序）</h3><p style="color:#8b949e">'+window._simMarkers.conditions+'</p><p style="color:#8b949e;font-size:12px">🔵 ①信号点=事件/信号发生日（含策略原因）②买入点=成交日 ③卖出点=平仓日；🟡入场线 🟢TP线 🔴SL线（悬停彩线查看 TP/SL 条件）。点击图中标记查看详情。</p></div>';
         }
         // R60: SMC 信号链叠加(单源 core/chain) — BSL/SSL线、FVG/OB框、BOS/CHoCH点、突破线、回踩点
-        if(d.smc_chain && chart){
+        if(d.smc_chain && chart){ try {
             var sc=d.smc_chain, endX=dates[dates.length-1];
             var ovML=[], ovMA=[], ovMP=[];
             (sc.bsl||[]).forEach(function(s){ if(!s.x)return;
@@ -2095,7 +2097,7 @@ function loadKline(){
             hp.push('<tr><td><b>回踩状态</b></td><td class=mono>当前</td><td class=mono>'+(rt.price||'-')+'</td><td style="color:'+((sc.retrace||{}).state==='retrace_ok'?'#3fb950':'#f85149')+'">'+(rt.signal||'-')+'</td></tr>');
             hp.push('</tbody></table></div>');
             if(hc)hc.innerHTML=hp.join('');
-        }
+        } catch(chainErr){ console.warn('smc_chain overlay:', chainErr); } }
         renderSignalsTable(d.signals_list);
         renderTradesTable(d.trades);
         renderSwingsTable(d.swings);
@@ -2489,7 +2491,7 @@ def build_kline(symbol='600519.SH', version=None):
 </div>
 <div class="card"><h2>📊 交易记录</h2><div id="trade-tbl"></div></div>
 <div class="card" style="border-left:3px solid #58a6ff"><h2>{kline_contract_title}</h2><div id="kline-contract">{kline_contract_placeholder}</div></div>
-</div>""" + JS_ECHARTS + "<script>var SIG_STYLE_MAP=" + json.dumps(SIG_STYLE) + ";" + KLINE_FULL_JS + "\nasync function loadKlineContract(){try{var sym=document.getElementById('sym').value||'" + symbol + "';var ver=document.getElementById('ver').value||'" + ACTIVE_VERSION + "';if(String(ver).toUpperCase()==='V517'){document.getElementById('kline-contract').innerHTML='<p style=\"color:#58a6ff\">版本=V517_EFFORT_RESULT | 冻结 replay 因果节点和交易已在上方绘制；REPLAY_ONLY / Shadow NO_BUY，不适用旧版 DNA、组合合同或 MTF 字段。</p>';return;}var r=await fetch('/api/kline_full?symbol='+encodeURIComponent(sym)+'&tf=daily&ver='+encodeURIComponent(ver));var d=await r.json();var rows=(d.trades||[]).slice(0,8);var html='<p style=\"color:#8b949e\">版本=" + FRONTEND_VERSION + " | 交易标识='+(d.trades||[]).length+' | 展示K线图上的信号/组合信号/DNA合同字段</p><table><thead><tr><th>代码</th><th>买入日</th><th>卖出日</th><th>信号</th><th>DNA</th><th>组合合同</th><th>MTF</th><th>Zone</th></tr></thead><tbody>';for(var t of rows){html+='<tr><td class=mono>'+sym+'</td><td class=mono>'+(t.entry_date||'-')+'</td><td class=mono>'+(t.exit_date||'-')+'</td><td class=mono>'+(t.signal_type||t.zone_type||'-')+'</td><td class=mono style=\"color:#3fb950;font-size:9px\">'+(t.dna_preferred_behavior||t.smc_dna||'-')+'</td><td class=mono style=\"color:#d29922;font-size:9px\">'+(t.combo_contract_key||t.combo_contract||'-')+'</td><td class=mono style=\"font-size:9px\">'+(t.weekly_trend_state||t.weekly_state||'-')+'/'+(t.daily_structure_state||t.daily_state||'-')+'/'+(t.m60_state||'-')+'</td><td class=mono>'+(t.zone||((t.zone_low&&t.zone_high)?(Number(t.zone_low).toFixed(2)+'~'+Number(t.zone_high).toFixed(2)):'-'))+'</td></tr>';}html+='</tbody></table>';document.getElementById('kline-contract').innerHTML=html;}catch(e){document.getElementById('kline-contract').innerHTML='<span style=\"color:#f85149\">合同加载失败: '+e+'</span>';}}setTimeout(loadKlineContract,800);" + "</script></body></html>"
+</div>""" + JS_ECHARTS + "<script>var SIG_STYLE_MAP=" + json.dumps(SIG_STYLE) + ";" + KLINE_FULL_JS + "\nasync function loadKlineContract(){try{var sym=document.getElementById('sym').value||'" + symbol + "';var ver=document.getElementById('ver').value||'" + ACTIVE_VERSION + "';if(String(ver).toUpperCase()==='V517'){document.getElementById('kline-contract').innerHTML='<p style=\"color:#58a6ff\">版本=V517_EFFORT_RESULT | 冻结 replay 因果节点和交易已在上方绘制；REPLAY_ONLY / Shadow NO_BUY，不适用旧版 DNA、组合合同或 MTF 字段。</p>';return;}var r=await fetch('/api/kline_full?symbol='+encodeURIComponent(sym)+'&tf=daily&ver='+encodeURIComponent(ver));var d=await r.json();var rows=(d.trades||[]).slice(0,8);var html='<p style=\"color:#8b949e\">版本=" + FRONTEND_VERSION + " | 交易标识='+(d.trades||[]).length+' | 展示K线图上的信号/组合信号/DNA合同字段</p><table><thead><tr><th>代码</th><th>买入日</th><th>卖出日</th><th>信号</th><th>DNA</th><th>组合合同</th><th>MTF</th><th>Zone</th></tr></thead><tbody>';for(var t of rows){html+='<tr><td class=mono>'+sym+'</td><td class=mono>'+(t.entry_date||'-')+'</td><td class=mono>'+(t.exit_date||'-')+'</td><td class=mono>'+(t.signal_type||t.zone_type||'-')+'</td><td class=mono style=\"color:#3fb950;font-size:9px\">'+(t.dna_preferred_behavior||t.smc_dna||'-')+'</td><td class=mono style=\"color:#d29922;font-size:9px\">'+(t.combo_contract_key||t.combo_contract||'-')+'</td><td class=mono style=\"font-size:9px\">'+(t.weekly_trend_state||t.weekly_state||'-')+'/'+(t.daily_structure_state||t.daily_state||'-')+'/'+(t.m60_state||'-')+'</td><td class=mono>'+(t.zone||((t.zone_low&&t.zone_high)?(Number(t.zone_low).toFixed(2)+'~'+Number(t.zone_high).toFixed(2)):'-'))+'</td></tr>';}html+='</tbody></table>';document.getElementById('kline-contract').innerHTML=html;}catch(e){document.getElementById('kline-contract').innerHTML='<span style=\"color:#f85149\">合同加载失败: '+e+'</span>';}}setTimeout(loadKline,300);setTimeout(loadKlineContract,800);" + "</script></body></html>"
 
 
 def build_dashboard(qs=None):
