@@ -156,8 +156,19 @@ def weekly_trend_of(bs, i):
 
 ev = []
 seen = set()
-cur.execute("SELECT date, stock_code, title FROM announce WHERE title LIKE '%增持%' OR title LIKE '%回购%'")
-for date, code, title in cur.fetchall():
+# R57: --smoke N = 只扫前 N 条公告, 输出写 combo_v21_smoke.csv (验证列填充用, 不作基线)
+SMOKE = 0
+if "--smoke" in sys.argv:
+    SMOKE = int(sys.argv[sys.argv.index("--smoke") + 1])
+_q = "SELECT date, stock_code, title FROM announce WHERE title LIKE '%增持%' OR title LIKE '%回购%'"
+if SMOKE > 0:
+    # smoke 取最新 N 条(默认插入序是最老公告, 会被 20230901 门槛全筛掉); 全量路径不加 ORDER BY, 行为零变化
+    _q += " ORDER BY date DESC"
+cur.execute(_q)
+_all_ann = cur.fetchall()
+if SMOKE > 0:
+    _all_ann = _all_ann[:SMOKE]
+for date, code, title in _all_ann:
     if not is_strong(title):
         continue
     d = str(date)[:10].replace("-", "")
@@ -358,7 +369,8 @@ V21_FIELDS = ["symbol", "entry_date", "src", "net_pnl_pct", "rank",
               "last_event_level", "event_gap_bars", "broken_low_level",
               "sl_below_structure", "supply_layers", "nearest_supply_dist",
               "zone_90d", "stage_span", "adx_span", "sub_signals", "rank_components"]
-out_path = r"E:\test\smc_project\research\combo_v21_trades.csv"
+out_path = (r"E:\test\smc_project\research\combo_v21_smoke.csv" if SMOKE > 0
+            else r"E:\test\smc_project\research\combo_v21_trades.csv")
 with open(out_path, "w", encoding="utf-8-sig", newline="") as fh:
     w = csv.DictWriter(fh, fieldnames=V21_FIELDS, restval="", extrasaction="ignore")
     w.writeheader()
