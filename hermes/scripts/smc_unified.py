@@ -6883,6 +6883,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def _api_kline_full(self, qs):
         symbol = qs.get('symbol', ['600519.SH'])[0]
+        # FIX(2026-09-20, R60b): 畸形符号归一化 —— 上游可能存在 "003004_SZ"
+        # 一类内嵌交易所后缀的代码, 拼接成 "003004_SZ.SZ" 后文件查找全炸。
+        # 只认 6 位数字, 交易所后缀按号段规则重建, 任意畸形输入都收敛。
+        _digits = ''.join(ch for ch in str(symbol) if ch.isdigit())[:6]
+        if len(_digits) == 6:
+            symbol = _digits + ('.SH' if _digits.startswith(('6', '9'))
+                                else ('.BJ' if _digits.startswith(('4', '8')) else '.SZ'))
         # FIX(2026-08-20): support no-suffix symbols (603629 -> 603629.SH)
         if '.' not in symbol:
             symbol = symbol + ('.SH' if symbol.startswith(('6', '9')) else '.SZ')
