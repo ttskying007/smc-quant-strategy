@@ -3258,10 +3258,10 @@ def build_monitor(start='', end=''):
             _sd_html = f'''<details style="margin-top:6px"><summary style="cursor:pointer;color:#58a6ff">查看被跳过股票明细（{len(_sr.get("skipped_detail") or [])} 条，最近 20）</summary>
 <table><thead><tr><th>披露日</th><th>代码</th><th>名称</th><th>跳过原因</th></tr></thead><tbody>{_sd_rows or '<tr><td colspan=4>无</td></tr>'}</tbody></table></details>''' if _sr.get('skipped_detail') else ''
             _selr_html = f'''<div class="card" style="border-left:3px solid #58a6ff"><h3>📌 最新选股执行结果（{html.escape(str(_sr.get("selected_at","")))}）</h3>
-<table><tr><th>扫描事件</th><th>新增选入</th><th>跳过:重复</th><th>跳过:阶段</th><th>跳过:ADX</th><th>跳过:强市</th><th>跳过:无数据</th></tr>
-<tr><td>{_st.get("scanned",0)}</td><td style="color:#3fb950">{_st.get("selected",0)}</td><td>{_st.get("skipped_dup",0)}</td><td>{_st.get("skipped_stage",0)}</td><td>{_st.get("skipped_adx",0)}</td><td>{_st.get("skipped_strong",0)}</td><td>{_st.get("skipped_nodata",0)}</td></tr></table>
+<table><tr><th>扫描事件</th><th>新增选入</th><th>跳过:重复</th><th>跳过:阶段</th><th>跳过:ADX</th><th>跳过:强市</th><th>跳过:无数据</th><th>顺延:周末披露</th></tr>
+<tr><td>{_st.get("scanned",0)}</td><td style="color:#3fb950">{_st.get("selected",0)}</td><td>{_st.get("skipped_dup",0)}</td><td>{_st.get("skipped_stage",0)}</td><td>{_st.get("skipped_adx",0)}</td><td>{_st.get("skipped_strong",0)}</td><td>{_st.get("skipped_nodata",0)}</td><td style="color:#58a6ff">{_st.get("rolled_weekend",0)}</td></tr></table>
 {_sd_html}
-<p style="color:#8b949e">扫描最近 5 日公告（增持/回购）；跳过原因：阶段不合格(非ACCUM/DOWNTREND)、ADX<20、强市(proxy>2%)、无K线数据、已存在。</p></div>'''
+<p style="color:#8b949e">扫描最近 5 日公告（增持/回购）；跳过原因：阶段不合格(非ACCUM/DOWNTREND)、ADX<20、强市(proxy>2%)、无K线数据、已存在。顺延=周末/节假日披露按前一交易日评估(R52修复, 原误报"K线无此日期")。</p></div>'''
         except Exception:
             _selr_html = ''
         # FIX(2026-08-22): realtime price records (for analysis/review)
@@ -4445,6 +4445,7 @@ def build_funnel():
 <tr><td>阶段拒绝(非ACCUM/DOWNTREND)</td><td>{_esc(rej.get('stage'))}</td></tr>
 <tr><td>ADX拒绝(&lt;20)</td><td>{_esc(rej.get('adx'))}</td></tr>
 <tr><td>无K线</td><td>{_esc(rej.get('nodata'))}</td></tr>
+<tr><td>顺延(周末披露→前交易日评估)</td><td>{_esc(rej.get('rolled_weekend'))}</td></tr>
 <tr><td>去重</td><td>{_esc(rej.get('dup'))}</td></tr>
 <tr><td><b>挂单</b></td><td><b>{_esc(fun.get('orders_created'))}</b></td></tr>
 </table></div>

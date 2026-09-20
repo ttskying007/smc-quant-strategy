@@ -1159,6 +1159,8 @@ def daily_selection():
                 "adx": _sel_stats.get("skipped_adx", 0),
                 "nodata": _sel_stats.get("skipped_nodata", 0),
                 "dup": _sel_stats.get("skipped_dup", 0),
+                # FIX(2026-09-20, R52): 周末/节假日披露顺延量 — 原"K线无此日期"假缺失口径已迁出
+                "rolled_weekend": _sel_stats.get("rolled_weekend", 0),
             },
             "orders_created": _event_order_count,
             "all_orders_created": len(new_orders),
