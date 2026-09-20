@@ -2093,8 +2093,14 @@ function loadKline(){
             (sc.ob||[]).slice(-2).forEach(function(o){hp.push('<tr><td>订单块</td><td class=mono>'+o.t+'</td><td class=mono>'+o.low+'~'+o.high+'</td><td>'+o.side+' → '+o.broke_kind+' @'+o.broke_at+'</td></tr>');});
             var nf=(sc.fvg_bull||[]).length, nb=(sc.fvg_bear||[]).length, nfvg=(sc.fvg_bull||[]).concat(sc.fvg_bear||[]).filter(function(f){return f.ifvg;}).length;
             hp.push('<tr><td>缺口</td><td class=mono>近30日</td><td class=mono>FVG多 '+nf+' / 空 '+nb+'</td><td>其中 IFVG(逆缺口) '+nfvg+'</td></tr>');
-            if(sc.breakout&&sc.breakout.date) hp.push('<tr><td><b>最近突破</b></td><td class=mono>'+sc.breakout.date+'</td><td class=mono><b>'+sc.breakout.price+'</b></td><td>'+sc.breakout.kind+'</td></tr>');
+            hp.push('<tr><td><b>最近突破</b></td><td class=mono>'+((sc.breakout&&sc.breakout.date)||'-')+'</td><td class=mono><b>'+((sc.breakout&&sc.breakout.price)||'-')+'</b></td><td>'+((sc.breakout&&sc.breakout.kind)||'-')+'</td></tr>');
+            // R61: Jensen Alpha 期望行
+            if(sc.alpha_expect!==undefined&&sc.alpha_expect!==null){
+                var ac=sc.alpha_expect>0?'#3fb950':'#f85149';
+                hp.push('<tr><td><b>期望Alpha (Jα)</b></td><td class=mono>PF后验</td><td class=mono style="color:'+ac+';font-weight:bold">'+(sc.alpha_expect>0?'+':'')+sc.alpha_expect+'%</td><td>桶='+(sc.alpha_bucket||'-')+' vs 全局+'+(sc.alpha_global_avg||0)+'%</td></tr>');
+            }
             hp.push('<tr><td><b>回踩状态</b></td><td class=mono>当前</td><td class=mono>'+(rt.price||'-')+'</td><td style="color:'+((sc.retrace||{}).state==='retrace_ok'?'#3fb950':'#f85149')+'">'+(rt.signal||'-')+'</td></tr>');
+
             hp.push('</tbody></table></div>');
             if(hc)hc.innerHTML=hp.join('');
         } catch(chainErr){ console.warn('smc_chain overlay:', chainErr); } }
@@ -7990,6 +7996,16 @@ class Handler(BaseHTTPRequestHandler):
                         'breakout': {**_ch['breakout'], 'x': _at60(str(_ch['breakout'].get('date') or ''))},
                         'retrace': _ch['retrace'],
                     }
+                    # R61: Jensen Alpha 期望(单源 core/alpha, PF后验基准表)
+                    try:
+                        from core.alpha import alpha_expect as _axp60
+                        _a60 = _axp60(_ch, None)
+                        if _a60:
+                            smc_chain['alpha_expect'] = _a60['alpha_expect']
+                            smc_chain['alpha_bucket'] = _a60['bucket_key']
+                            smc_chain['alpha_global_avg'] = _a60['global_avg']
+                    except Exception:
+                        pass
             except Exception:
                 smc_chain = {}
 

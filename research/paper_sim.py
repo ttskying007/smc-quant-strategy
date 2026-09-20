@@ -360,6 +360,15 @@ def _chain_of(bs, i):
         return {}
 
 
+def _alpha_of(chain, stage):
+    """R61: Jensen Alpha 期望(软失败 None) — 单源 core/alpha, PF后验基准"""
+    try:
+        from core.alpha import alpha_expect as _axp
+        return _axp(chain, stage)
+    except Exception:
+        return None
+
+
 def is_swing_high(bs, j):
     return _csh(bs, j, PIVOT)
 
@@ -892,6 +901,20 @@ def daily_selection():
             _position_pct = min(_position_pct, 0.25)  # 单票上限 25%
             # FIX(2026-09-05, 审计 G11): 强市降仓系数（不跳过，保留信号但控风险）
             _position_pct = round(_position_pct * _risk_coef, 4)
+            # R60(用户指令: 选股挂单带完整 SMC 信号链): 单源 core/chain, 信号日因果
+            _chain_snap = _chain_of(bs, i)
+            # R61(用户指令: Jensen Alpha 联动): 前向期望 α —— PF后验基准表(冻结窗),
+            # 1日滞后口径; 软失败(无表)时 _alpha=None, 不影响下单
+            _alpha = None
+            try:
+                from core.alpha import alpha_expect as _axp
+                _alpha = _axp(_chain_snap, st)
+            except Exception:
+                _alpha = None
+            # R61 shadow gate: 记录"拦截会拦掉什么"到漏斗统计, 不拦(shadow 模式默认)
+            if _alpha and _alpha.get("alpha_expect") is not None:
+                if _alpha["alpha_expect"] < float(getattr(CFG, "ALPHA_SHADOW_MIN", -1.0) or -1.0):
+                    _sel_stats["alpha_shadow_low"] = _sel_stats.get("alpha_shadow_low", 0) + 1
             led.append({
                 "code": code, "name": name, "signal_combo": sig,
                 "signal_date": dd, "trigger": f"回踩挂单(披露收盘×0.99={limit_px})，回落成交；次日开盘兜底(实时open)",
@@ -907,8 +930,12 @@ def daily_selection():
                 "created_at": cn_now("%Y-%m-%d"), "pick_date": cn_now("%Y-%m-%d"),
                 "sub_signals": subs, "stage": st, "v_ratio": v_ratio, "rank_score": rank_score,
                 "stage_span": _stage_span, "adx_span": _adx_span, "weekly_trend": _wt,
-                # R60(用户指令: 选股挂单带完整 SMC 信号链): 单源 core/chain, 信号日因果
-                "chain": _chain_of(bs, i),
+                # R60: 完整 SMC 信号链 + R61: Jensen Alpha 期望
+                "chain": _chain_snap,
+                "alpha_expect": (_alpha["alpha_expect"] if _alpha else None),
+                "alpha_bucket": (_alpha["bucket_key"] if _alpha else None),
+                "alpha_bucket_n": (_alpha["bucket_n"] if _alpha else None),
+                "alpha_global_avg": (_alpha["global_avg"] if _alpha else None),
                 "insider_amount_wan": _amt, "insider_pct": _pct, "insider_hint": _mag_hint,
                 "position_pct": _position_pct, "risk_dist_pct": round(_risk_dist / limit_px * 100, 2) if _risk_dist else None,
                 "filled_price": None, "filled_at": None,
@@ -987,6 +1014,9 @@ def daily_selection():
                         subs2 = sub_signals_cont(bs2, ei2, sig_d)
                 _cont_risk = (ep - sl) if ep and sl else 0
                 _cont_pos = min(0.01 / (_cont_risk / ep), 0.25) if _cont_risk > 0 else 0.01
+                # R60/R61: 股挂单带 chain + alpha (软失败安全)
+                _c_cont = _chain_of(bs2, dates2.index(sig_d8)) if (bs2 and dates2 and sig_d8 in dates2) else {}
+                _a_cont = _alpha_of(_c_cont, "DOWNTREND")
                 _cont_order = {
                     "code": code, "name": code, "signal_combo": "CONTINUATION_MARKUP",
                     # FIX(2026-09-05, 审计 G04): 延续腿不再当日 FILLED —— 信号 bar 用 ≤signal 数据过滤，
@@ -1003,7 +1033,11 @@ def daily_selection():
                 "status": "PENDING_ORDER", "paper": True, "source": "CONT",
                 "created_at": cn_now("%Y-%m-%d"), "pick_date": cn_now("%Y-%m-%d"),
                 "sub_signals": subs2, "entry_mode": "next_open",
-                "chain": _chain_of(bs2, dates2.index(sig_d8)) if (bs2 and sig_d8 in [x["t"] for x in bs2]) else {},
+                "chain": _c_cont,
+                "alpha_expect": (_a_cont["alpha_expect"] if _a_cont else None),
+                "alpha_bucket": (_a_cont["bucket_key"] if _a_cont else None),
+                "alpha_bucket_n": (_a_cont["bucket_n"] if _a_cont else None),
+                "alpha_global_avg": (_a_cont["global_avg"] if _a_cont else None),
                 "filled_price": None,
                 "filled_at": None,
                 "exit_reason": None, "pnl_pct": None, "hold": 10,
@@ -1174,6 +1208,8 @@ def daily_selection():
                 # FIX(2026-09-20, R52): 周末/节假日披露顺延量 — 原"K线无此日期"假缺失口径已迁出
                 "rolled_weekend": _sel_stats.get("rolled_weekend", 0),
             },
+            # R61: Jensen Alpha shadow gate 统计(α_expect < ALPHA_SHADOW_MIN 的腿数, 不拦截只记录)
+            "alpha_shadow_low": _sel_stats.get("alpha_shadow_low", 0),
             "orders_created": _event_order_count,
             "all_orders_created": len(new_orders),
             "terminal_stage_counts": _terminal_counts,

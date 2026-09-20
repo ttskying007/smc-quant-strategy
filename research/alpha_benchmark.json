@@ -1,0 +1,53 @@
+{
+  "generated_at": "2026-09-20",
+  "source": "combo_v22_trades.csv EVENT legs (frozen window through 2026-09-18)",
+  "global_avg": 3.787,
+  "n": 1524,
+  "buckets": {
+    "*|*|*": {
+      "n": 1524,
+      "avg": 3.787,
+      "wr": 65.4
+    },
+    "down|*|*": {
+      "n": 1190,
+      "avg": 4.489,
+      "wr": 67.5
+    },
+    "down|no_retrace|*": {
+      "n": 314,
+      "avg": 5.667,
+      "wr": 74.8
+    },
+    "down|retrace_fail|*": {
+      "n": 391,
+      "avg": 3.142,
+      "wr": 68.8
+    },
+    "down|retrace_ok|*": {
+      "n": 485,
+      "avg": 4.813,
+      "wr": 61.6
+    },
+    "up|*|*": {
+      "n": 334,
+      "avg": 1.284,
+      "wr": 58.1
+    },
+    "up|no_retrace|*": {
+      "n": 97,
+      "avg": -0.012,
+      "wr": 46.4
+    },
+    "up|retrace_fail|*": {
+      "n": 115,
+      "avg": 1.904,
+      "wr": 65.2
+    },
+    "up|retrace_ok|*": {
+      "n": 122,
+      "avg": 1.73,
+      "wr": 60.7
+    }
+  }
+}
