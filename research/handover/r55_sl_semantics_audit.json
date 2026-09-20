@@ -1,0 +1,20 @@
+{
+  "n_checked": 1527,
+  "no_broken_low": {
+    "n": 0
+  },
+  "sl_below_structure": {
+    "n": 1483,
+    "avg": 3.83,
+    "wr": 65.2,
+    "pf": 3.66,
+    "avg_sl_dist": 16.5
+  },
+  "sl_exposed_in_broken_zone": {
+    "n": 44,
+    "avg": 1.61,
+    "wr": 68.2,
+    "pf": 2.59,
+    "avg_sl_dist": 6.4
+  }
+}
