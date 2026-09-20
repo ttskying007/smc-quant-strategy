@@ -147,3 +147,50 @@ def weekly_trend_of(bs, i):
     ma10 = sum(week_close[-10:]) / 10
     ma_prev = sum(week_close[-12:-2]) / 10
     return "up" if ma10 > ma_prev else "down"
+
+
+# ---------------- 因果结构事件流 (R57, nextgen_v21_spec 单源) ----------------
+def structure_events(ks, i_limit=None, pivot=3):
+    """逐bar因果 BOS/CHoCH 事件流 —— gen_v21 / paper_sim 共用(单源)。
+
+    规则(与 KB internal_and_external_bos_and_choch 对齐):
+      收盘破"最近已确认摆动高": trend==down → CHoCH↑ (反转), 否则 BOS↑ (延续)
+      收盘破"最近已确认摆动低": trend==up   → CHoCH↓ (反转), 否则 BOS↓ (延续)
+    摆动点确认: j + pivot <= 判定bar (防未来, 同 F04 纪律)。
+    i_limit: 只扫描至该bar收盘(信号日因果口径); None=全序列。
+    返回: [{"bar":k, "date":ks[k]["t"], "kind":"BOS↑"|..., "level":被破价位, "trend":"up"/"down"}]
+    """
+    n = len(ks) if i_limit is None else min(i_limit, len(ks) - 1)
+    piv_h = {}
+    piv_l = {}
+    for j in range(pivot, len(ks) - pivot):
+        ci = j + pivot
+        if is_swing_high(ks, j, pivot):
+            piv_h.setdefault(ci, []).append((j, ks[j]["h"]))
+        if is_swing_low(ks, j, pivot):
+            piv_l.setdefault(ci, []).append((j, ks[j]["l"]))
+    events = []
+    trend = None
+    last_h = None  # (price, pivot_date)
+    last_l = None
+    for k in range(pivot, n + 1):
+        c = ks[k]["c"]
+        if k in piv_h:
+            pj, ph = piv_h[k][-1]
+            last_h = (ph, ks[pj]["t"])
+        if k in piv_l:
+            pj, pl = piv_l[k][-1]
+            last_l = (pl, ks[pj]["t"])
+        if last_h and c > last_h[0]:
+            kind = "CHoCH↑" if trend == "down" else "BOS↑"
+            events.append({"bar": k, "date": ks[k]["t"], "kind": kind,
+                           "level": last_h[0], "level_date": last_h[1], "trend": "up"})
+            trend = "up"
+            last_h = None
+        elif last_l and c < last_l[0]:
+            kind = "CHoCH↓" if trend == "up" else "BOS↓"
+            events.append({"bar": k, "date": ks[k]["t"], "kind": kind,
+                           "level": last_l[0], "level_date": last_l[1], "trend": "down"})
+            trend = "down"
+            last_l = None
+    return events
