@@ -94,9 +94,9 @@
     "注": "未开始=冻结期策略优化禁令(用户指令) + PAPER 累积前置; 进行中=时间驱动或 Phase E 合并项"
   },
   "实验账本_2026h2": {
-    "上线": ["R13归因+rank<3修正", "announce索引+自愈", "行业RS(R38-8)", "sanity_check"],
-    "拒绝": ["E2 min-R:R(R26证伪)", "E3 min-risk_pct>=4%(frozen OOS FAIL)", "D5三维自适应(flip57%)", "delay-1bar", "弱市加权k=2", "risk_pct门控全家族(R30翻转段)"],
-    "登记不实施": ["rank甜区4-5(需新OOS流程)", "TIME_STOP trailing-TP(需bar级重放)", "宽SL相对优势的机制研究"],
+    "上线": ["R13归因+rank<3修正", "announce索引+自愈", "行业RS(R38-8)", "sanity_check", "R52周末公告顺延+TP守卫补全"],
+    "拒绝": ["E2 min-R:R(R26证伪)", "E3 min-risk_pct>=4%(frozen OOS FAIL)", "D5三维自适应(flip57%)", "delay-1bar", "弱市加权k=2", "risk_pct门控全家族(R30翻转段)", "E4趋势门(R54影子: down腿+4.46碾压up腿+1.27)", "E4供给层门(R54b: 93%腿≥3层且最优, 无区分力)"],
+    "登记不实施": ["rank甜区4-5(需新OOS流程)", "TIME_STOP trailing-TP(需bar级重放)", "宽SL相对优势的机制研究", "E4''结构特征入rank(需next-gen新数据,与R33缺口合并)"],
     "数据缺口": ["canonical CSV sub_signals/rank_components字段(下次gen重跑时补)"]
   }
 }
