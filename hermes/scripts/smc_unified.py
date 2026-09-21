@@ -7964,42 +7964,140 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
-            # R60(用户指令): SMC 信号链叠加 — 单源 core/chain.build_chain, 展示层只读
+            # R62(用户指令: 链层切回引擎信号 —— 取消 core/chain 自研判断层):
+            # smc_chain 全部由引擎 signals_list/swings 换算, 不再独立定义 BOS/OB/FVG。
             smc_chain = {}
             try:
-                import sys as _s2
-                if r'E:\test\smc_project\research' not in _s2.path:
-                    _s2.path.insert(0, r'E:\test\smc_project\research')
-                from core.chain import build_chain as _bc60
-                _bsc = [{'t': str(k['date'])[:10].replace('-', ''), 'o': float(k['o']), 'h': float(k['h']),
-                         'l': float(k['l']), 'c': float(k['c']), 'v': 0.0} for k in klines]
-                if len(_bsc) >= 30 and tf == 'daily':
-                    _ch = _bc60(_bsc, len(_bsc) - 1)
-                    _dates = [str(k['date'])[:10] for k in klines]
-                    _ddi = {str(k['date'])[:10].replace('-', ''): idx2 for idx2, k in enumerate(klines)}
-                    def _at60(d8):
-                        return _dates[_ddi[d8]] if d8 in _ddi else None
-                    def _lvl60(lst):
+                if tf == 'daily' and klines:
+                    _dd = {}           # d8 -> 图上日期字符串 (与前端 fmtDate 一致)
+                    for _i2, k in enumerate(klines):
+                        _s = str(k['date'])[:10]
+                        if len(_s) == 8 and _s.isdigit():
+                            _s = _s[:4] + '-' + _s[4:6] + '-' + _s[6:8]
+                        _dd[str(k['date'])[:10].replace('-', '')] = _s
+                    _xd = lambda d8: _dd.get(str(d8 or '')[:10].replace('-', ''))
+                    _cur = float(klines[-1]['c'])
+                    # 趋势: 引擎摆动点最后两个高点/低点比较(HH+HL→up; LH+LL→down)
+                    _hs = [s for s in swings_list if str(s.get('type', '')).upper() == 'HIGH']
+                    _ls = [s for s in swings_list if str(s.get('type', '')).upper() == 'LOW']
+                    _trend = 'none'
+                    if len(_hs) >= 2 and len(_ls) >= 2:
+                        if _hs[-1]['price'] > _hs[-2]['price'] and _ls[-1]['price'] > _ls[-2]['price']:
+                            _trend = 'up'
+                        elif _hs[-1]['price'] < _hs[-2]['price'] and _ls[-1]['price'] < _ls[-2]['price']:
+                            _trend = 'down'
+                    # BSL/SSL: 引擎摆动高低点 + swept 判定(确认后才允许扫)
+                    def _sweep_state(sw, side):
+                        b = int(sw.get('confirm_bar') or sw.get('bar') or 0)
+                        p = float(sw['price'])
+                        for kk in klines[b + 1:]:
+                            c = float(kk['c'])
+                            if side == 'bsl' and c > p:
+                                return True
+                            if side == 'ssl' and c < p:
+                                return True
+                        return False
+                    _bsl = [{'t': _xd(klines[int(s['bar'])]['date'] if 0 <= int(s['bar']) < len(klines) else None),
+                             'price': round(float(s['price']), 2), 'swept': _sweep_state(s, 'bsl')}
+                            for s in _hs[-3:]]
+                    _ssl = [{'t': _xd(klines[int(s['bar'])]['date'] if 0 <= int(s['bar']) < len(klines) else None),
+                             'price': round(float(s['price']), 2), 'swept': _sweep_state(s, 'ssl')}
+                            for s in _ls[-3:]]
+                    for _row in _bsl + _ssl:
+                        _row['x'] = _row['t']
+                    # 结构事件: 引擎 BOS/CHoCH 末 8 条(带极性)
+                    _evs = [s for s in signals_list if str(s.get('family', '')).lower() in ('bos', 'choch')]
+                    _evs = sorted(_evs, key=lambda s: (str(s.get('date') or ''), s.get('idx') or 0))[-8:]
+                    _evtail = [{'date': str(s.get('date') or ''), 'x': _xd(s.get('date')),
+                                'level': round(float(s.get('price') or 0), 2),
+                                'kind': ('CHoCH' if str(s.get('family')).lower() == 'choch' else 'BOS') +
+                                        ('↑' if str(s.get('direction')) == 'bull' else '↓')}
+                               for s in _evs]
+                    # OB(引擎 order-block) / FVG-IFVG(引擎缺口), 只取近端
+                    def _obrows(fam, keep):
                         out = []
-                        for it in lst:
-                            x = _at60(str(it.get('t') or it.get('date') or ''))
-                            if x:
-                                out.append({**it, 'x': x})
+                        for s in [x for x in signals_list if str(x.get('family', '')).lower() == fam][-keep:]:
+                            hi = float(s.get('upper') or s.get('zone_high') or s.get('price') or 0)
+                            lo = float(s.get('lower') or s.get('zone_low') or s.get('price') or 0)
+                            if hi < lo:
+                                hi, lo = lo, hi
+                            dirc = str(s.get('direction', ''))
+                            # 回补检查: demand 被向下回补 / supply 被向上回补
+                            b = int(s.get('idx') or 0)
+                            bk, bk_at = '未破', ''
+                            for kk in klines[b + 1:]:
+                                if dirc == 'bull' and float(kk['c']) < lo:
+                                    bk, bk_at = '回补', _xd(str(kk['date']))
+                                    break
+                                if dirc == 'bear' and float(kk['c']) > hi:
+                                    bk, bk_at = '回补', _xd(str(kk['date']))
+                                    break
+                            row = {'t': str(s.get('date') or ''), 'x': _xd(s.get('date')),
+                                   'low': round(lo, 2), 'high': round(hi, 2),
+                                   'broke_kind': bk, 'broke_at': bk_at or ''}
+                            if fam == 'ob':
+                                row['side'] = ('demand(OB+)' if dirc == 'bull' else 'supply(OB-)')
+                            else:
+                                row['ifvg'] = 'IFVG' in str(s.get('type', '')).upper()
+                            out.append(row)
                         return out
+                    _ob = _obrows('ob', 2)
+                    # FVG/IFVG: 按 direction 分多/空(引擎信号直出)
+                    _fvg_bull, _fvg_bear = [], []
+                    for s in [x for x in signals_list if str(x.get('family', '')).lower() == 'fvg'][-5:]:
+                        hi = float(s.get('upper') or s.get('price') or 0); lo = float(s.get('lower') or s.get('price') or 0)
+                        if hi < lo: hi, lo = lo, hi
+                        rr = {'t': str(s.get('date') or ''), 'x': _xd(s.get('date')),
+                              'low': round(lo, 2), 'high': round(hi, 2),
+                              'ifvg': 'IFVG' in str(s.get('type', '')).upper()}
+                        (_fvg_bull if str(s.get('direction')) == 'bull' else _fvg_bear).append(rr)
+                    # 最近突破(引擎 BOS) + 回踩状态(相对突破价, 3% 带宽)
+                    _brk_rows = [s for s in signals_list if str(s.get('family', '')).lower() == 'bos']
+                    _brk = {}
+                    _rt = {'price': None, 'state': 'no_retrace', 'signal': ''}
+                    if _brk_rows:
+                        _bs = sorted(_brk_rows, key=lambda s: (str(s.get('date') or ''), s.get('idx') or 0))[-1]
+                        _bp = float(_bs.get('price') or 0)
+                        _bbull = str(_bs.get('direction')) == 'bull'
+                        _bd8 = str(_bs.get('date') or '')
+                        _brk = {'date': _bd8, 'x': _xd(_bd8), 'price': round(_bp, 2),
+                                'kind': 'BOS' + ('↑' if _bbull else '↓')}
+                        _bi = None
+                        for _j, kk in enumerate(klines):
+                            if str(kk['date'])[:10].replace('-', '') == _bd8.replace('-', ''):
+                                _bi = _j
+                        if _bi is not None and _bp > 0:
+                            _win = klines[_bi:]
+                            if _bbull:
+                                mn = min(float(kk['l']) for kk in _win)
+                                if mn > _bp * 1.03:
+                                    _rt = {'price': round(mn, 2), 'state': 'no_retrace', 'signal': '未回踩(走势延续)'}
+                                elif _cur >= _bp:
+                                    _rt = {'price': round(mn, 2), 'state': 'retrace_ok', 'signal': '回踩确认(缺口/结构内)'}
+                                else:
+                                    _rt = {'price': round(mn, 2), 'state': 'retrace_fail', 'signal': '回踩跌破(突破失败)'}
+                            else:
+                                mx = max(float(kk['h']) for kk in _win)
+                                if mx < _bp * 0.97:
+                                    _rt = {'price': round(mx, 2), 'state': 'no_retrace', 'signal': '未反抽(弱势延续)'}
+                                elif _cur <= _bp:
+                                    _rt = {'price': round(mx, 2), 'state': 'retrace_ok', 'signal': '反抽受阻(结构内)'}
+                                else:
+                                    _rt = {'price': round(mx, 2), 'state': 'retrace_fail', 'signal': '反抽收复(破位失败)'}
                     smc_chain = {
-                        'trend_state': _ch['trend_state'], 'current_price': _ch['current_price'],
-                        'events_tail': [{'date': e['date'], 'x': _at60(e['date']), 'kind': e['kind'], 'level': e['level']}
-                                        for e in _ch['events_tail']],
-                        'bsl': _lvl60(_ch['bsl_levels']), 'ssl': _lvl60(_ch['ssl_levels']),
-                        'ob': _lvl60(_ch['ob']),
-                        'fvg_bull': _lvl60(_ch['fvg_bull']), 'fvg_bear': _lvl60(_ch['fvg_bear']),
-                        'breakout': {**_ch['breakout'], 'x': _at60(str(_ch['breakout'].get('date') or ''))},
-                        'retrace': _ch['retrace'],
+                        'trend_state': _trend, 'current_price': _cur,
+                        'events_tail': _evtail,
+                        'bsl': _bsl, 'ssl': _ssl,
+                        'ob': _ob, 'fvg_bull': _fvg_bull, 'fvg_bear': _fvg_bear,
+                        'breakout': _brk, 'retrace': _rt,
                     }
                     # R61: Jensen Alpha 期望(单源 core/alpha, PF后验基准表)
                     try:
+                        import sys as _s2
+                        if r'E:\test\smc_project\research' not in _s2.path:
+                            _s2.path.insert(0, r'E:\test\smc_project\research')
                         from core.alpha import alpha_expect as _axp60
-                        _a60 = _axp60(_ch, None)
+                        _a60 = _axp60({'trend_state': _trend, 'retrace': _rt}, None)
                         if _a60:
                             smc_chain['alpha_expect'] = _a60['alpha_expect']
                             smc_chain['alpha_bucket'] = _a60['bucket_key']
