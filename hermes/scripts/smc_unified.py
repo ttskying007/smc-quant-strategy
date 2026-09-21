@@ -2042,7 +2042,7 @@ function loadKline(){
                 sln.push({yAxis:l.price,label:{show:true,fontSize:9,color:l.color||'#888',formatter:l.label},lineStyle:{color:l.color||'#888',type:'dashed',width:1.5},_tt:l.label});
             });
             if(chart){
-                chart.setOption({series:[{name:'K',type:'candlestick',markPoint:{data:sp,label:{show:true,fontSize:9,color:'#fff',fontWeight:'bold'}},markLine:{silent:false,symbol:['none','none'],data:sln,emphasis:{lineStyle:{width:2}}}}]});
+                chart.setOption({series:[{id:'K',name:'K',type:'candlestick',markPoint:{data:sp,label:{show:true,fontSize:9,color:'#fff',fontWeight:'bold'}},markLine:{silent:false,symbol:['none','none'],data:sln,emphasis:{lineStyle:{width:2}}}}]});
             }
             var condBox=document.getElementById('sim-cond');
             if(condBox&&window._simMarkers.conditions)condBox.innerHTML='<div class="card" style="border-left:3px solid #d29922"><h3>🎯 模拟交易信号标注（买入原因 / TP / SL / 顺序）</h3><p style="color:#8b949e">'+window._simMarkers.conditions+'</p><p style="color:#8b949e;font-size:12px">🔵 ①信号点=事件/信号发生日（含策略原因）②买入点=成交日 ③卖出点=平仓日；🟡入场线 🟢TP线 🔴SL线（悬停彩线查看 TP/SL 条件）。点击图中标记查看详情。</p></div>';
@@ -2079,7 +2079,7 @@ function loadKline(){
                 var okC=rt.state==='retrace_ok'?'#3fb950':(rt.state==='retrace_fail'?'#f85149':'#8b949e');
                 ovMP.push({coord:[endX,rt.price],value:rt.state,symbol:'circle',symbolSize:10,itemStyle:{color:okC},label:{show:true,fontSize:9,color:okC,formatter:rt.signal||rt.state}});
             }
-            chart.setOption({series:[{name:'SMC链',type:'line',data:[],z:5,
+            chart.setOption({series:[{id:'smc_chain_ov',name:'SMC链',type:'line',data:[],z:5,
                 markLine:{silent:true,symbol:['none','none'],data:ovML},
                 markArea:{silent:true,data:ovMA},
                 markPoint:{silent:true,data:ovMP}}]});
@@ -2333,7 +2333,7 @@ function renderKline(d){
         grid:{left:'5%',right:'5%',bottom:'15%',top:'5%'},
         xAxis:{type:'category',data:dates,axisLine:{lineStyle:{color:'#30363d'}},axisLabel:{rotate:45,fontSize:10,interval:Math.max(1,Math.floor(dates.length/20)),color:'#8b949e'},splitLine:{show:false}},
         yAxis:{scale:true,splitLine:{lineStyle:{color:'#21262d',type:'dashed'}},axisLabel:{color:'#8b949e',fontSize:11}},
-        series:[{name:'K',type:'candlestick',data:ohlcvData,
+        series:[{id:'K',name:'K',type:'candlestick',data:ohlcvData,
             itemStyle:{color:'#f85149',color0:'#3fb950',borderColor:'#f85149',borderColor0:'#3fb950'},
             markPoint:{data:allPoints,label:{show:true,fontSize:8,color:'#fff',fontWeight:'bold'},emphasis:{scale:true}},
             markArea:{silent:false,data:fa,emphasis:{itemStyle:{opacity:0.5}}},
