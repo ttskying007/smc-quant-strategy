@@ -410,7 +410,7 @@ with open(out_path, "w", encoding="utf-8-sig", newline="") as fh:
     w.writeheader()
     for t in combo:
         w.writerow(t)
-print(f"v21 结构增强 CSV(引擎=v20f2 零改动, 仅加列): {len(combo)} 笔 → {out_path}")
+print(f"v22 信号链 CSV(引擎=v20f2 零改动, 仅加列): {len(combo)} 笔 → {out_path}")
 
 # quick stats
 import statistics
