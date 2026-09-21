@@ -369,6 +369,61 @@ def _alpha_of(chain, stage):
         return None
 
 
+# R64(用户指令: 外挂判断模型 Jev(TypeSafe System One)) — 影子判断, 不做决策
+_JEV_QUESTIONS = {
+    "executable_now": {"type": "noul",
+                       "instructions": "仅根据给出的结构化交易信号状态, 这笔A股事件驱动买入挂单此刻是否值得"
+                                        "执行(仅信号质量, 不考虑大盘)?"},
+    "event_kind": {"type": "choice",
+                   "instructions": "该事件最接近以下哪种 SMC 叙事?",
+                   "criteria": {"bottom_accumulation": "内部人增持/回购出现在低位区(Downtrend末端), 主力吸筹含义",
+                                "markup_retrace": "已有上涨趋势后回踩结构支撑, 趋势延续含义",
+                                "false_signal": "结构/叙事与价位矛盾, 假信号风险",
+                                "unclear": "信息不足以归类"}},
+    "expected_excess": {"type": "score",
+                        "instructions": "未来2周内该笔交易相对市场(等权组合)的超额收益预期区间?",
+                        "criteria": ["负超额(大概率跑输)", "无显著超额", "小幅正超额(+0~3%)", "显著正超额(+3%以上)"]},
+}
+_JEV_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jev_shadow_log.jsonl")
+
+
+def _jev_of(order, chain):
+    """R64: Jev 影子判断(软失败 None, 绝不阻断; 若 key 未设直接 None)"""
+    if not os.environ.get("TYPESAFE_API_KEY"):
+        return None
+    try:
+        from core.jev_client import judge_verbose
+        st = {"code": order.get("code"), "signal_combo": order.get("signal_combo"),
+              "signal_date": order.get("signal_date"), "entry_price": order.get("entry_price"),
+              "stage": order.get("stage"), "v_ratio": order.get("v_ratio"),
+              "rank_score": order.get("rank_score"), "alpha_expect": order.get("alpha_expect"),
+              "sub_signals": [s.get("name") for s in (order.get("sub_signals") or [])][:6],
+              "trigger": order.get("trigger"),
+              "chain": {"trend": (chain or {}).get("trend_state"),
+                        "breakout": (chain or {}).get("breakout"),
+                        "retrace_state": ((chain or {}).get("retrace") or {}).get("state")}}
+        ans = judge_verbose(st, _JEV_QUESTIONS)
+        a = (ans or {}).get("answers") or {}
+        out = {"p_executable": a.get("executable_now", {}).get("noul"),
+               "event_kind": a.get("event_kind", {}).get("choice"),
+               "event_kind_conf": a.get("event_kind", {}).get("confidence"),
+               "excess_score": a.get("expected_excess", {}).get("score"),
+               "excess_conf": a.get("expected_excess", {}).get("confidence"),
+               "model": (ans or {}).get("model"),
+               "date": datetime.date.today().isoformat()}
+        # 影子日志(jsonl): 瞳孔采样, 供后续本地校准
+        try:
+            with open(_JEV_LOG, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"code": order.get("code"), "date": out["date"],
+                                     "signal_combo": order.get("signal_combo"), **out},
+                                    ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+        return out
+    except Exception:
+        return None
+
+
 def is_swing_high(bs, j):
     return _csh(bs, j, PIVOT)
 
@@ -974,6 +1029,11 @@ def daily_selection():
                                         "why": _gate_why, "total_exposure": round(_gate_total, 4)})
                 continue
             _mark_funnel(_key, "PASSED_TO_ORDER")
+            # R64: Jev 影子判断(过闸后采样, 只记录/不影响任何决策; key 未设自动跳过)
+            _j = _jev_of(led[-1], _chain_snap)
+            if _j is not None:
+                led[-1]["jev"] = _j
+                _sel_stats["jev_judged"] = _sel_stats.get("jev_judged", 0) + 1
             new_orders.append((code, name, dd, limit_px))
             _event_order_count += 1
     conn.close()
@@ -1060,6 +1120,11 @@ def daily_selection():
                         _sel_stats["gate_error"] = _sel_stats.get("gate_error", 0) + 1
                     continue
             new_orders.append((code, code, sig_d, ep))
+            # R64: Jev 影子判断(CONT 腿同样采样, 只记录)
+            _jc = _jev_of(led[-1], _c_cont)
+            if _jc is not None:
+                led[-1]["jev"] = _jc
+                _sel_stats["jev_judged"] = _sel_stats.get("jev_judged", 0) + 1
         except Exception:
             pass
     # FIX(2026-09-05, 审计 G03): SMC 腿接入生产选股 —— 读取 smc_candidates → PENDING(next_open)
@@ -1210,6 +1275,8 @@ def daily_selection():
             },
             # R61: Jensen Alpha shadow gate 统计(α_expect < ALPHA_SHADOW_MIN 的腿数, 不拦截只记录)
             "alpha_shadow_low": _sel_stats.get("alpha_shadow_low", 0),
+            # R64: Jev 影子判断采样数(本日新过闸挂单中被 Jev 打分的笔数; 未设 key → 0)
+            "jev_judged": _sel_stats.get("jev_judged", 0),
             "orders_created": _event_order_count,
             "all_orders_created": len(new_orders),
             "terminal_stage_counts": _terminal_counts,
