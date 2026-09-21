@@ -7855,8 +7855,21 @@ class Handler(BaseHTTPRequestHandler):
             sim_markers = {'points': [], 'lines': [], 'conditions': ''}
             try:
                 _sim_code = symbol.split('.')[0]
-                _sim_led = json.loads(Path('/root/.hermes/smc_monitor/paper_ledger.json').read_text(encoding='utf-8'))
-                _sim_rec = next((t for t in _sim_led if str(t.get('code', '')) == _sim_code), None)
+                # FIX(2026-09-21, R63): 原写死 Linux 路径 /root/.hermes/... — Windows 上直接
+                # 抛异常被吞, 导致挂单/持仓(①信号②买入③卖出+TP/SL线)永远不上图。
+                _lj = None
+                for _lp in (r'/root/.hermes/smc_monitor/paper_ledger.json',
+                            r'E:\test\smc_project\research\paper_ledger.json'):
+                    try:
+                        _lj = json.loads(Path(_lp).read_text(encoding='utf-8'))
+                        break
+                    except Exception:
+                        continue
+                _sim_led = _lj if isinstance(_lj, list) else ((_lj or {}).get('orders') or [])
+                _sim_recs = [t for t in _sim_led
+                             if str(t.get('code', '')) == _sim_code
+                             and t.get('status') in ('PENDING_ORDER', 'FILLED', 'OPEN', 'CLOSED')]
+                _sim_rec = _sim_recs[-1] if _sim_recs else None
                 if _sim_rec:
                     _sig_d = str(_sim_rec.get('signal_date') or _sim_rec.get('disclose_date') or '').replace('-', '')
                     _fill_d = str(_sim_rec.get('filled_at') or '')[:10].replace('-', '') or None
