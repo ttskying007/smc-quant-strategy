@@ -160,7 +160,8 @@ def structure_events(ks, i_limit=None, pivot=3):
     i_limit: 只扫描至该bar收盘(信号日因果口径); None=全序列。
     返回: [{"bar":k, "date":ks[k]["t"], "kind":"BOS↑"|..., "level":被破价位, "trend":"up"/"down"}]
     """
-    n = len(ks) if i_limit is None else min(i_limit, len(ks) - 1)
+    # FIX(2026-09-21, R66): i_limit=None 时 n 必须是 len-1 — 循环上界含端点, 原 len 越界
+    n = (len(ks) - 1) if i_limit is None else min(i_limit, len(ks) - 1)
     piv_h = {}
     piv_l = {}
     for j in range(pivot, len(ks) - pivot):

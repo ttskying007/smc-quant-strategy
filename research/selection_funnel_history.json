@@ -78,5 +78,22 @@
       "nodata": 4,
       "dup": 4
     }
+  },
+  {
+    "day": "2026-09-22",
+    "generated_at": "2026-09-22 08:11:13",
+    "raw": 94,
+    "positive": 32,
+    "orders": 0,
+    "reject": {
+      "event_filter_hard": 0,
+      "event_filter_soft": 19,
+      "event_filter_soft_with_delta_research": 6,
+      "stage": 13,
+      "adx": 6,
+      "nodata": 4,
+      "dup": 5,
+      "rolled_weekend": 10
+    }
   }
 ]

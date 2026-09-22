@@ -187,6 +187,12 @@ def _run_main_steps():
     # 0. FIX(2026-08-22): incremental full-market refresh (datalen=10 append, 3 workers ~1/s)
     #    replaces slow 600/day batch — full market (~4657) done in ~75 min, coverage 4.8%->100%
     rc0 = run("incremental_refresh.py", "--workers", "3", cwd=WDH, timeout=10800)
+    # FIX(2026-09-21/22, R66): 网络慢timeout自愈 — 正常失败(rc=124超时)冷站10分钟重来一次,
+    # 避免单次上游抖动导致 selection/funnel_monitor 整天被跳过(今例: 2026-09-21)
+    if rc0 == 124:
+        print("refresh 首次超时, 冷却 600s 后重试一次", flush=True)
+        time.sleep(600)
+        rc0 = run("incremental_refresh.py", "--workers", "3", cwd=WDH, timeout=12600)
     step_status["refresh"] = rc0
     # 0b. 数据新鲜度治理(2026-09-12): 腾讯源双源复核 —— 只补新浪没刷上的(末bar<今日),
     #     kline 端点+append+11%跳变守卫; 幂等(已最新文件自动跳过). 09-12 实战: 覆盖 39.5%→99.3%
