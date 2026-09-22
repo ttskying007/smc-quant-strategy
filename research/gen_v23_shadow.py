@@ -25,6 +25,7 @@ W_RANK2 = 0.5
 W_RISK_LT5 = 0.6
 W_WHALE_3PLUS = 1.2   # 3+ 次积极公告 → 加权
 W_WHALE_ONCE = 0.7    # 只披露 1 次 → 降权 (R72: 2.03/2.19 PF)
+W_UP_TREND = 0.7      # 用户 2026-09-23 验收: up 趋势腿降权 (R69 D1: up PF 2.43 vs down 4.23)
 
 
 def _whale_counts(legs):
@@ -83,6 +84,9 @@ for r in rows:
             w *= W_WHALE_ONCE; flags.append("s6_whale_once")
     else:
         r["whale_90d_n"] = None
+    # S7 (用户验收 2026-09-23): up 趋势腿 ×0.7 — up 系整体 PF 2.43 vs down 4.23
+    if (r.get("trend_state") or "") == "up":
+        w *= W_UP_TREND; flags.append("s7_up_trend")
     r["v23_weight"] = round(w, 3)
     r["v23_flags"] = "|".join(flags) or "none"
 

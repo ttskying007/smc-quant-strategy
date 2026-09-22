@@ -460,6 +460,9 @@ def _v23_of(order, chain):
             conn.close()
         except Exception:
             n_ev = None
+        # S7 (用户验收 2026-09-23): up 趋势 ×0.7
+        if (chain or {}).get("trend_state") == "up":
+            w *= 0.7; flags.append("s7_up_trend")
         if n_ev is not None:
             if n_ev >= 3:
                 w *= 1.2; flags.append(f"s6_whale_x{n_ev}")
