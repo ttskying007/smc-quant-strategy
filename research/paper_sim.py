@@ -410,7 +410,7 @@ def _jev_of(order, chain):
                "excess_score": a.get("expected_excess", {}).get("score"),
                "excess_conf": a.get("expected_excess", {}).get("confidence"),
                "model": (ans or {}).get("model"),
-               "date": datetime.date.today().isoformat()}
+               "date": time.strftime("%Y-%m-%d")}
         # 影子日志(jsonl): 瞳孔采样, 供后续本地校准
         try:
             with open(_JEV_LOG, "a", encoding="utf-8") as fh:
@@ -420,6 +420,53 @@ def _jev_of(order, chain):
         except Exception:
             pass
         return out
+    except Exception:
+        return None
+
+
+def _v23_of(order, chain):
+    """R70/R72: v23 影子权重(预注册, 只记录, 不参与任何决策)。
+    成分: S1 CHoCH×0.5 / S4 rank2×0.5 / S5 risk<5%×0.6 / S6 whale(3+×1.2, 1次×0.7)。
+    失败一律 None。"""
+    try:
+        import sqlite3
+        w = 1.0
+        flags = []
+        bk = ((chain or {}).get("breakout") or {}).get("kind") or ""
+        if "CHoCH" in bk:
+            w *= 0.5; flags.append("s1_choch:" + bk)
+        if str(order.get("rank_score")) == "2":
+            w *= 0.5; flags.append("s4_rank2")
+        try:
+            if float(order.get("risk_dist_pct") or 0) < 5:
+                w *= 0.6; flags.append("s5_risk_lt5")
+        except Exception:
+            pass
+        n_ev = None
+        try:
+            from core.events import classify_title
+            from datetime import datetime as _dt, timedelta as _td
+            d0 = _dt.strptime(str(order.get("signal_date", "")).replace("-", ""), "%Y%m%d")
+            lo = (d0 - _td(days=90)).strftime("%Y-%m-%d")
+            hi = d0.strftime("%Y-%m-%d")
+            conn = sqlite3.connect(CFG.ANNOUNCE_DB)
+            n_ev = 0
+            for (t,) in conn.execute(
+                    "SELECT title FROM announce WHERE stock_code=? AND date BETWEEN ? AND ?",
+                    (order.get("code"), lo, hi)):
+                is_ev, _, pol, _, _ = classify_title(t)
+                if is_ev and pol > 0:
+                    n_ev += 1
+            conn.close()
+        except Exception:
+            n_ev = None
+        if n_ev is not None:
+            if n_ev >= 3:
+                w *= 1.2; flags.append(f"s6_whale_x{n_ev}")
+            elif n_ev <= 1:
+                w *= 0.7; flags.append(f"s6_whale_x{n_ev}")
+        return {"weight": round(w, 3), "flags": flags, "whale_90d_n": n_ev,
+                "date": time.strftime("%Y-%m-%d")}
     except Exception:
         return None
 
@@ -1034,6 +1081,11 @@ def daily_selection():
             if _j is not None:
                 led[-1]["jev"] = _j
                 _sel_stats["jev_judged"] = _sel_stats.get("jev_judged", 0) + 1
+            # R70: v23 影子权重(记录不入决策)
+            _v = _v23_of(led[-1], _chain_snap)
+            if _v is not None:
+                led[-1]["v23"] = _v
+                _sel_stats["v23_tagged"] = _sel_stats.get("v23_tagged", 0) + 1
             new_orders.append((code, name, dd, limit_px))
             _event_order_count += 1
     conn.close()
@@ -1125,6 +1177,11 @@ def daily_selection():
             if _jc is not None:
                 led[-1]["jev"] = _jc
                 _sel_stats["jev_judged"] = _sel_stats.get("jev_judged", 0) + 1
+            # R70: CONT 腿同样打 v23 影子标(whale 分量只适用于事件腿, CONT 走 S1/S4/S5 即可)
+            _vc = _v23_of(led[-1], _c_cont)
+            if _vc is not None:
+                led[-1]["v23"] = _vc
+                _sel_stats["v23_tagged"] = _sel_stats.get("v23_tagged", 0) + 1
         except Exception:
             pass
     # FIX(2026-09-05, 审计 G03): SMC 腿接入生产选股 —— 读取 smc_candidates → PENDING(next_open)
@@ -1277,6 +1334,8 @@ def daily_selection():
             "alpha_shadow_low": _sel_stats.get("alpha_shadow_low", 0),
             # R64: Jev 影子判断采样数(本日新过闸挂单中被 Jev 打分的笔数; 未设 key → 0)
             "jev_judged": _sel_stats.get("jev_judged", 0),
+            # R70: v23 影子权重被打标的腿数(前向对照数据积累)
+            "v23_tagged": _sel_stats.get("v23_tagged", 0),
             "orders_created": _event_order_count,
             "all_orders_created": len(new_orders),
             "terminal_stage_counts": _terminal_counts,
