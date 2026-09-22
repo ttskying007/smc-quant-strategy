@@ -1,0 +1,8 @@
+{"code": "600860", "date": "2026-09-22", "stage": "backfill", "p_executable": 0.46, "event_kind": "bottom_accumulation", "event_kind_conf": 0.98, "excess_score": 1.59, "excess_conf": 0.32}
+{"code": "603040", "date": "2026-09-22", "stage": "backfill", "p_executable": 0.47, "event_kind": "bottom_accumulation", "event_kind_conf": 0.97, "excess_score": 1.54, "excess_conf": 0.27}
+{"code": "601633", "date": "2026-09-22", "stage": "backfill", "p_executable": 0.46, "event_kind": "bottom_accumulation", "event_kind_conf": 0.96, "excess_score": 1.52, "excess_conf": 0.26}
+{"code": "300408", "date": "2026-09-22", "stage": "backfill", "p_executable": 0.51, "event_kind": "bottom_accumulation", "event_kind_conf": 0.97, "excess_score": 1.81, "excess_conf": 0.33}
+{"code": "300789", "date": "2026-09-22", "stage": "backfill", "p_executable": 0.45, "event_kind": "bottom_accumulation", "event_kind_conf": 0.97, "excess_score": 1.59, "excess_conf": 0.31}
+{"code": "300307", "date": "2026-09-22", "stage": "backfill", "p_executable": 0.45, "event_kind": "bottom_accumulation", "event_kind_conf": 0.97, "excess_score": 1.58, "excess_conf": 0.31}
+{"code": "000157", "date": "2026-09-22", "stage": "backfill", "p_executable": 0.48, "event_kind": "bottom_accumulation", "event_kind_conf": 0.96, "excess_score": 1.37, "excess_conf": 0.38}
+{"code": "300808", "date": "2026-09-22", "stage": "backfill", "p_executable": 0.29, "event_kind": "bottom_accumulation", "event_kind_conf": 0.52, "excess_score": 0.18, "excess_conf": 0.82}
