@@ -8,7 +8,7 @@
 基线 = v22 冻结 1858 腿; v23 = 同腿 × 权重; 统计对比即可。
 纪律: 不修改 v22 任何文件; v23 仅生成 combo_v23_shadow.csv + 统计。
 """
-import csv, os, sqlite3, sys
+import csv, os, json, sqlite3, sys
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -45,6 +45,8 @@ W_BSL_TIGHT = 0.7     # S9 (用户验收 R76): 入场贴近被攻克 BSL (<5%) �
 W_IN_OB = 0.8         # S10 (R77, 用户拍板"要检查就要修"): 入场价 sedari 最近 OB 区 → 降权 (312腿 +2.59 PF2.53 vs 外 4.01)
 W_MSS_BULL_FRESH = 0.7  # S11 (R78): 近2bar内 bull MSS 刚确认反转 → 追高界 → 降权 (57腿 ~PF1.4)
 W_IN_OTE = 0.7        # S12 (R79): 入场价在最近脉冲的 OTE 61.8-79% 内 → 降权 (141腿 +1.72 PF1.87)
+W_RANK_VR2_VC = 0.7   # S13 (R81): rank 分量 vr2 或 vol_cont 携带 → 降权 (vr2:135腿−2.82pp / vol_cont:139腿−1.20pp)
+W_RANK_VR2_VC = 0.7   # S13 (R81): rank 分量 vr2(放量追入)/vol_cont(量能持续) 负贡献 → 其中一个=1 即×0.7
 
 V24_RULES = True  # 2026-09-23 用户定: 全部入影子生产打标
 
@@ -131,6 +133,14 @@ for r in rows:
     # S12 (R79): 入场价在 OTE 61.8-79% 回测带内(蝶形) → 降权
     if enr and str(enr.get("in_ote")) == "True":
         w *= W_IN_OTE; flags.append("s12_in_ote")
+    # S13 (R81): rank 分量 vr2/vol_cont 出现 → 负贡献 → ×0.7
+    try:
+        _rc = json.loads(r.get("rank_components") or "{}") if r.get("rank_components") else {}
+        if _rc.get("vr2") == 1 or _rc.get("vol_cont") == 1:
+            w *= W_RANK_VR2_VC
+            flags.append("s13_rank_" + ("vr2" if _rc.get("vr2") else "vol_cont"))
+    except Exception:
+        pass
     r["v23_weight"] = round(w, 3)
     r["v23_flags"] = "|".join(flags) or "none"
 
