@@ -42,6 +42,7 @@ W_WHALE_ONCE = 0.7    # 只披露 1 次 → 降权 (R72: 2.03/2.19 PF)
 W_UP_TREND = 0.7      # 用户 2026-09-23 验收: up 趋势腿降权 (R69 D1: up PF 2.43 vs down 4.23)
 W_SWEEP_BEAR = 0.6    # S8 (用户验收 R76): 入场近10bar有 bear sweep → 降权 (R76: 244腿 avg+1.46 PF2.02)
 W_BSL_TIGHT = 0.7     # S9 (用户验收 R76): 入场贴近被攻克 BSL (<5%) → 降权 (R76: 354腿 avg~+1.0 PF~1.6)
+W_IN_OB = 0.8         # S10 (R77, 用户拍板"要检查就要修"): 入场价 sedari 最近 OB 区 → 降权 (312腿 +2.59 PF2.53 vs 外 4.01)
 
 V24_RULES = True  # 2026-09-23 用户定: 全部入影子生产打标
 
@@ -116,6 +117,9 @@ for r in rows:
                 w *= W_BSL_TIGHT; flags.append(f"s9_bsl_tight_{d}%")
         except Exception:
             pass
+    # S10 (R77): 入价在最近 OB 区内 → 降权
+    if enr and str(enr.get("in_ob")) == "True":
+        w *= W_IN_OB; flags.append("s10_in_ob")
     r["v23_weight"] = round(w, 3)
     r["v23_flags"] = "|".join(flags) or "none"
 

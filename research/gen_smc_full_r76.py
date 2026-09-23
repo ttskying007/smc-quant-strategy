@@ -92,11 +92,37 @@ for r in rows:
     ob_far = None
     if recent_ob:
         meta = recent_ob.meta or {}
-        lo = float(meta.get("zone_lo", recent_ob.price))
-        hi = float(meta.get("zone_hi", recent_ob.price))
+        # R77 FIX: meta key 是 ob_high/ob_low(detector 真实字段), 不是 zone_lo/zone_hi ——
+        # R76 用错 key 导致 "in_ob 只 1 腿命中" 假阴性; 本节已修
+        lo = float(meta.get("ob_low") or recent_ob.price)
+        hi = float(meta.get("ob_high") or recent_ob.price)
         in_ob = lo <= entry_px <= hi
         if not in_ob:
             ob_far = (entry_px - hi) / hi * 100 if entry_px > hi else (lo - entry_px) / lo * -100
+
+    # ═══ R77: FVG 自主检测(detector 不出 FVG) — 3-bar 形态, 最近60bar窗 ═══
+    fvgs = []  # (kind, lo, hi, bar)
+    n = len(kl)
+    for i in range(1, n - 1):
+        h_prev, h_next = kl[i - 1]["h"], kl[i + 1]["l"]
+        l_prev, l_next = kl[i - 1]["l"], kl[i + 1]["h"]
+        # bullish FVG: i+1 的 low > i-1 的 high (跳空)
+        if h_next > h_prev:
+            fvgs.append(("bull", h_prev, h_next, i))
+        # bearish FVG: i+1 的 high < i-1 的 low (向下跳空)
+        if l_next < l_prev:
+            fvgs.append(("bear", l_next, l_prev, i))
+    active_fvgs = [f for f in fvgs if f[3] >= n - 60]  # 近 60 bar 内形成
+    in_fvg = None
+    fvg_gap_to_entry = None
+    for kind, lo, hi, b in reversed(active_fvgs):
+        if lo <= entry_px <= hi:
+            in_fvg = kind
+            break
+        if kind == "bull" and entry_px < lo:
+            fvg_gap_to_entry = round((lo - entry_px) / entry_px * 100, 2)
+        elif kind == "bear" and entry_px > hi:
+            fvg_gap_to_entry = round((entry_px - hi) / hi * 100, 2)
 
     highs = sorted([s for s in sigs if "swing_price" in (s.meta or {}) and s.type in ("BOS_Bull", "CHOCH_Bull")],
                    key=lambda s: -s.bar)
@@ -109,6 +135,7 @@ for r in rows:
     sl = float(r.get("sl") or 0) or None
     out.append({**r,
                 "clean_close": last_close,
+                "in_fvg": in_fvg if in_fvg else "none", "fvg_gap_to_entry": fvg_gap_to_entry,
                 "sweeps_10b": len(sweeps_10b), "sweep_dir": my_sweep_dir,
                 "in_ob": in_ob, "ob_gap_pct": round(ob_far, 2) if ob_far else (0 if in_ob else None),
                 "bsl": bsl, "ssl": ssl,
@@ -132,6 +159,7 @@ for title, fn in [
     ("入场前10bar内是否有 sweep(SMC 经典动机)", lambda r: f"sweeps={r['sweeps_10b']}"),
     ("sweep 方向(多单应期望 bull sweep = 扫低再回拉)", lambda r: r["sweep_dir"] or "无sweep"),
     ("入场价是否落在最近 OB 区", lambda r: str(r["in_ob"])),
+    ("入场价是否落在最近 FVG(近60bar)", lambda r: str(r["in_fvg"])),
     ("入场价距最近被攻克的 SSL 距离", lambda r: bucket_dist(r["dist_to_ssl"])),
     ("入场价距最近被攻克的 BSL 距离", lambda r: bucket_dist(r["dist_to_bsl"])),
     ("TP 是否在 BSL 上方(撞向被吞流动性)", lambda r: str(r["tp_above_bsl"])),

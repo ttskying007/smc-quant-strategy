@@ -503,6 +503,13 @@ def _v23_of(order, chain):
                             d = (float(bsl) - float(order["entry_price"])) / float(order["entry_price"]) * 100
                             if d < 5:
                                 w *= 0.7; flags.append(f"s9_bsl_tight_{d:.1f}%")
+                    # S10 (R77): 入场落在最近 OB 区内 → ×0.8
+                    obs = [s for s in sigs if s.type.startswith("OB")]
+                    if obs and order.get("entry_price"):
+                        lo = float((obs[-1].meta or {}).get("ob_low") or obs[-1].price)
+                        hi = float((obs[-1].meta or {}).get("ob_high") or obs[-1].price)
+                        if lo <= float(order["entry_price"]) <= hi:
+                            w *= 0.8; flags.append("s10_in_ob")
         except Exception:
             pass
         if n_ev is not None:
