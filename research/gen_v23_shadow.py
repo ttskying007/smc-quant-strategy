@@ -19,6 +19,20 @@ from core.events import classify_title  # noqa: E402
 
 SRC = os.path.join(ROOT, "combo_v22_trades.csv")
 OUT = os.path.join(ROOT, "combo_v23_shadow.csv")
+MD = os.path.join(ROOT, "handover", "R76_smc_full_audit.md")  # (旁注)
+ENR_CSV = os.path.join(ROOT, "combo_v22_smc_full.csv")  # R76 产物
+
+
+def _load_smc_env():
+    """载入 R76 腿的 sweep_dir / dist_to_bsl"""
+    m = {}
+    if os.path.exists(ENR_CSV):
+        for r in csv.DictReader(open(ENR_CSV, encoding="utf-8-sig")):
+            m[r["symbol"] + "|" + r["entry_date"]] = r
+    return m
+
+
+SMC_ENV = _load_smc_env()
 
 W_CHOCH = 0.5
 W_RANK2 = 0.5
@@ -26,6 +40,10 @@ W_RISK_LT5 = 0.6
 W_WHALE_3PLUS = 1.2   # 3+ 次积极公告 → 加权
 W_WHALE_ONCE = 0.7    # 只披露 1 次 → 降权 (R72: 2.03/2.19 PF)
 W_UP_TREND = 0.7      # 用户 2026-09-23 验收: up 趋势腿降权 (R69 D1: up PF 2.43 vs down 4.23)
+W_SWEEP_BEAR = 0.6    # S8 (用户验收 R76): 入场近10bar有 bear sweep → 降权 (R76: 244腿 avg+1.46 PF2.02)
+W_BSL_TIGHT = 0.7     # S9 (用户验收 R76): 入场贴近被攻克 BSL (<5%) → 降权 (R76: 354腿 avg~+1.0 PF~1.6)
+
+V24_RULES = True  # 2026-09-23 用户定: 全部入影子生产打标
 
 
 def _whale_counts(legs):
@@ -87,6 +105,17 @@ for r in rows:
     # S7 (用户验收 2026-09-23): up 趋势腿 ×0.7 — up 系整体 PF 2.43 vs down 4.23
     if (r.get("trend_state") or "") == "up":
         w *= W_UP_TREND; flags.append("s7_up_trend")
+    # S8/S9 (R76 用户验收): sweep 方向 + dist_to_bsl (源: combo_v22_smc_full.csv)
+    enr = SMC_ENV.get(r["symbol"] + "|" + r["entry_date"])
+    if enr:
+        if enr.get("sweep_dir") == "bear":
+            w *= W_SWEEP_BEAR; flags.append("s8_sweep_bear")
+        d = enr.get("dist_to_bsl")
+        try:
+            if d is not None and float(d) < 5:
+                w *= W_BSL_TIGHT; flags.append(f"s9_bsl_tight_{d}%")
+        except Exception:
+            pass
     r["v23_weight"] = round(w, 3)
     r["v23_flags"] = "|".join(flags) or "none"
 

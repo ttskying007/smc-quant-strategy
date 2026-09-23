@@ -463,6 +463,48 @@ def _v23_of(order, chain):
         # S7 (用户验收 2026-09-23): up 趋势 ×0.7
         if (chain or {}).get("trend_state") == "up":
             w *= 0.7; flags.append("s7_up_trend")
+        # S8/S9 (R76 用户验收): 引擎重跑 sweep 方向 + 距 BSL (无前视, 只到 signal_date)
+        try:
+            from datetime import datetime as _dt2
+            import importlib.util as _ilu
+            _sd = str(order.get("signal_date") or "").replace("-", "")
+            _sym = order.get("code", "")
+            _fn = None
+            for _suf in ("_SH", "_SZ", "_BJ"):
+                _p = os.path.join(CFG.KT_CACHE, _sym + _suf + "_daily_800.json")
+                if os.path.exists(_p):
+                    _fn = _p
+                    break
+            if _fn:
+                import json as _json
+                raw = _json.load(open(_fn, encoding="utf-8"))
+                bars = [{"t": str(b["t"]), "o": float(b["o"]), "h": float(b["h"]),
+                         "l": float(b["l"]), "c": float(b["c"]), "v": float(b.get("v", 0))}
+                        for b in raw if str(b["t"]) <= _sd]
+                if len(bars) >= 30:
+                    _spec = _ilu.spec_from_file_location(
+                        "smc_detector", os.path.join(os.path.dirname(os.path.dirname(CFG.KT_CACHE)),
+                                                     "scripts", "v25", "smc_detector.py"))
+                    _mod = _ilu.module_from_spec(_spec)
+                    _spec.loader.exec_module(_mod)
+                    sigs = _mod.detect_smc_signals(bars)
+                    n10 = len(bars) - 12
+                    sw = [s for s in sigs if "Sweep" in s.type and s.bar >= n10]
+                    if sw:
+                        nb = sum(1 for s in sw if s.dir == "bear")
+                        nbull = sum(1 for s in sw if s.dir == "bull")
+                        if nb > nbull:
+                            w *= 0.6; flags.append(f"s8_sweep_bear_x{nb}")
+                    # dist_to_bsl: 最近突破高 vs 入场价
+                    highs = [s for s in sigs if s.type in ("BOS_Bull", "CHOCH_Bull")]
+                    if highs and order.get("entry_price"):
+                        bsl = sorted(highs, key=lambda s: -s.bar)[0].meta.get("swing_price")
+                        if bsl:
+                            d = (float(bsl) - float(order["entry_price"])) / float(order["entry_price"]) * 100
+                            if d < 5:
+                                w *= 0.7; flags.append(f"s9_bsl_tight_{d:.1f}%")
+        except Exception:
+            pass
         if n_ev is not None:
             if n_ev >= 3:
                 w *= 1.2; flags.append(f"s6_whale_x{n_ev}")
