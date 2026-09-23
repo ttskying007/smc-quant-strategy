@@ -46,6 +46,31 @@ W_IN_OB = 0.8         # S10 (R77, 用户拍板"要检查就要修"): 入场价 s
 W_MSS_BULL_FRESH = 0.7  # S11 (R78): 近2bar内 bull MSS 刚确认反转 → 追高界 → 降权 (57腿 ~PF1.4)
 W_IN_OTE = 0.7        # S12 (R79): 入场价在最近脉冲的 OTE 61.8-79% 内 → 降权 (141腿 +1.72 PF1.87)
 W_RANK_VR2_VC = 0.7   # S13 (R81): rank 分量 vr2 或 vol_cont 携带 → 降权 (vr2:135腿−2.82pp / vol_cont:139腿−1.20pp)
+W_MKT_WEAK = 0.5      # S14 (R83 用户验收): 上证指数20日 < −2% 时入场 → 降权 (桶<−2%: 529腿 avg2.51/PF2.11 vs ≥+2%: 847腿 avg5.99/PF5.92)
+
+IDX_JSON = os.path.join(ROOT, "idx_sh000001.json")  # 真上证指数(2023-01→2026-09, 904 bars)
+
+
+def _load_idx():
+    if os.path.exists(IDX_JSON):
+        return json.load(open(IDX_JSON, encoding="utf-8"))
+    return []
+
+
+_IDX = _load_idx()
+
+
+def _idx20(entry_date):
+    """入场日的上证20日收益%. 无前视: 只用到当日闭市."""
+    d = str(entry_date).replace("-", "")
+    j = -1
+    for i in range(len(_IDX) - 1, -1, -1):
+        if str(_IDX[i]["t"]) <= d:
+            j = i
+            break
+    if j < 20:
+        return None
+    return (float(_IDX[j]["c"]) / float(_IDX[j - 20]["c"]) - 1) * 100
 W_RANK_VR2_VC = 0.7   # S13 (R81): rank 分量 vr2(放量追入)/vol_cont(量能持续) 负贡献 → 其中一个=1 即×0.7
 
 V24_RULES = True  # 2026-09-23 用户定: 全部入影子生产打标
@@ -141,6 +166,10 @@ for r in rows:
             flags.append("s13_rank_" + ("vr2" if _rc.get("vr2") else "vol_cont"))
     except Exception:
         pass
+    # S14 (R83): 大盘弱(上证20日 < −2%) 时降权
+    m20 = _idx20(r["entry_date"])
+    if m20 is not None and m20 < -2:
+        w *= W_MKT_WEAK; flags.append(f"s14_mkt_weak_{m20:.1f}%")
     r["v23_weight"] = round(w, 3)
     r["v23_flags"] = "|".join(flags) or "none"
 

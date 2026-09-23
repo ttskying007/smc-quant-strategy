@@ -537,6 +537,24 @@ def _v23_of(order, chain):
                 w *= 1.2; flags.append(f"s6_whale_x{n_ev}")
             elif n_ev <= 1:
                 w *= 0.7; flags.append(f"s6_whale_x{n_ev}")
+        # S14 (R83 用户验收): 大盘弱(上证20日<−2%) → ×0.5
+        try:
+            _idxp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "idx_sh000001.json")
+            if os.path.exists(_idxp):
+                import json as _json2
+                _idx = _json2.load(open(_idxp, encoding="utf-8"))
+                _d = str(order.get("signal_date") or "").replace("-", "")
+                _j = -1
+                for _i in range(len(_idx) - 1, -1, -1):
+                    if str(_idx[_i]["t"]) <= _d:
+                        _j = _i
+                        break
+                if _j >= 20:
+                    _r20 = (float(_idx[_j]["c"]) / float(_idx[_j - 20]["c"]) - 1) * 100
+                    if _r20 < -2:
+                        w *= 0.5; flags.append(f"s14_mkt_weak_{_r20:.1f}%")
+        except Exception:
+            pass
         return {"weight": round(w, 3), "flags": flags, "whale_90d_n": n_ev,
                 "date": time.strftime("%Y-%m-%d")}
     except Exception:
