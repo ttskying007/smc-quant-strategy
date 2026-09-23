@@ -12,6 +12,7 @@ OUT = os.path.normpath(os.path.join(ROOT, "..", "hermes", "web_reports"))
 
 # 报告顺序(先审计后动刀): R60 → R68 → R74 → R69 → R70 → R72 → R76(+R77并入)
 REPORTS = [
+    ("R82_v24_full_backtest", "R82 v24 影子(12手术) 全回测: 总览/逐年×权重桶/逐年逐月/季度/裁判表", "最新全套"),
     ("R68_jev_full_report", "R68 逐腿全景报告(1858腿×SMC链×Jev五问)", "完整明细"),
     ("R69_diagnosis", "R69 病灶诊断(13维×4交叉)", "问题清单"),
     ("R70_v23_shadow", "R70/R73b v23→v24 影子组合+验收记录", "手术预注册"),
