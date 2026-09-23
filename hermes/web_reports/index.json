@@ -1,0 +1,74 @@
+{
+ "kpis": [
+  {
+   "title": "v22 冻结基线",
+   "val": "PF 3.36",
+   "sub": "1858腿 avg 4.07% WR 64%"
+  },
+  {
+   "title": "v24 影子(9手术)",
+   "val": "PF 5.06",
+   "sub": "avg 5.47% WR 71.8%"
+  },
+  {
+   "title": "Jev 盲审 TP/SL",
+   "val": "99.0% 合规",
+   "sub": "R65 1858腿 无前视"
+  },
+  {
+   "title": "出口结构",
+   "val": "冻结",
+   "sub": "R71 trailing 实回放证伪"
+  }
+ ],
+ "reports": [
+  {
+   "slug": "R68_jev_full_report",
+   "title": "R68 逐腿全景报告(1858腿×SMC链×Jev五问)",
+   "tag": "完整明细",
+   "preview": "|腿|日期|代码|src|组合|趋势|突破(日/价/型)|回踩(价/状态)|买入→卖出|pnl%|持有|出场|Jev: 信号p/趋势/时机/tpsl/方向|\n|---|---|---|---|---|---|---|---|---|---|---|---|---|\n|202309/688381.SH|20230913|688381.SH|EVENT|insider-event|down|20230807/29.50/BOS↓|29.25/no_retrace|20230913 27.88→20231009 27.10|-3.19|12|TIME_STOP|p=0.33 trend=strong_down(0.57) timing=1.69 tpsl=tp_sys_ok dir=down(0.55)|\n"
+  },
+  {
+   "slug": "R69_diagnosis",
+   "title": "R69 病灶诊断(13维×4交叉)",
+   "tag": "问题清单",
+   "preview": "| 桶 | n | avg% | WR% | PF |\n|---|---|---|---|---|\n| down | 1193 | 4.49 | 67.4 | 4.23 |\n| up | 665 | 3.31 | 58.0 | 2.43 |\n"
+  },
+  {
+   "slug": "R70_v23_shadow",
+   "title": "R70/R73b v23→v24 影子组合+验收记录",
+   "tag": "手术预注册",
+   "preview": "| 规则 | 命中条件 | 权重 | 针对病灶 |\n|---|---|---|---|\n| s1_choch | breakout_kind ∈ CHoCH↑/CHoCH↓ | ×0.5 | P1: CHoCH 604腿均赚+1.89 PF1.88 |\n| s4_rank2 | rank == 2 | ×0.5 | P4: rank2 140腿 avg 0.76 PF1.36 |\n| s5_risk_lt5 | risk_pct < 5% | ×0.6 | P5: 窄幅风险档 avg 0.4-1.2 PF≤1.7 |\n| s6_whale | 入场前90日 积极公告 3+次 | ×1.2 | R72: 重述=真金 PF5.31 |\n"
+  },
+  {
+   "slug": "R72_whale_window",
+   "title": "R72 大资金(内部人)窗口分析",
+   "tag": "大鱼追踪",
+   "preview": "| 桶 | n | avg% | WR% | PF |\n|---|---|---|---|---|\n| 3+次 | 619 | 5.12 | 70.8 | 5.31 |\n| 2次 | 419 | 3.85 | 66.6 | 3.64 |\n| 1次 | 486 | 2.03 | 57.6 | 2.19 |\n"
+  },
+  {
+   "slug": "R74_smc_signal_audit",
+   "title": "R74 逐SMC信号族审计",
+   "tag": "结构元件",
+   "preview": "| 锚 | n | avg% | WR% | PF | Jev p_valid均 |\n|---|---|---|---|---|---|\n| BOS↓ | 965 | 5.11 | 70.7 | 5.45 | 0.315 |\n| CHoCH↑ | 376 | 1.91 | 58.0 | 1.95 | 0.498 |\n| BOS↑ | 289 | 5.13 | 58.1 | 2.89 | 0.437 |\n| CHoCH↓ | 228 | 1.86 | 53.5 | 1.77 | 0.32 |\n"
+  },
+  {
+   "slug": "R76_smc_full_audit",
+   "title": "R76/77 引擎全信号链审计(BSL/SSL/OB/FVG/MSS/OTE/LV)",
+   "tag": "核心信号",
+   "preview": "| 桶 | n | avg% | WR% | PF |\n|---|---|---|---|---|\n| sweeps=0 | 896 | 4.57 | 68.9 | 4.36 |\n| sweeps=1 | 483 | 2.85 | 61.3 | 2.86 |\n| sweeps=2 | 120 | 2.19 | 60.0 | 2.57 |\n| sweeps=3 | 22 | 1.51 | 50.0 | 1.73 |\n"
+  },
+  {
+   "slug": "R64_jev_shadow",
+   "title": "R64 Jev接入·生产付",
+   "tag": "影子接线",
+   "preview": "| 件 | 路径 | 说明 |\n|---|---|---|\n| Jev 客户端 | `research/core/jev_client.py` | 纯 stdlib HTTP; key 只走 `TYPESAFE_API_KEY` 环境变量, 绝不落盘 |\n| 生产接线 | `research/paper_sim.py` | `_jev_of(order, chain)` 软失败助手; EVENT+CONT 两腿过 PortfolioGate 后采样; jev 字段落 ledger; 影子 jsonl |\n| 漏斗计数 | `research/paper_sim.py` | `jev_judged`(本日采样数) 进 selection_funnel |\n| 影子 log | `research/jev_shadow_log.jsonl` | 每次判断一行 {code,date,signal"
+  },
+  {
+   "slug": "R61_alpha_stack",
+   "title": "R61 Jensen Alpha 栈",
+   "tag": "Alpha骨架",
+   "preview": "| 件 | 路径 | 说明 |\n|---|---|---|\n| Alpha 引擎(单源) | `research/core/alpha.py` | `alpha_expect(chain, stage)` 前向期望 α；`alpha_realized` 后验 α |\n| 基准生成器 | `research/gen_alpha_benchmark.py` | 从 combo_v22_trades.csv 切桶落盘 |\n| 基准表 | `research/alpha_benchmark.json` | 9 桶 trend×retrace，1524 EVENT 腿 |\n| 生产接线 | `research/paper_sim.py` | `_alpha_of()` 软失败助手；EVENT+CONT 挂单带 alpha_expect/bucket 4 字段；漏斗加 alpha_shadow_low"
+  }
+ ]
+}

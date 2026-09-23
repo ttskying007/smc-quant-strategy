@@ -133,9 +133,62 @@ for r in rows:
     ssl = lows[0].meta["swing_price"] if lows else None
     tp = float(r.get("tp") or 0) or None
     sl = float(r.get("sl") or 0) or None
+    # ═══ R78: MSS (Market Structure Shift) — CHOCH 被跟进确认 ═══
+    mss = [s for s in sigs if s.type.startswith("MSS")]
+    recent_mss = mss[-1] if mss else None
+    mss_dir = recent_mss.dir if recent_mss else None
+    mss_bars_ago = (len(kl) - 1 - recent_mss.bar) if recent_mss else None
+
+    # ═══ R79: OTE (Optimal Trade Entry) — 最近脉冲摆动的 61.8%-79% 回测带 ═══
+    # 从 detector 的 swing 列表重建最近一段脉冲, 算 fib 区
+    from smc_detector import find_swings
+    h_sw, l_sw = find_swings(kl, min_bars=3)
+    ote_zone = None
+    if len(h_sw) >= 2 and len(l_sw) >= 2:
+        # 最近脉冲: swing_low 后 swing_high (向上脉冲)
+        # 找最近的 (l_sw 高点) 序
+        if h_sw and l_sw:
+            # 理想: 最后 swing_low → swing_high (后者 bar > 前者 bar)
+            candidates = [(l, h) for l in l_sw for h in h_sw if h['bar'] > l['bar'] and h['bar'] - l['bar'] < 30]
+            if candidates:
+                l0, h0 = candidates[-1]  # 最近的摆动对
+                impulse_hi = h0['price']
+                impulse_lo = l0['price']
+                if impulse_hi > impulse_lo:
+                    ote_lo = impulse_hi - (impulse_hi - impulse_lo) * 0.79
+                    ote_hi = impulse_hi - (impulse_hi - impulse_lo) * 0.618
+                    ote_zone = (ote_lo, ote_hi)
+    in_ote = False
+    if ote_zone:
+        in_ote = ote_zone[0] <= entry_px <= ote_zone[1]
+
+    # ═══ R80: LV(Liquidity Void) — 极速填充间隙, 近60bar内出现 ═══
+    atr14 = 0.0
+    trs = []
+    for i in range(1, len(kl)):
+        b, pb = kl[i], kl[i-1]
+        trs.append(max(b["h"]-b["l"], abs(b["h"]-pb["c"]), abs(b["l"]-pb["c"])))
+        atr14 = sum(trs[-14:]) / min(14, len(trs))
+    lvs = []
+    for i in range(n - 1, max(0, n - 60), -1):
+        b, pb = kl[i], kl[i-1]
+        gap_up = b["l"] > pb["h"] * 1.01  # 上跳空
+        gap_dn = b["h"] < pb["l"] * 0.99
+        body_m = abs(b["c"] - b["o"])
+        if (gap_up or gap_dn) and body_m > atr14 * 1.5:
+            lvs.append((i, "up" if gap_up else "dn", pb["c"], b["o"], body_m / max(atr14, 1e-9)))
+    in_lv = False
+    if lvs:
+        recent_lv = lvs[0]
+        _, lv_dir, lv_lo, lv_hi, _ = recent_lv
+        in_lv = min(lv_lo, lv_hi) <= entry_px <= max(lv_lo, lv_hi)
+
     out.append({**r,
                 "clean_close": last_close,
                 "in_fvg": in_fvg if in_fvg else "none", "fvg_gap_to_entry": fvg_gap_to_entry,
+                "mss_dir": mss_dir, "mss_bars_ago": mss_bars_ago,
+                "in_ote": in_ote, "ote_zone": [round(ote_zone[0], 2), round(ote_zone[1], 2)] if ote_zone else None,
+                "in_lv": in_lv, "lvs_60b": len(lvs),
                 "sweeps_10b": len(sweeps_10b), "sweep_dir": my_sweep_dir,
                 "in_ob": in_ob, "ob_gap_pct": round(ob_far, 2) if ob_far else (0 if in_ob else None),
                 "bsl": bsl, "ssl": ssl,
@@ -160,6 +213,10 @@ for title, fn in [
     ("sweep 方向(多单应期望 bull sweep = 扫低再回拉)", lambda r: r["sweep_dir"] or "无sweep"),
     ("入场价是否落在最近 OB 区", lambda r: str(r["in_ob"])),
     ("入场价是否落在最近 FVG(近60bar)", lambda r: str(r["in_fvg"])),
+    ("入场前最近一次 MSS 方向(结构确认)", lambda r: f"mss={r['mss_dir'] or '无'}@{r['mss_bars_ago']} bar前"),
+    ("入场在 OTE(61.8-79%蝶形) 内", lambda r: str(r["in_ote"])),
+    ("入场在 LV(流动性真空, 近60bar) 内", lambda r: str(r["in_lv"])),
+    ("LV 数量(市场情绪级)", lambda r: f"lvs={r['lvs_60b']}"),
     ("入场价距最近被攻克的 SSL 距离", lambda r: bucket_dist(r["dist_to_ssl"])),
     ("入场价距最近被攻克的 BSL 距离", lambda r: bucket_dist(r["dist_to_bsl"])),
     ("TP 是否在 BSL 上方(撞向被吞流动性)", lambda r: str(r["tp_above_bsl"])),

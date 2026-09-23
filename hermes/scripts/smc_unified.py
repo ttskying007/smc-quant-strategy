@@ -3823,8 +3823,102 @@ def build_combo():
 def build_nav():
     if _production_empty_book():
         # FIX(2026-08-17): K线入口不再锁死 V517；EMPTY_BOOK 下由用户自由选择研究版本。
-        return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>冻结研究回测</a><a href='/monitor'>生产状态 / 冻结研究</a><a href='/combo'>研究组合</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/funnel'>漏斗</a><a href='/tdx'>数据源</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收研究</a><a href='/docs'>文档</a></nav>"
-    return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>回测</a><a href='/monitor'>选股</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/uzi'>UZI评审</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/shadow'>Shadow</a><a href='/funnel'>漏斗</a><a href='/tdx'>数据源</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/v45?ver=v45_5'>事件实验({FRONTEND_VERSION})</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收</a><a href='/docs'>文档</a></nav>"
+        return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>冻结研究回测</a><a href='/monitor'>生产状态 / 冻结研究</a><a href='/combo'>研究组合</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/audit'>研究审计</a><a href='/shadow'>Shadow</a><a href='/funnel'>漏斗</a><a href='/tdx'>数据源</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收研究</a><a href='/docs'>文档</a></nav>"
+    return f"<nav><span class='brand'>SMC {FRONTEND_VERSION}</span><a href='/'>仪表</a><a href='/kline'>K线</a><a href='/backtest'>回测</a><a href='/monitor'>选股</a><a href='/historical-artifacts'>旧系统历史审计</a><a href='/live'>实时</a><a href='/uzi'>UZI评审</a><a href='/logs'>日志</a><a href='/compare'>对比</a><a href='/analysis'>分析</a><a href='/audit'>研究审计</a><a href='/shadow'>Shadow</a><a href='/funnel'>漏斗</a><a href='/tdx'>数据源</a><a href='/ai'>AI助手</a><a href='/autopsy'>复盘</a><a href='/stoploss'>止损</a><a href='/v45?ver=v45_5'>事件实验({FRONTEND_VERSION})</a><a href='/resonance'>共振</a><a href='/effort-result'>V517量价吸收</a><a href='/docs'>文档</a></nav>"
+
+
+# ═══ R-portal (R75+): 研究审计门户 — handover 报告自动前端化 ═══
+def _audit_md_to_html(md):
+    """Markdown 最小渲染: 标题/表格/列表/横线/换行. 报告编辑人不用说."""
+    import re as _re
+    md = html.escape(md)
+    # 代码块先兜底
+    md = _re.sub(r'```(\w*\n)?(.*?)```', lambda m: f"<pre>{m.group(2)}</pre>", md, flags=_re.S)
+    # 表格: |a|b| 行
+    def _tab(m):
+        body = m.group(1)
+        lines = [l for l in body.strip().split('\n') if l.strip().startswith('|')]
+        if len(lines) < 2:
+            return body
+        # 拆行
+        def cells(l):
+            return [c.strip() for c in l.strip().strip('|').split('|')]
+        head = cells(lines[0])
+        out_rows = []
+        for row in lines[2:]:  # 跳过分隔行
+            cs = cells(row)
+            out_rows.append('<tr>' + ''.join(f'<td>{c}</td>' for c in cs) + '</tr>')
+        return ('<table><thead><tr>' + ''.join(f'<th>{h}</th>' for h in head) +
+                '</tr></thead><tbody>' + ''.join(out_rows) + '</tbody></table>')
+    md = _re.sub(r'((?:^\|[^\n]+\|[ ]*\n)+)', _tab, md, flags=_re.M)
+    # 标题
+    md = _re.sub(r'^### (.*?)$', r'<h3>\1</h3>', md, flags=_re.M)
+    md = _re.sub(r'^## (.*?)$', r'<h2>\1</h2>', md, flags=_re.M)
+    md = _re.sub(r'^# (.*?)$', r'<h1>\1</h1>', md, flags=_re.M)
+    # 列表
+    md = _re.sub(r'^[-*] (.*)$', r'<li>\1</li>', md, flags=_re.M)
+    md = _re.sub(r'(<li>.*?</li>\n?)+', lambda m: f"<ul>{m.group(0)}</ul>", md, flags=_re.S)
+    # 横线
+    md = _re.sub(r'^---\s*$', r'<hr>', md, flags=_re.M)
+    # 加粗
+    md = _re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', md)
+    # 换行
+    md = md.replace('\n', '<br>\n')
+    return md
+
+
+def build_audit_portal(slug=''):
+    """读取 hermes/web_reports/*.json, 渲染审计报告门户"""
+    import json as _json
+    import re as _re
+    wp = Path(r'E:\test\smc_project\hermes\web_reports')
+    idx_p = wp / 'index.json'
+    index_data = {"kpis": [], "reports": []}
+    if idx_p.exists():
+        try:
+            index_data = _json.loads(idx_p.read_text(encoding='utf-8'))
+        except Exception:
+            index_data = {"kpis": [], "reports": []}
+    kpis = index_data.get('kpis') or []
+    reports = index_data.get('reports') or []
+
+    kpi_html = ''.join(
+        f'<div class="stat"><div class="val" style="color:#58a6ff">{html.escape(k["val"])}</div>'
+        f'<div class="lbl">{html.escape(k["title"])}</div>'
+        f'<div class="sub" style="color:#8b949e;font-size:0.78em">{html.escape(k.get("sub",""))}</div></div>'
+        for k in kpis
+    )
+    side = ''.join(
+        f'<div style="padding:6px 8px;border-bottom:1px solid #21262d;">'
+        f'<a href="/audit?r={html.escape(r["slug"])}" style="color:"#58a6ff">{html.escape(r["tag"])}</a>'
+        f'<div style="color:#8b949e;font-size:0.8em">{html.escape(r["title"])}</div></div>'
+        for r in reports
+    ).replace('color:"#58a6ff"', 'color:#58a6ff')  # 防御误引
+
+    body = ''
+    if slug:
+        for r in reports:
+            if r['slug'] == slug:
+                rp = wp / (slug + '.json')
+                md = _json.loads(rp.read_text(encoding='utf-8'))['md'] if rp.exists() else '(缺失)'
+                body = f'<div class="card"><h2>{html.escape(r["title"])}</h2>{_audit_md_to_html(md)}</div>'
+                break
+        if not body:
+            body = '<div class="card">报告不存在: ' + html.escape(slug) + '</div>'
+    else:
+        preview = ''.join(f'<div class="card"><a href="/audit?r={html.escape(r["slug"])}" style="font-size:1.1em;color:#58a6ff">{html.escape(r["title"])}</a><div style="color:#8b949e">{html.escape(r["tag"])}</div></div>' for r in reports)
+        body = f'<div class="card" style="border-left:3px solid #58a6ff"><h2>研究审计门户</h2><p>R60-R77 全部自动化报告在一起。K线链 / 逐腿审计 / 手术预注册 / 熊市追踪 / 全信号家族都在这里。</p></div>{preview}'
+
+    return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"><title>研究审计门户</title><style>{CSS} .stats{{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}} .stat{{flex:1;min-width:180px;background:#161b22;border-radius:8px;padding:10px 14px}} .val{{font-size:1.3em;font-weight:700}} .lbl{{color:#8b949e;font-size:0.85em}} table{{width:100%;border-collapse:collapse;font-size:0.86em}} th,td{{padding:5px 8px;border:1px solid #30363d;text-align:left}} th{{background:#161b22}} pre{{background:#0d1117;padding:8px;border-radius:6px;font-size:0.85em;overflow:auto}}</style></head><body>{build_nav()}<div class="container" style="max-width:1400px">
+<div class="stats">{kpi_html}</div>
+<div style="display:flex;gap:14px;align-items:flex-start">
+  <div style="flex:0 0 260px">{side}</div>
+  <div style="flex:1">{body}</div>
+</div></div></body></html>"""
+
+
+# ──保持原有 build_* 函数在下面开始变 ──
+
 
 
 def _empty_book_page(title, detail):
@@ -6064,6 +6158,8 @@ class Handler(BaseHTTPRequestHandler):
             self._html(build_v144_preview())
         elif path == '/analysis':
             self._html(build_analysis(qs.get('start', [''])[0], qs.get('end', [''])[0]))
+        elif path == '/audit':
+            self._html(build_audit_portal(qs.get('r', [''])[0]))
         elif path == '/shadow':
             self._html(build_shadow())
         elif path == '/ai':

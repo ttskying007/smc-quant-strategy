@@ -43,6 +43,8 @@ W_UP_TREND = 0.7      # 用户 2026-09-23 验收: up 趋势腿降权 (R69 D1: up
 W_SWEEP_BEAR = 0.6    # S8 (用户验收 R76): 入场近10bar有 bear sweep → 降权 (R76: 244腿 avg+1.46 PF2.02)
 W_BSL_TIGHT = 0.7     # S9 (用户验收 R76): 入场贴近被攻克 BSL (<5%) → 降权 (R76: 354腿 avg~+1.0 PF~1.6)
 W_IN_OB = 0.8         # S10 (R77, 用户拍板"要检查就要修"): 入场价 sedari 最近 OB 区 → 降权 (312腿 +2.59 PF2.53 vs 外 4.01)
+W_MSS_BULL_FRESH = 0.7  # S11 (R78): 近2bar内 bull MSS 刚确认反转 → 追高界 → 降权 (57腿 ~PF1.4)
+W_IN_OTE = 0.7        # S12 (R79): 入场价在最近脉冲的 OTE 61.8-79% 内 → 降权 (141腿 +1.72 PF1.87)
 
 V24_RULES = True  # 2026-09-23 用户定: 全部入影子生产打标
 
@@ -120,6 +122,15 @@ for r in rows:
     # S10 (R77): 入价在最近 OB 区内 → 降权
     if enr and str(enr.get("in_ob")) == "True":
         w *= W_IN_OB; flags.append("s10_in_ob")
+    # S11 (R78): 近2bar 内 bull MSS 刚确认 → 追高界 → 降权
+    try:
+        if enr and enr.get("mss_dir") == "bull" and int(enr.get("mss_bars_ago") or 999) <= 2:
+            w *= W_MSS_BULL_FRESH; flags.append(f"s11_mss_bull@{enr['mss_bars_ago']}")
+    except Exception:
+        pass
+    # S12 (R79): 入场价在 OTE 61.8-79% 回测带内(蝶形) → 降权
+    if enr and str(enr.get("in_ote")) == "True":
+        w *= W_IN_OTE; flags.append("s12_in_ote")
     r["v23_weight"] = round(w, 3)
     r["v23_flags"] = "|".join(flags) or "none"
 

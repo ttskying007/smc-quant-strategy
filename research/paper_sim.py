@@ -510,6 +510,26 @@ def _v23_of(order, chain):
                         hi = float((obs[-1].meta or {}).get("ob_high") or obs[-1].price)
                         if lo <= float(order["entry_price"]) <= hi:
                             w *= 0.8; flags.append("s10_in_ob")
+                    # S11 (R78): 近2bar内 bull MSS 刚确认 → 追高界 ×0.7
+                    mss = [s for s in sigs if s.type.startswith("MSS_Bull")]
+                    if mss and (len(bars) - 1 - mss[-1].bar) <= 2:
+                        w *= 0.7; flags.append(f"s11_mss_bull@{len(bars)-1-mss[-1].bar}")
+                    # S12 (R79): 入场价在 OTE 61.8-79% 区 → ×0.7
+                    try:
+                        h_sw, l_sw = _mod.find_swings(bars, min_bars=3)
+                        candidates = [(l, h) for l in l_sw for h in h_sw
+                                      if h["bar"] > l["bar"] and h["bar"] - l["bar"] < 30]
+                        if candidates and order.get("entry_price"):
+                            l0, h0 = candidates[-1]
+                            hi_p, lo_p = h0["price"], l0["price"]
+                            if hi_p > lo_p:
+                                ote_lo = hi_p - (hi_p - lo_p) * 0.79
+                                ote_hi = hi_p - (hi_p - lo_p) * 0.618
+                                ep = float(order["entry_price"])
+                                if ote_lo <= ep <= ote_hi:
+                                    w *= 0.7; flags.append("s12_in_ote")
+                    except Exception:
+                        pass
         except Exception:
             pass
         if n_ev is not None:
