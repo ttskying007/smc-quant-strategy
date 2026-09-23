@@ -3882,6 +3882,39 @@ def build_audit_portal(slug=''):
     kpis = index_data.get('kpis') or []
     reports = index_data.get('reports') or []
 
+    # ═══ R87: 生产影子池卡(近挂单 + v23权重/flags + Jev判定) ═══
+    shadow_card = ''
+    try:
+        _led = _json.loads(Path(r'E:\test\smc_project\research\paper_ledger.json').read_text(encoding='utf-8'))
+        _orders = _led if isinstance(_led, list) else (_led.get('orders') or [])
+        _tv = [o for o in _orders if isinstance(o, dict) and (o.get('v23') or o.get('jev'))]
+        _tv.sort(key=lambda o: str(o.get('signal_date') or ''), reverse=True)
+        _tv = _tv[:40]
+        def _cell_flags(o):
+            v = o.get('v23') or {}
+            if not v:
+                return '<span style="color:#8b949e">未标(v23上线前)</span>'
+            fl = ' · '.join(v.get('flags') or [])
+            return f"<span style='color:#d29922'>w={v.get('weight')}</span> <span style='color:#8b949e;font-size:0.85em'>{html.escape(fl)}</span>"
+        def _cell_jev(o):
+            j = o.get('jev') or {}
+            if not j:
+                return '<span style="color:#8b949e">-</span>'
+            return f"<span style='color:#58a6ff'>{html.escape(str(j.get('event_kind') or '-'))}</span>"
+        _trs = ''.join(
+            f"<tr><td class='mono'>{html.escape(str(o.get('code') or ''))}</td>"
+            f"<td>{html.escape(str(o.get('signal_date') or ''))}</td>"
+            f"<td>{html.escape(str(o.get('status') or ''))}</td>"
+            f"<td>{_cell_jev(o)}</td><td>{_cell_flags(o)}</td></tr>"
+            for o in _tv)
+        shadow_card = (f"<div class='card' style='border-left:3px solid #d29922'><h2>生产影子池(R87 值守) "
+                       f"— 近 {len(_tv)} 张带标签单</h2>"
+                       f"<p style='color:#8b949e'>v23 权重=13手术合成(S1-S14); Jev=事件判型; 只记录不决策; 复盘日: 2026-10-23</p>"
+                       f"<table><thead><tr><th>代码</th><th>信号日</th><th>状态</th><th>Jev判型</th><th>v23影子标签</th></tr></thead>"
+                       f"<tbody>{_trs}</tbody></table></div>")
+    except Exception as _e:
+        shadow_card = f"<div class='card' style='color:#f85149'>影子池读取失败: {html.escape(str(_e))}</div>"
+
     kpi_html = ''.join(
         f'<div class="stat"><div class="val" style="color:#58a6ff">{html.escape(k["val"])}</div>'
         f'<div class="lbl">{html.escape(k["title"])}</div>'
@@ -3907,7 +3940,7 @@ def build_audit_portal(slug=''):
             body = '<div class="card">报告不存在: ' + html.escape(slug) + '</div>'
     else:
         preview = ''.join(f'<div class="card"><a href="/audit?r={html.escape(r["slug"])}" style="font-size:1.1em;color:#58a6ff">{html.escape(r["title"])}</a><div style="color:#8b949e">{html.escape(r["tag"])}</div></div>' for r in reports)
-        body = f'<div class="card" style="border-left:3px solid #58a6ff"><h2>研究审计门户</h2><p>R60-R77 全部自动化报告在一起。K线链 / 逐腿审计 / 手术预注册 / 熊市追踪 / 全信号家族都在这里。</p></div>{preview}'
+        body = f'{shadow_card}<div class="card" style="border-left:3px solid #58a6ff"><h2>研究审计门户</h2><p>R60-R86 全部自动化报告在一起。K线链 / 逐腿审计 / 手术预注册 / 熊市追踪 / 全信号家族都在这里。</p></div>{preview}'
 
     return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"><title>研究审计门户</title><style>{CSS} .stats{{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}} .stat{{flex:1;min-width:180px;background:#161b22;border-radius:8px;padding:10px 14px}} .val{{font-size:1.3em;font-weight:700}} .lbl{{color:#8b949e;font-size:0.85em}} table{{width:100%;border-collapse:collapse;font-size:0.86em}} th,td{{padding:5px 8px;border:1px solid #30363d;text-align:left}} th{{background:#161b22}} pre{{background:#0d1117;padding:8px;border-radius:6px;font-size:0.85em;overflow:auto}}</style></head><body>{build_nav()}<div class="container" style="max-width:1400px">
 <div class="stats">{kpi_html}</div>

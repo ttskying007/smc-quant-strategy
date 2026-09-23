@@ -12,6 +12,7 @@ OUT = os.path.normpath(os.path.join(ROOT, "..", "hermes", "web_reports"))
 
 # 报告顺序(先审计后动刀): R60 → R68 → R74 → R69 → R70 → R72 → R76(+R77并入)
 REPORTS = [
+    ("R85_regime_depth", "R85/86 熊市持续时间分层+市场宽度+生产影子池审计(S15: 熊加速段PF41)", "最新深研"),
     ("R84_regime_switch", "R84 市道开关(牛/熊/振荡 detect→子集): 证伪记录, 振荡为主战场", "饱和证伪"),
     ("R83_three_fronts", "R83 三面同时: 低权重腿稳定性/大盘熔断/2023深研 + S14 反事实", "三面验收"),
     ("R82_v24_full_backtest", "R82 v24 影子(13手术) 全回测: 总览/逐年×权重桶/逐年逐月/季度/裁判表", "最新全套"),
