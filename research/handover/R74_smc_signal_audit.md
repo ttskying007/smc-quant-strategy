@@ -1,0 +1,49 @@
+# R74 — 按 SMC 信号族审计(1858 腿)
+
+## A. last_event_kind(引擎事件锚)
+| 锚 | n | avg% | WR% | PF | Jev p_valid均 |
+|---|---|---|---|---|---|
+| BOS↓ | 965 | 5.11 | 70.7 | 5.45 | 0.315 |
+| CHoCH↑ | 376 | 1.91 | 58.0 | 1.95 | 0.498 |
+| BOS↑ | 289 | 5.13 | 58.1 | 2.89 | 0.437 |
+| CHoCH↓ | 228 | 1.86 | 53.5 | 1.77 | 0.32 |
+
+## B. 腿内 chain events_tail BOS/CHoCH 个数 × 盈亏
+
+> **族覆盖限制**: v22 冻结腿的 events_tail 只有结构事件 (BOS/CHoCH, 来自 core/chain);
+> OB/FVG/IFVG 当时只在 anchor_note 文本里, 不是结构化字段。R60 引擎链改造后 signal_family 入 CSV, 下次 v23 冻结时可覆盖全族。
+
+| 个数 | n | avg% | WR% | PF |
+|---|---|---|---|---|
+| 1 种 | 572 | 4.35 | 64.9 | 3.68 |
+| 2 种 | 1286 | 3.95 | 63.7 | 3.23 |
+
+## C. 突破型 × Jev 趋势判定 合规度
+| 组合 | n | avg% | WR% | 
+|---|---|---|---|
+| BOS↓ × jev=strong_down | 949 | 5.08 | 70.5 |
+| CHoCH↑ × jev=mild_up | 355 | 1.78 | 57.2 |
+| BOS↑ × jev=strong_up | 272 | 5.2 | 57.0 |
+| CHoCH↓ × jev=mild_down | 163 | 0.71 | 49.7 |
+| CHoCH↓ × jev=strong_down | 65 | 4.76 | 63.1 |
+| CHoCH↑ × jev=strong_up | 21 | 4.12 | 71.4 |
+| BOS↑ × jev=mild_up | 17 | 4.13 | 76.5 |
+| BOS↓ × jev=mild_down | 16 | 6.97 | 81.2 |
+
+## D. 入场位置质量(buy vs retrace/breakout 价差)
+| 价差桶 | n | avg% | WR% |
+|---|---|---|---|
+| 3%+脱节 | 945 | 4.86 | 69.7 |
+| 偏下1-3% | 279 | 2.61 | 62.7 |
+| 贴买(差<1%) | 148 | 1.95 | 57.4 |
+| 偏上1-3% | 76 | 1.9 | 61.8 |
+
+## E. Jev TP/SL 判型 × 出场原因交叉(v2 版, 无前视)
+| 组合 | n | avg% | WR% |
+|---|---|---|---|
+| tpsl=tp_sys_ok × exit=TIME_STOP | 790 | 6.31 | 79.4 |
+| tpsl=tp_sys_ok × exit=- | 334 | 5.37 | 57.8 |
+| tpsl=tp_sys_ok × exit=TP2_RUNNER | 236 | 8.9 | 98.7 |
+| tpsl=tp_sys_ok × exit=SL_HIT | 225 | -5.09 | 0.0 |
+| tpsl=tp_sys_ok × exit=SL_GAP | 131 | -2.51 | 15.3 |
+| tpsl=tp_sys_ok × exit=BE | 123 | 0.92 | 84.6 |
