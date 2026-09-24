@@ -11,10 +11,21 @@ shutil.copy(ROOT + '/research/paper_ledger.json', ROOT + '/research/paper_ledger
 
 import paper_sim
 done, skip, failed = 0, 0, 0
+done1, skip1 = 0, 0
 for o in lg:
     if not isinstance(o, dict) or not o.get('code') or not o.get('signal_date'):
         skip += 1
         continue
+    if not o.get('v23'):  # R99: 补 v1 影子 (原 R96 只补了 v2)
+        try:
+            r1 = paper_sim._v23_of(o, {})
+            if r1:
+                o['v23'] = r1
+                done1 += 1
+            else:
+                skip1 += 1
+        except Exception:
+            skip1 += 1
     if o.get('v23_v2'):
         skip += 1
         continue
@@ -28,6 +39,7 @@ for o in lg:
     except Exception:
         failed += 1
 json.dump(lg, open(ROOT + '/research/paper_ledger.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+print(f'回填 v1(v23): {done1} / 跳过(已有) {skip1}')
 print(f'回填 v23_v2: {done} / 跳过 {skip} / 失败 {failed} / 合计 {len(lg)}')
 
 # 汇总带 v23 vs v23_v2 的两路
