@@ -1789,6 +1789,14 @@ def _load_v22_legs(symbol):
                         shadow[r['symbol'] + '|' + r['entry_date']] = r
             except Exception:
                 shadow = {}
+            # 再读 R76/77 引擎增强(sweep/BSL/SSL/FVG/OTE/MSS 流动性判定)
+            enrich = {}
+            try:
+                with open(r'E:\test\smc_project\research\combo_v22_smc_full.csv', encoding='utf-8-sig') as fh:
+                    for r in _csv.DictReader(fh):
+                        enrich[r['symbol'] + '|' + r['entry_date']] = r
+            except Exception:
+                enrich = {}
             with open(r'E:\test\smc_project\research\combo_v22_trades.csv', encoding='utf-8-sig') as fh:
                 for r in _csv.DictReader(fh):
                     leg = dict(r)
@@ -1796,6 +1804,11 @@ def _load_v22_legs(symbol):
                     sh = shadow.get(key) or {}
                     leg['v23_weight'] = sh.get('v23_weight', '1.0')
                     leg['v23_flags'] = sh.get('v23_flags', 'none')
+                    en = enrich.get(key) or {}
+                    for ek in ('sweeps_10b', 'sweep_dir', 'dist_to_ssl', 'dist_to_bsl',
+                               'tp_above_bsl', 'sl_below_ssl', 'in_ob', 'in_fvg', 'in_ote',
+                               'in_lv', 'mss_dir', 'mss_bars_ago', 'bsl', 'ssl'):
+                        leg['enrich_' + ek] = en.get(ek, '')
                     try:
                         leg['chain'] = json.loads(r.get('chain_json') or '{}')
                     except Exception:
@@ -2423,20 +2436,60 @@ function renderLegsTable(legs){
     var el=document.getElementById('legs-chain');
     if(!el)return;
     if(!legs||!legs.length){el.innerHTML='<p style=color:#8b949e>该股票无 v22 引擎腿</p>';return}
-    el.innerHTML='<table><thead><tr><th>#</th><th>类型</th><th>入场日</th><th>卖出日</th><th>买</th><th>卖</th><th>TP</th><th>SL</th><th>PnL</th><th>退出</th><th>趋势</th><th>引擎信号序列</th><th>突破→回踩</th><th>影子w</th><th>flags</th></tr></thead><tbody>'
+    function tpNote(leg){
+        if(!(leg.tp>0))return '';
+        var en=leg.enrich||{};
+        var bsl=Number(en.bsl||0);
+        var above=(en.tp_above_bsl==='True');
+        var d=parseFloat(en.dist_to_bsl);
+        return (above?'<span style=color:#f85149>TP在被攻克的BSL上方(超额)</span>':'<span style=color:#3fb950>TP在BSL/买入下方安全区</span>')
+            +(bsl>0?('<br/>参照BSL='+bsl.toFixed(2)+(isNaN(d)?'':' (距'+(d>=0?'+':'')+d.toFixed(1)+'%)')):'');
+    }
+    function slNote(leg){
+        if(!(leg.sl>0))return '';
+        var en=leg.enrich||{};
+        var ssl=Number(en.ssl||0);
+        var below=(en.sl_below_ssl==='True');
+        return (below?'<span style=color:#3fb950>SL在SSL下方(防扫)</span>':'<span style=color:#f85149>SL未落到SSL下方</span>')
+            +(ssl>0?('<br/>参照SSL='+ssl.toFixed(2)):'');
+    }
+    function sweepNote(leg){
+        var en=leg.enrich||{};
+        var s=en.sweeps_10b, sd=en.sweep_dir;
+        if(s===undefined||s===''||s===null)return '';
+        if(String(s)==='0')return '<span style=color:#8b949e>近10bar:无sweep</span>';
+        return '<span style=color:#9e6ae8>近10bar来sweep x'+s+'('+(sd||'?')+')</span>';
+    }
+    el.innerHTML='<table style="font-size:10px"><thead><tr>'
+        +'<th>#</th><th>类型</th><th>当时趋势</th>'
+        +'<th>突破(什么时候/什么信号)</th>'
+        +'<th>回踩(状态/回踩到什么水平)</th>'
+        +'<th>入场(哪天/什么价)</th>'
+        +'<th>出场(哪天/什么理由)</th>'
+        +'<th>TP 设计(在什么水平/为什么这么设)</th>'
+        +'<th>SL 设计(在什么水平/为什么这么设)</th>'
+        +'<th>PnL</th><th>持有bar</th><th>v24影子权重+flags</th>'
+        +'<th>引擎信号序列(按时间)</th></tr></thead><tbody>'
         +legs.map(function(leg,i){
             var pnl=Number(leg.pnl||0), cls=pnl>0?'green':'red';
-            var seq=(leg.events_tail||[]).map(function(e){return e.kind+'('+e.date+')'}).join(' → ');
-            var br=leg.breakout?('突破 '+leg.breakout.kind+'@'+leg.breakout.date+' '+Number(leg.breakout.price||0).toFixed(2)):'-';
-            var rt=leg.retrace?('回踩 '+(leg.retrace.state||'-')+'@'+Number(leg.retrace.price||0).toFixed(2)):'-';
+            var brk='<b style=color:#58a6ff>'+(leg.breakout_kind||'-')+'</b><br/><span style=color:#8b949e>触发日</span> '+(leg.breakout_date||'-')+'<br/><span style=color:#8b949e>突破价</span> '+(leg.breakout_price||'-');
+            var rt='<b style=color:'+(leg.retrace_state==='retrace_ok'?'#3fb950':'#d29922')+'>'+(leg.retrace_state||'-')+'</b><br/><span style=color:#8b949e>'+(leg.retrace_signal||'')+'</span>'+'<br/>回踩到 '+(leg.retrace_price||'-');
+            var seq=(leg.enrich&&leg.enrich.mss_dir?('MSS:'+leg.enrich.mss_dir+'('+leg.enrich.mss_bars_ago+'bar前)<br/>'):'')
+                +(leg.events_tail||[]).map(function(e){return (e.kind||'?')+' <span style=color:#8b949e>@'+(e.date||'?')+'</span>';}).join('<br/>');
             var w=Number(leg.v23_weight||1);
             var wc=w<0.7?'#f85149':(w>=1?'#3fb950':'#d29922');
-            return '<tr><td class=mono>'+(i+1)+'</td><td>'+leg.src+'</td><td class=mono>'+leg.entry_date+'</td><td class=mono>'+(leg.sell_date||'')+'</td>'
-                +'<td class=mono>'+Number(leg.buy_price).toFixed(2)+'</td><td class=mono>'+Number(leg.sell_price).toFixed(2)+'</td>'
-                +'<td class=mono style=color:#3fb950>'+Number(leg.tp).toFixed(2)+'</td><td class=mono style=color:#f85149>'+Number(leg.sl).toFixed(2)+'</td>'
-                +'<td class='+cls+'><b>'+(pnl>=0?'+':'')+pnl.toFixed(2)+'%</b></td><td>'+(leg.reason||'-')+'</td><td>'+(leg.trend_state||'-')+'</td>'
-                +'<td style=font-size:10px>'+seq+'</td><td style=font-size:10px>'+br+'<br/>'+rt+'</td>'
-                +'<td style="color:'+wc+';font-weight:bold">'+w.toFixed(2)+'</td><td style=font-size:9px>'+(leg.v23_flags||'none')+'</td></tr>';
+            return '<tr><td class=mono>'+(i+1)+'</td><td>'+leg.src+'</td>'
+                +'<td style="color:'+((leg.trend_state==='up')?'#3fb950':'#ff6b6b')+';font-weight:bold">'+(leg.trend_state||'-')+'</td>'
+                +'<td class=mono>'+brk+'</td>'
+                +'<td class=mono>'+rt+'</td>'
+                +'<td class=mono><b>'+leg.buy_date+'</b><br/>@ '+Number(leg.buy_price).toFixed(2)+'</td>'
+                +'<td class=mono><b>'+(leg.sell_date||'')+'</b><br/>@ '+Number(leg.sell_price).toFixed(2)+'<br/><span style=color:#8b949e>('+(leg.reason||'-')+')</span></td>'
+                +'<td class=mono style=color:#3fb950><b>'+Number(leg.tp).toFixed(2)+'</b><br/><span style="font-size:9px;color:#8b949e">'+tpNote(leg)+'</span></td>'
+                +'<td class=mono style=color:#f85149><b>'+Number(leg.sl).toFixed(2)+'</b><br/><span style="font-size:9px;color:#8b949e">'+slNote(leg)+'</span></td>'
+                +'<td class='+cls+'><b>'+(pnl>=0?'+':'')+pnl.toFixed(2)+'%</b></td>'
+                +'<td class=mono>'+(leg.hold_bars||0)+'</td>'
+                +'<td style="color:'+wc+';font-weight:bold">'+w.toFixed(2)+'<br/><span style="font-size:9px;color:#8b949e">'+(leg.v23_flags||'none')+'</span></td>'
+                +'<td style="font-size:9px">'+sweepNote(leg)+'<br/>'+(seq||'-')+'</td></tr>';
         }).join('')+'</tbody></table>';
 }
 function renderKline(d){
@@ -8443,9 +8496,16 @@ class Handler(BaseHTTPRequestHandler):
                         'hold_bars': int(float(_lg.get('hold_bars') or 0)),
                         'reason': _lg.get('reason'),
                         'rank': _lg.get('rank'), 'risk_pct': _lg.get('risk_pct'),
+                        # 突破/回踩 (v22 平铺字段, 无需解开 chain_json)
+                        'breakout_date': _lg.get('breakout_date'), 'breakout_price': _lg.get('breakout_price'),
+                        'breakout_kind': _lg.get('breakout_kind'),
+                        'retrace_price': _lg.get('retrace_price'), 'retrace_state': _lg.get('retrace_state'),
+                        'retrace_signal': _lg.get('retrace_signal'),
+                        # 引擎增强 (BSL/SSL/sweep/FVG/OTE/MSS 判定)
+                        'enrich': {k[7:]: _lg.get(k) for k in _lg if k.startswith('enrich_')},
                         'v23_weight': float(_lg.get('v23_weight') or 1),
                         'v23_flags': _lg.get('v23_flags'),
-                        'trend_state': ch.get('trend_state'),
+                        'trend_state': ch.get('trend_state') or _lg.get('trend_state'),
                         'events_tail': (ch.get('events_tail') or [])[-6:],
                         'bsl_levels': (ch.get('bsl_levels') or [])[-3:],
                         'ssl_levels': (ch.get('ssl_levels') or [])[-3:],
