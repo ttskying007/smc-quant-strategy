@@ -1771,6 +1771,51 @@ def get_default_trades():
 _KLINE_FULL_CACHE = {}
 _V20C_TRADES_CACHE = None
 
+_V22_LEGS_CACHE = None
+
+def _load_v22_legs(symbol):
+    """加载 v22 引擎腿(combo_v22_trades.csv) + v24 影子标签(combo_v23_shadow.csv), 归一化成
+    K线叠加渲染所需字段. 返回该 symbol 的全部腿."""
+    global _V22_LEGS_CACHE
+    if _V22_LEGS_CACHE is None:
+        import csv as _csv
+        legs = []
+        try:
+            # 先读影子(CSV 带 s_xx flags)
+            shadow = {}
+            try:
+                with open(r'E:\test\smc_project\research\combo_v23_shadow.csv', encoding='utf-8-sig') as fh:
+                    for r in _csv.DictReader(fh):
+                        shadow[r['symbol'] + '|' + r['entry_date']] = r
+            except Exception:
+                shadow = {}
+            with open(r'E:\test\smc_project\research\combo_v22_trades.csv', encoding='utf-8-sig') as fh:
+                for r in _csv.DictReader(fh):
+                    leg = dict(r)
+                    key = r['symbol'] + '|' + r['entry_date']
+                    sh = shadow.get(key) or {}
+                    leg['v23_weight'] = sh.get('v23_weight', '1.0')
+                    leg['v23_flags'] = sh.get('v23_flags', 'none')
+                    try:
+                        leg['chain'] = json.loads(r.get('chain_json') or '{}')
+                    except Exception:
+                        leg['chain'] = {}
+                    legs.append(leg)
+        except Exception:
+            legs = []
+        _V22_LEGS_CACHE = legs
+    _s = str(symbol).replace('_SH', '.SH').replace('_SZ', '.SZ')
+    out = []
+    for l in _V22_LEGS_CACHE:
+        ls = str(l.get('symbol', ''))
+        # 归一化 symbol 匹配
+        if '.' not in ls:
+            ls = ls + ('.SH' if ls.startswith(('6', '9')) else ('.BJ' if ls.startswith(('4', '8')) else '.SZ'))
+        if ls == _s:
+            out.append(l)
+    return out
+
+
 def _load_v20c_trades_for(symbol, klines, chart_date_idx):
     """Load v20c backtest trades for symbol, enriched with prices/sub-signals (all versions)."""
     global _V20C_TRADES_CACHE
@@ -1981,7 +2026,7 @@ JS_ECHARTS = '<script src="/echarts.js"></script>'
 # KLINE FULL JS — Rectangle zones + Line breaks + Buy/Sell markers + Swings
 # ════════════════════════════════════════════
 KLINE_FULL_JS = r"""
-var chart, allSeries, allSwings, allTrades, ohlcvData, dates;
+var chart, allSeries, allSwings, allTrades, allLegs, ohlcvData, dates;
 var currentVersion = 'V88';
 var currentSeq = [];
 var tablePages = {signals:1, swings:1, trades:1};
@@ -2026,7 +2071,8 @@ function loadKline(){
         allSeries=d.signals_list||[];
         allSwings=d.wave_swings||d.swings||[];
         allTrades=d.trades||[];
-        tablePages={signals:1,swings:1,trades:1};
+        allLegs=d.smc_legs||[];
+        tablePages={signals:1,swings:1,trades:1,legs:1};
         window._highlight=d.highlight||[];
         ohlcvData=d.klines.map(function(k){return[k.o,k.c,k.l,k.h]});
         dates=d.klines.map(function(k){return k.date});
@@ -2106,6 +2152,7 @@ function loadKline(){
         } catch(chainErr){ console.warn('smc_chain overlay:', chainErr); } }
         renderSignalsTable(d.signals_list);
         renderTradesTable(d.trades);
+        renderLegsTable(d.smc_legs||[]);
         renderSwingsTable(d.swings);
         updateVersionBadge(ver,d);
         if(d.version==='V517_EFFORT_RESULT'){
@@ -2295,6 +2342,103 @@ function buildTradeMarkers(af){
     });
     return {entries:entries,exits:exits,sllines:sllines,tplines:tplines};
 }
+function buildLegMarkers(af){
+    // R88: v22/v24 引擎腿全链 — 入场/出场大标 + TP/SL 线 + 结构事件序列 + BSL/SSL/FVG
+    var points=[], lines=[], areas=[];
+    if(af['legs']===false)return {points:points,lines:lines,areas:areas};
+    if(!allLegs||!allLegs.length)return {points:points,lines:lines,areas:areas};
+    var d2i={}; dates.forEach(function(d,i){var s=String(d).slice(0,10).replace(/-/g,'');d2i[s]=i;});
+    allLegs.forEach(function(leg,li){
+        var ed=String(leg.entry_date||'').replace(/-/g,'');
+        var ei=d2i[ed]; if(ei===undefined)return;
+        var sd=String(leg.sell_date||'').replace(/-/g,'');
+        var si=d2i[sd];
+        var pnl=Number(leg.pnl||0), won=pnl>0;
+        var tag='v22腿#'+(li+1)+(leg.src==='CONT'?'(续)':'(事)');
+        var tt='<b>'+tag+'</b><br/>'+ed+' → '+sd+'<br/>买: '+Number(leg.buy_price).toFixed(2)+' / 卖: '+Number(leg.sell_price).toFixed(2)
+            +'<br/>PnL: <b style="color:'+(won?'#3fb950':'#f85149')+'">'+(pnl>=0?'+':'')+pnl.toFixed(2)+'%</b> | exit: '+(leg.reason||'-')
+            +'<br/>v23影子权重: <b style="color:#d29922">'+Number(leg.v23_weight||1).toFixed(2)+'</b> ['+(leg.v23_flags||'none')+']'
+            +'<br/>rank: '+leg.rank+' | risk: '+Number(leg.risk_pct||0).toFixed(2)+'% | 趋势: '+(leg.trend_state||'-');
+        // 入场大标(青色五边形)
+        points.push({name:tag,coord:[dates[ei],Number(leg.buy_price)],value:tag,_tt:tt,
+            symbol:'diamond',symbolSize:22,itemStyle:{color:'#00d4aa'},
+            label:{show:true,formatter:'▶腿'+(li+1),fontSize:9,color:'#00d4aa',fontWeight:'bold',position:'top'}});
+        // 出场大标
+        if(si!==undefined&&si<dates.length){
+            points.push({name:tag+'出场',coord:[dates[si],Number(leg.sell_price)],value:(pnl>=0?'+':'')+pnl.toFixed(1)+'%',_tt:tt,
+                symbol:'triangle',symbolSize:14,itemStyle:{color:won?'#3fb950':'#f85149'},
+                label:{show:true,formatter:(pnl>=0?'+':'')+pnl.toFixed(1)+'%',fontSize:9,color:won?'#3fb950':'#f85149',position:'bottom'}});
+            // TP/SL 虚线: 从入场画到出场
+            if(leg.tp>0)lines.push([{xAxis:dates[ei],yAxis:Number(leg.tp)},{xAxis:dates[si],yAxis:Number(leg.tp),
+                lineStyle:{color:'#3fb950',type:'dashed',width:1.4,opacity:0.85},
+                label:{show:true,formatter:'腿'+(li+1)+' TP '+Number(leg.tp).toFixed(2),color:'#3fb950',fontSize:8,position:'insideEndTop'}}]);
+            if(leg.sl>0)lines.push([{xAxis:dates[ei],yAxis:Number(leg.sl)},{xAxis:dates[si],yAxis:Number(leg.sl),
+                lineStyle:{color:'#f85149',type:'dashed',width:1.4,opacity:0.85},
+                label:{show:true,formatter:'腿'+(li+1)+' SL '+Number(leg.sl).toFixed(2),color:'#f85149',fontSize:8,position:'insideStartBottom'}}]);
+        } else if(leg.tp>0&&leg.sl>0){
+            var endIdx=Math.min(ei+(leg.hold_bars||10),dates.length-1);
+            lines.push([{xAxis:dates[ei],yAxis:Number(leg.tp)},{xAxis:dates[endIdx],yAxis:Number(leg.tp),
+                lineStyle:{color:'#3fb950',type:'dashed',width:1.4,opacity:0.85},
+                label:{show:true,formatter:'TP '+Number(leg.tp).toFixed(2),color:'#3fb950',fontSize:8,position:'insideEndTop'}}]);
+            lines.push([{xAxis:dates[ei],yAxis:Number(leg.sl)},{xAxis:dates[endIdx],yAxis:Number(leg.sl),
+                lineStyle:{color:'#f85149',type:'dashed',width:1.4,opacity:0.85},
+                label:{show:true,formatter:'SL '+Number(leg.sl).toFixed(2),color:'#f85149',fontSize:8,position:'insideStartBottom'}}]);
+        }
+        // 结构事件序列(按发生时间): BOS/CHoCH 带日期的圆点
+        (leg.events_tail||[]).forEach(function(ev){
+            var d8=String(ev.date||'').replace(/-/g,''); var j=d2i[d8]; if(j===undefined)return;
+            var up=String(ev.kind||'').indexOf('↑')>=0;
+            points.push({name:'腿'+(li+1)+' '+(ev.kind||'event'),coord:[dates[j],Number(ev.level||0)],_tt:
+                '<b>'+(ev.kind||'')+'</b> @ '+d8+'<br/>水平: '+Number(ev.level||0).toFixed(2)+'<br/>属于腿#'+(li+1),
+                symbol:'circle',symbolSize:9,itemStyle:{color:up?'#58a6ff':'#ff9e4f'},
+                label:{show:true,formatter:(ev.kind||'').substring(0,7),fontSize:8,color:up?'#58a6ff':'#ff9e4f',position:'top'}});
+        });
+        // BSL/SSL 最近三级水平线(带扫未扫标记)
+        (leg.bsl_levels||[]).forEach(function(lv){
+            var d8=String(lv.t||'').replace(/-/g,''); var j=d2i[d8]; if(j===undefined)return;
+            var width=Math.min(dates.length-1,j+15);
+            lines.push([{xAxis:dates[j],yAxis:Number(lv.price)},{xAxis:dates[width],yAxis:Number(lv.price),
+                lineStyle:{color:lv.swept?'#9e6ae8':'#58a6ff',type:'dotted',width:1,opacity:0.55},
+                label:{show:true,formatter:'BSL '+(lv.swept?'扫':'')+' '+Number(lv.price).toFixed(2),color:lv.swept?'#9e6ae8':'#58a6ff',fontSize:7,position:'insideEndTop'}}]);
+        });
+        (leg.ssl_levels||[]).forEach(function(lv){
+            var d8=String(lv.t||'').replace(/-/g,''); var j=d2i[d8]; if(j===undefined)return;
+            var width=Math.min(dates.length-1,j+15);
+            lines.push([{xAxis:dates[j],yAxis:Number(lv.price)},{xAxis:dates[width],yAxis:Number(lv.price),
+                lineStyle:{color:lv.swept?'#9e6ae8':'#2ea043',type:'dotted',width:1,opacity:0.55},
+                label:{show:true,formatter:'SSL '+(lv.swept?'扫':'')+' '+Number(lv.price).toFixed(2),color:lv.swept?'#9e6ae8':'#2ea043',fontSize:7,position:'insideStartBottom'}}]);
+        });
+        // FVG 小块
+        function addFvg(f,clr){
+            var d8=String(f.t||'').replace(/-/g,''); var j=d2i[d8]; if(j===undefined)return;
+            var width=Math.min(dates.length-1,j+12);
+            areas.push([{xAxis:dates[j],yAxis:Number(f.low),itemStyle:{color:clr,opacity:0.14}},{xAxis:dates[width],yAxis:Number(f.high)}]);
+        }
+        (leg.fvg_bull||[]).forEach(function(f){addFvg(f,'#00d4aa')});
+        (leg.fvg_bear||[]).forEach(function(f){addFvg(f,'#ff6b6b')});
+    });
+    return {points:points,lines:lines,areas:areas};
+}
+function renderLegsTable(legs){
+    var el=document.getElementById('legs-chain');
+    if(!el)return;
+    if(!legs||!legs.length){el.innerHTML='<p style=color:#8b949e>该股票无 v22 引擎腿</p>';return}
+    el.innerHTML='<table><thead><tr><th>#</th><th>类型</th><th>入场日</th><th>卖出日</th><th>买</th><th>卖</th><th>TP</th><th>SL</th><th>PnL</th><th>退出</th><th>趋势</th><th>引擎信号序列</th><th>突破→回踩</th><th>影子w</th><th>flags</th></tr></thead><tbody>'
+        +legs.map(function(leg,i){
+            var pnl=Number(leg.pnl||0), cls=pnl>0?'green':'red';
+            var seq=(leg.events_tail||[]).map(function(e){return e.kind+'('+e.date+')'}).join(' → ');
+            var br=leg.breakout?('突破 '+leg.breakout.kind+'@'+leg.breakout.date+' '+Number(leg.breakout.price||0).toFixed(2)):'-';
+            var rt=leg.retrace?('回踩 '+(leg.retrace.state||'-')+'@'+Number(leg.retrace.price||0).toFixed(2)):'-';
+            var w=Number(leg.v23_weight||1);
+            var wc=w<0.7?'#f85149':(w>=1?'#3fb950':'#d29922');
+            return '<tr><td class=mono>'+(i+1)+'</td><td>'+leg.src+'</td><td class=mono>'+leg.entry_date+'</td><td class=mono>'+(leg.sell_date||'')+'</td>'
+                +'<td class=mono>'+Number(leg.buy_price).toFixed(2)+'</td><td class=mono>'+Number(leg.sell_price).toFixed(2)+'</td>'
+                +'<td class=mono style=color:#3fb950>'+Number(leg.tp).toFixed(2)+'</td><td class=mono style=color:#f85149>'+Number(leg.sl).toFixed(2)+'</td>'
+                +'<td class='+cls+'><b>'+(pnl>=0?'+':'')+pnl.toFixed(2)+'%</b></td><td>'+(leg.reason||'-')+'</td><td>'+(leg.trend_state||'-')+'</td>'
+                +'<td style=font-size:10px>'+seq+'</td><td style=font-size:10px>'+br+'<br/>'+rt+'</td>'
+                +'<td style="color:'+wc+';font-weight:bold">'+w.toFixed(2)+'</td><td style=font-size:9px>'+(leg.v23_flags||'none')+'</td></tr>';
+        }).join('')+'</tbody></table>';
+}
 function renderKline(d){
     if(!chart){chart=echarts.init(document.getElementById('chart'),'dark');window.addEventListener('resize',function(){chart.resize()});}
     var af={};
@@ -2305,15 +2449,18 @@ function renderKline(d){
     af['sl']=document.getElementById('showSL')?document.getElementById('showSL').checked:true;
     af['tp']=document.getElementById('showTP')?document.getElementById('showTP').checked:true;
     af['swings']=document.getElementById('showSwings')?document.getElementById('showSwings').checked:true;
+    af['legs']=document.getElementById('showLegs')?document.getElementById('showLegs').checked:true;
 
     var fa=buildMarkAreas(af);
     var fl=buildMarkLines(af);
     var fp=buildSignalPoints(af);
     var swl=buildSwingLines(af);
     var tm=buildTradeMarkers(af);
+    var lm=buildLegMarkers(af);
 
-    var allPoints=fp.concat(tm.entries).concat(tm.exits);
-    var allLines=fl.concat(tm.sllines).concat(tm.tplines);
+    var allPoints=fp.concat(tm.entries).concat(tm.exits).concat(lm.points);
+    var allLines=fl.concat(tm.sllines).concat(tm.tplines).concat(lm.lines);
+    fa=fa.concat(lm.areas);
     if(af['swings'])allLines=allLines.concat(swl);
 
     chart.clear();
@@ -2486,6 +2633,7 @@ def build_kline(symbol='600519.SH', version=None):
 <label class="tog" style="border-left:3px solid #ff6b6b"><input type="checkbox" id="showSwings" checked onchange="toggleSwings()"> 🔷 Swings</label>
 <label class="tog" style="border-left:3px solid #d29922"><input type="checkbox" id="showSL" checked onchange="toggleSL()"> 🛑 SL</label>
 <label class="tog" style="border-left:3px solid #3fb950"><input type="checkbox" id="showTP" checked onchange="toggleTP()"> 🎯 TP</label>
+<label class="tog" style="border-left:3px solid #00d4aa"><input type="checkbox" id="showLegs" checked onchange="renderKline()"> 🧩 引擎腿链</label>
 <button style="padding:2px 8px;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:3px;cursor:pointer;font-size:10px" onclick="toggleAllSignals(true)">全开</button>
 <button style="padding:2px 8px;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:3px;cursor:pointer;font-size:10px" onclick="toggleAllSignals(false)">全关</button>
 </div>
@@ -2496,6 +2644,7 @@ def build_kline(symbol='600519.SH', version=None):
 <div class="card"><h2>📋 信号列表</h2><div id="signal-tbl"></div></div>
 </div>
 <div class="card"><h2>📊 交易记录</h2><div id="trade-tbl"></div></div>
+<div class="card" style="border-left:3px solid #00d4aa"><h2>🧩 v22/v24 引擎腿全链(买入/卖出/TP/SL + 信号序列 + 影子权重)</h2><div id="legs-chain"></div></div>
 <div class="card" style="border-left:3px solid #58a6ff"><h2>{kline_contract_title}</h2><div id="kline-contract">{kline_contract_placeholder}</div></div>
 </div>""" + JS_ECHARTS + "<script>var SIG_STYLE_MAP=" + json.dumps(SIG_STYLE) + ";" + KLINE_FULL_JS + "\nasync function loadKlineContract(){try{var sym=document.getElementById('sym').value||'" + symbol + "';var ver=document.getElementById('ver').value||'" + ACTIVE_VERSION + "';if(String(ver).toUpperCase()==='V517'){document.getElementById('kline-contract').innerHTML='<p style=\"color:#58a6ff\">版本=V517_EFFORT_RESULT | 冻结 replay 因果节点和交易已在上方绘制；REPLAY_ONLY / Shadow NO_BUY，不适用旧版 DNA、组合合同或 MTF 字段。</p>';return;}var r=await fetch('/api/kline_full?symbol='+encodeURIComponent(sym)+'&tf=daily&ver='+encodeURIComponent(ver));var d=await r.json();var rows=(d.trades||[]).slice(0,8);var html='<p style=\"color:#8b949e\">版本=" + FRONTEND_VERSION + " | 交易标识='+(d.trades||[]).length+' | 展示K线图上的信号/组合信号/DNA合同字段</p><table><thead><tr><th>代码</th><th>买入日</th><th>卖出日</th><th>信号</th><th>DNA</th><th>组合合同</th><th>MTF</th><th>Zone</th></tr></thead><tbody>';for(var t of rows){html+='<tr><td class=mono>'+sym+'</td><td class=mono>'+(t.entry_date||'-')+'</td><td class=mono>'+(t.exit_date||'-')+'</td><td class=mono>'+(t.signal_type||t.zone_type||'-')+'</td><td class=mono style=\"color:#3fb950;font-size:9px\">'+(t.dna_preferred_behavior||t.smc_dna||'-')+'</td><td class=mono style=\"color:#d29922;font-size:9px\">'+(t.combo_contract_key||t.combo_contract||'-')+'</td><td class=mono style=\"font-size:9px\">'+(t.weekly_trend_state||t.weekly_state||'-')+'/'+(t.daily_structure_state||t.daily_state||'-')+'/'+(t.m60_state||'-')+'</td><td class=mono>'+(t.zone||((t.zone_low&&t.zone_high)?(Number(t.zone_low).toFixed(2)+'~'+Number(t.zone_high).toFixed(2)):'-'))+'</td></tr>';}html+='</tbody></table>';document.getElementById('kline-contract').innerHTML=html;}catch(e){document.getElementById('kline-contract').innerHTML='<span style=\"color:#f85149\">合同加载失败: '+e+'</span>';}}setTimeout(loadKline,300);setTimeout(loadKlineContract,800);" + "</script></body></html>"
 
@@ -7058,6 +7207,35 @@ class Handler(BaseHTTPRequestHandler):
                                 _vt['engine'] = 'V517'
                             _v517['trades'] = _v517_trades
                             _v517['trade_count'] = len(_v517_trades)
+                        # R88: v22/v24 引擎腿全链 (V517 也可见)
+                        try:
+                            _legs5 = _load_v22_legs(symbol)
+                            _legs5out = []
+                            for _lg in _legs5:
+                                ch = _lg.get('chain') or {}
+                                _legs5out.append({
+                                    'src': _lg.get('src'), 'entry_date': _lg.get('entry_date'),
+                                    'buy_date': _lg.get('buy_date'), 'sell_date': _lg.get('sell_date'),
+                                    'buy_price': float(_lg.get('buy_price') or 0),
+                                    'sell_price': float(_lg.get('sell_price') or 0),
+                                    'tp': float(_lg.get('tp') or 0), 'sl': float(_lg.get('sl') or 0),
+                                    'pnl': float(_lg.get('net_pnl_pct') or 0),
+                                    'hold_bars': int(float(_lg.get('hold_bars') or 0)),
+                                    'reason': _lg.get('reason'),
+                                    'rank': _lg.get('rank'), 'risk_pct': _lg.get('risk_pct'),
+                                    'v23_weight': float(_lg.get('v23_weight') or 1),
+                                    'v23_flags': _lg.get('v23_flags'),
+                                    'trend_state': ch.get('trend_state'),
+                                    'events_tail': (ch.get('events_tail') or [])[-6:],
+                                    'bsl_levels': (ch.get('bsl_levels') or [])[-3:],
+                                    'ssl_levels': (ch.get('ssl_levels') or [])[-3:],
+                                    'fvg_bull': (ch.get('fvg_bull') or [])[-4:],
+                                    'fvg_bear': (ch.get('fvg_bear') or [])[-4:],
+                                    'breakout': ch.get('breakout'), 'retrace': ch.get('retrace'),
+                                })
+                            _v517['smc_legs'] = _legs5out
+                        except Exception:
+                            _v517['smc_legs'] = []
                     except Exception:
                         pass
                 self._json(_v517)
@@ -8249,11 +8427,41 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 smc_chain = {}
 
+            # R88: v22/v24 引擎腿全链叠加 (buy/sell/TP/SL + 信号时序 + BSL/SSL/FVG)
+            smc_legs = []
+            try:
+                _legs = _load_v22_legs(symbol)
+                for _lg in _legs:
+                    ch = _lg.get('chain') or {}
+                    smc_legs.append({
+                        'src': _lg.get('src'),
+                        'entry_date': _lg.get('entry_date'), 'buy_date': _lg.get('buy_date'),
+                        'sell_date': _lg.get('sell_date'),
+                        'buy_price': float(_lg.get('buy_price') or 0), 'sell_price': float(_lg.get('sell_price') or 0),
+                        'tp': float(_lg.get('tp') or 0), 'sl': float(_lg.get('sl') or 0),
+                        'pnl': float(_lg.get('net_pnl_pct') or 0),
+                        'hold_bars': int(float(_lg.get('hold_bars') or 0)),
+                        'reason': _lg.get('reason'),
+                        'rank': _lg.get('rank'), 'risk_pct': _lg.get('risk_pct'),
+                        'v23_weight': float(_lg.get('v23_weight') or 1),
+                        'v23_flags': _lg.get('v23_flags'),
+                        'trend_state': ch.get('trend_state'),
+                        'events_tail': (ch.get('events_tail') or [])[-6:],
+                        'bsl_levels': (ch.get('bsl_levels') or [])[-3:],
+                        'ssl_levels': (ch.get('ssl_levels') or [])[-3:],
+                        'fvg_bull': (ch.get('fvg_bull') or [])[-4:],
+                        'fvg_bear': (ch.get('fvg_bear') or [])[-4:],
+                        'breakout': ch.get('breakout'), 'retrace': ch.get('retrace'),
+                    })
+            except Exception:
+                smc_legs = []
+
             self._json({
                 'klines': klines, 'count': len(klines),
                 'signals_list': signals_list, 'signal_count': len(signals_list),
                 'swings': swings_list, 'wave_swings': wave_swings_list, 'swing_count': len(swings_list),
                 'trades': trade_list, 'trade_count': len(trade_list),
+                'smc_legs': smc_legs,
                 'sim_markers': sim_markers, 'smc_chain': smc_chain,
                 'highlight': highlight, 'seq': seq_raw,
                 'symbol': symbol, 'tf': tf, 'version': ver, 'frontend_version': FRONTEND_VERSION
@@ -8263,6 +8471,7 @@ class Handler(BaseHTTPRequestHandler):
                 'signals_list': signals_list, 'signal_count': len(signals_list),
                 'swings': swings_list, 'wave_swings': wave_swings_list, 'swing_count': len(swings_list),
                 'trades': trade_list, 'trade_count': len(trade_list),
+                'smc_legs': smc_legs,
                 'sim_markers': sim_markers, 'smc_chain': smc_chain,
                 'highlight': highlight, 'seq': seq_raw,
                 'symbol': symbol, 'tf': tf, 'version': ver, 'frontend_version': FRONTEND_VERSION
