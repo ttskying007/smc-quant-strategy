@@ -150,7 +150,30 @@ def weekly_trend_of(bs, i):
 
 
 # ---------------- 因果结构事件流 (R57, nextgen_v21_spec 单源) ----------------
-def structure_events(ks, i_limit=None, pivot=3):
+def pick_pivot_by_density(ks, up_to_idx, lookback=250, target_lo=8.0, target_hi=14.0):
+    """R90 (goal round 2): 跨股票 swing 密度收归 —— 把 pivot 调到让
+    swings/100bar 落进 [target_lo, target_hi] 范围内.
+    依次试 2/3/4/5/6/8, 落进区间即返回; 全高用 8, 全低用 2; 无命中选最接区间中值者.
+    R89 实证: 固定 3 时跨股信号密度 15.8~34.2/100bar, 用此法收归到 4.3~13.2.
+    返回 (pivot, density). 用到的都是 up_to_idx 之前已确认信息(因果安全)."""
+    n = min(up_to_idx, len(ks) - 1)
+    start = max(8, n - lookback)
+    meta = {}
+    for p in (2, 3, 4, 5, 6, 8):
+        cnt = 0
+        for j in range(max(p, start), max(p, n - p) + 1):
+            if is_swing_high(ks, j, p) or is_swing_low(ks, j, p):
+                cnt += 1
+        span = max(1, n - start)
+        d = cnt / span * 100
+        meta[p] = d
+        if target_lo <= d <= target_hi:
+            return p, d
+    best = min(meta, key=lambda w: abs(meta[w] - (target_lo + target_hi) / 2))
+    return best, meta[best]
+
+
+def structure_events(ks, i_limit=None, pivot=3, mode="fixed"):
     """逐bar因果 BOS/CHoCH 事件流 —— gen_v21 / paper_sim 共用(单源)。
 
     规则(与 KB internal_and_external_bos_and_choch 对齐):
@@ -158,8 +181,23 @@ def structure_events(ks, i_limit=None, pivot=3):
       收盘破"最近已确认摆动低": trend==up   → CHoCH↓ (反转), 否则 BOS↓ (延续)
     摆动点确认: j + pivot <= 判定bar (防未来, 同 F04 纪律)。
     i_limit: 只扫描至该bar收盘(信号日因果口径); None=全序列。
-    返回: [{"bar":k, "date":ks[k]["t"], "kind":"BOS↑"|..., "level":被破价位, "trend":"up"/"down"}]
+
+    mode:
+      'fixed' — 原行为 (默认, 向后兼容)
+      'auto'  — R90 跨股适应: pivot 按收归密度自选; 额外要求收盘价过枢轴 0.15*ATR%
+                才计事件 (原为 0, 一个基日剩余波动都计 → 高波股无噪声过滤)
+    返回: [{"bar":k, "date":ks[k]["t"], "kind":"BOS↑"|..., "level":被破价位, "level_date":..., "trend":"up"/"down"}]
     """
+    # R90: 如果 mode='auto', 先自我标定 pivot + 穿透缘
+    if mode == "auto":
+        pivot, _d = pick_pivot_by_density(ks, i_limit if i_limit is not None else len(ks) - 1)
+    atr_ref = atr_of(ks, i_limit if i_limit is not None else (len(ks) - 1)) if mode == "auto" else None
+    pen_edge = 0.0
+    if atr_ref:
+        c_ref = ks[min(i_limit, len(ks) - 1)]['c'] if i_limit is not None else ks[-1]['c']
+        if c_ref > 0:
+            pen_edge = 0.15 * atr_ref / c_ref  # 相对百分比单位
+
     # FIX(2026-09-21, R66): i_limit=None 时 n 必须是 len-1 — 循环上界含端点, 原 len 越界
     n = (len(ks) - 1) if i_limit is None else min(i_limit, len(ks) - 1)
     piv_h = {}
@@ -182,13 +220,14 @@ def structure_events(ks, i_limit=None, pivot=3):
         if k in piv_l:
             pj, pl = piv_l[k][-1]
             last_l = (pl, ks[pj]["t"])
-        if last_h and c > last_h[0]:
+        # R90: 穿透缘 — 收净价必须高于枢架 (1+pen_edge), 过滤"真回调临界"
+        if last_h and c > last_h[0] * (1.0 + pen_edge):
             kind = "CHoCH↑" if trend == "down" else "BOS↑"
             events.append({"bar": k, "date": ks[k]["t"], "kind": kind,
                            "level": last_h[0], "level_date": last_h[1], "trend": "up"})
             trend = "up"
             last_h = None
-        elif last_l and c < last_l[0]:
+        elif last_l and c < last_l[0] * (1.0 - pen_edge):
             kind = "CHoCH↓" if trend == "up" else "BOS↓"
             events.append({"bar": k, "date": ks[k]["t"], "kind": kind,
                            "level": last_l[0], "level_date": last_l[1], "trend": "down"})

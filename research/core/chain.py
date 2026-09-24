@@ -9,7 +9,7 @@ R60(用户需求): 回测/选股/前端统一消费一条"信号链":
 全部因果: 任何元素只使用 <= 信号日截断的数据, 摆动点需确认(j+PIVOT<=i)。
 消费者: gen_v22(回测列) / paper_sim(挂单留档) / smc_unified.py /kline(前端绘制)。
 """
-from core.structure import structure_events
+from core.structure import structure_events, pick_pivot_by_density
 
 PIVOT = 3
 
@@ -132,19 +132,23 @@ def _retrace_state(bs, i, events):
             "current_price": round(bs[i]["c"], 3)}
 
 
-def build_chain(bs, i, ret_bars=90):
+def build_chain(bs, i, ret_bars=90, mode='fixed'):
     """主入口: 信号日 bar 索引 i(含)的完整因果链。
     返回 dict:
       trend_state, events_tail(最近4个BOS/CHoCH, 含时间/价格/类型),
       bsl_levels[N]{t,price,type,swept}, ssl_levels[N], ob[N], fvg_bull[N], fvg_bear[N],
       breakout: {date,price,kind}, retrace: {price,state,signal},
       current: {price, zone_px_band}
+    mode='auto' (R90): 跨股 swing 密度收归 pivot + ATR 穿透缘; 默认 fixed = 原行为.
     """
-    events = structure_events(bs, i)
+    _pivot = PIVOT
+    if mode == 'auto':
+        _pivot, _ = pick_pivot_by_density(bs, i)
+    events = structure_events(bs, i, pivot=_pivot, mode='auto' if mode == 'auto' else 'fixed')
     trend = events[-1]["trend"] if events else "none"
     bull, bear = _fvg_boxes(bs, i)
     obs = _order_blocks(bs, i, events)
-    highs, lows = _swing_levels(bs, i)
+    highs, lows = _swing_levels(bs, i, pivot=_pivot)
     rt = _retrace_state(bs, i, events)
     return {
         "trend_state": trend,

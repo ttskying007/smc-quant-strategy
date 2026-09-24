@@ -33,11 +33,11 @@ def find_swings(klines, min_bars=3):
     """Find swing highs and lows — more sensitive than LuxAlgo"""
     n = len(klines)
     highs, lows = [], []
-    
+
     for i in range(min_bars, n - min_bars):
         b = klines[i]
         h, l = float(b.get('h',0)), float(b.get('l',0))
-        
+
         # Swing high: higher than min_bars bars on each side
         is_high = True
         for j in range(i-min_bars, i+min_bars+1):
@@ -46,7 +46,7 @@ def find_swings(klines, min_bars=3):
                 is_high = False; break
         if is_high:
             highs.append({'bar': i, 'price': h, 'label': 'HH', 'date': klines[i].get('t','?')})
-        
+
         # Swing low
         is_low = True
         for j in range(i-min_bars, i+min_bars+1):
@@ -55,19 +55,41 @@ def find_swings(klines, min_bars=3):
                 is_low = False; break
         if is_low:
             lows.append({'bar': i, 'price': l, 'label': 'LL', 'date': klines[i].get('t','?')})
-    
+
     # Label HH/HL/LH/LL
     for i, h in enumerate(highs):
-        if i > 0: 
+        if i > 0:
             h['label'] = 'HH' if h['price'] > highs[i-1]['price'] else 'LH'
     for i, l in enumerate(lows):
         if i > 0:
             l['label'] = 'HL' if l['price'] > lows[i-1]['price'] else 'LL'
-    
+
     return highs, lows
 
 
-def detect_smc_signals(klines):
+# ═══ R90: 跨股票 swing 密度收归 — 把"一个结构事件"的语义跨股对齐 ═══
+def pick_wing_by_density(klines, target_lo=8.0, target_hi=14.0):
+    """按目标 swings/100bar 密度自动选 wing:
+    依次试 2,3,4,5,6,8, 选首个落进 [target_lo, target_hi] 的;
+    全超 → wing=8; 全低 → wing=2.
+    返回 (wing, density). R89 实证: 跨股 ATR% 5.4x 跨度下,
+    该法把信号量跨股跨度从固定版的 15.8~34.2 压到 4.3~13.2.
+    """
+    n = len(klines)
+    if n < 30:
+        return 3, 0.0
+    meta = {}
+    for w in (2, 3, 4, 5, 6, 8):
+        hs, ls = find_swings(klines, min_bars=w)
+        density = (len(hs) + len(ls)) / n * 100
+        meta[w] = density
+        if target_lo <= density <= target_hi:
+            return w, density
+    best = min(meta, key=lambda w: abs(meta[w] - (target_lo + target_hi) / 2))
+    return best, meta[best]
+
+
+def detect_smc_signals(klines, mode='fixed'):
     """
     Detects ONLY core SMC signals:
     1. BOS (Break of Structure) — price breaks prior swing point
@@ -75,24 +97,40 @@ def detect_smc_signals(klines):
     3. Sweep (Liquidity Sweep) — price briefly breaks swing point then reverses
     4. OB (Order Block) — last opposing candle before a strong move
     5. MSS (Market Structure Shift) — CHOCH confirmed by follow-through
+
+    mode (R90):
+      'fixed' — 旧版硬编参数 (默认, 向后兼容)
+      'norm'  — 密度收归: wing 按 swings/100bar∈[8,14] 搜索 + ATR% 映射所有阈值
     """
     n = len(klines)
     signals = []
     atr14 = atr(klines, n-1)
-    highs, lows = find_swings(klines, min_bars=3)
-    
+
+    # ── 参数化(R90) ──
+    _wing, _pen_floor, _bos_win, _sw_edge = 3, 0.1, 40, 0.2
+    if mode == 'norm':
+        _cur = float(klines[-1].get('c', 0)) or 1
+        _atr_pct = atr14 / _cur * 100.0 if _cur else 1.0
+        _wing, _wing_density = pick_wing_by_density(klines)
+        _pen_floor = max(0.10, min(1.5, _atr_pct * 0.45))
+        _bos_win = max(20, min(60, round(80 - _atr_pct * 12)))
+        _sw_edge = max(0.08, min(0.60, _atr_pct * 0.15))
+
+    atr14 = atr(klines, n-1)
+    highs, lows = find_swings(klines, min_bars=_wing)
+
     if not highs or not lows:
         return signals
-    
+
     # ═══ 1. BOS/CHOCH Detection ═══
     for h in highs:
         h_bar, h_price = h['bar'], h['price']
         # Check if price subsequently broke above this high
-        for i in range(h_bar + 2, min(h_bar + 40, n)):
+        for i in range(h_bar + 2, min(h_bar + _bos_win, n)):
             cl = float(klines[i].get('c', 0))
             if cl > h_price:
                 penetration = (cl - h_price) / h_price * 100
-                if penetration < 0.1:  # Too small, keep scanning
+                if penetration < _pen_floor:  # Too small, keep scanning
                     continue
                 
                 tag = 'CHOCH_Bull' if h['label'] == 'LH' else 'BOS_Bull'
@@ -104,11 +142,11 @@ def detect_smc_signals(klines):
     
     for l in lows:
         l_bar, l_price = l['bar'], l['price']
-        for i in range(l_bar + 2, min(l_bar + 40, n)):
+        for i in range(l_bar + 2, min(l_bar + _bos_win, n)):
             cl = float(klines[i].get('c', 0))
             if cl < l_price:
                 penetration = (l_price - cl) / l_price * 100
-                if penetration < 0.1: continue
+                if penetration < _pen_floor: continue
                 
                 tag = 'CHOCH_Bear' if l['label'] == 'HL' else 'BOS_Bear'
                 signals.append(Signal(tag, i, 'bear', price=round(cl, 2),
@@ -124,7 +162,7 @@ def detect_smc_signals(klines):
             hi = float(klines[i].get('h', 0))
             cl = float(klines[i].get('c', 0))
             # Briefly broke above swing high then closed below
-            if hi > h_price * 1.002 and cl < h_price * 0.998:
+            if hi > h_price * (1 + _sw_edge/100.0) and cl < h_price * (1 - _sw_edge/100.0):
                 signals.append(Signal('Sweep_SSL', i, 'bear', price=round(cl, 2),
                     strength=round((hi - h_price)/h_price*100, 2),
                     confidence=0.70,
@@ -136,7 +174,7 @@ def detect_smc_signals(klines):
         for i in range(l_bar + 1, min(l_bar + 15, n)):
             lo = float(klines[i].get('l', 0))
             cl = float(klines[i].get('c', 0))
-            if lo < l_price * 0.998 and cl > l_price * 1.002:
+            if lo < l_price * (1 - _sw_edge/100.0) and cl > l_price * (1 + _sw_edge/100.0):
                 signals.append(Signal('Sweep_BSL', i, 'bull', price=round(cl, 2),
                     strength=round((l_price - lo)/l_price*100, 2),
                     confidence=0.70,
