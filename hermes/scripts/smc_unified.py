@@ -4134,6 +4134,37 @@ def build_audit_portal(slug=''):
                        f"<p style='color:#8b949e'>v23 权重=14手术合成(S1-S14, 生产 v1 链); v2 全链影子=自适应chain+狠打手术(s1-s21, R94 回测 PF 6.98 胜 v1=5.89); Jev=事件判型; 三者只记录不决策; 复盘日: 2026-10-23</p>"
                        f"<table><thead><tr><th>代码</th><th>信号日</th><th>状态</th><th>Jev判型</th><th>v23影子(v1)</th><th>v2全链影子(新自适应)</th></tr></thead>"
                        f"<tbody>{_trs}</tbody></table></div>")
+        # ═══ R97 (goal round 9): 双链分歧警报 —— v1 高权(v23≥0.7) 但 v2 狠打(v23_v2<0.5) 的单 ═══
+        try:
+            div = []
+            for o in _orders:
+                if not isinstance(o, dict):
+                    continue
+                v1 = (o.get('v23') or {}).get('weight')
+                v2w = (o.get('v23_v2') or {}).get('weight')
+                try:
+                    v1f, v2f = float(v1) if v1 is not None else None, float(v2w) if v2w is not None else None
+                except Exception:
+                    continue
+                if v1f is not None and v2f is not None and v1f >= 0.7 and v2f < 0.5:
+                    div.append((o, v1f, v2f))
+            div.sort(key=lambda t: str(t[0].get('signal_date') or ''), reverse=True)
+            if div:
+                _dr = ''.join(
+                    f"<tr><td class='mono'>{html.escape(str(o.get('code')))}</td>"
+                    f"<td>{html.escape(str(o.get('signal_date')))}</td>"
+                    f"<td style='color:#3fb950'>v1 w={v1f:.2f}</td>"
+                    f"<td style='color:#f85149;font-weight:bold'>v2 w={v2f:.3f}</td>"
+                    f"<td style='color:#8b949e;font-size:0.85em'>{html.escape(' · '.join((o.get('v23_v2') or {}).get('flags') or [])[:8])}</td></tr>"
+                    for o, v1f, v2f in div[:15])
+                shadow_card += (
+                    f"<div class='card' style='border-left:3px solid #f85149'><h2>🚨 双链分歧警报 (R97) — {len(div)} 张</h2>"
+                    f"<p style='color:#8b949e'>v1 影子高位(≥0.7) v2 自适应链狠打(<0.5) — v2 chain 认为这些是老语义错杀; "
+                    f"2026-10-23 复盘时如果 v2 收益样本显著低于 v1 → 这些单确实该 ❌</p>"
+                    f"<table><thead><tr><th>代码</th><th>信号日</th><th>v1影子</th><th>v2影子</th><th>v2的狠打理由</th></tr></thead>"
+                    f"<tbody>{_dr}</tbody></table></div>")
+        except Exception as _de:
+            pass
     except Exception as _e:
         shadow_card = f"<div class='card' style='color:#f85149'>影子池读取失败: {html.escape(str(_e))}</div>"
 
