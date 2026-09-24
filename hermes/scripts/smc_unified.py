@@ -2413,8 +2413,8 @@ function buildLegMarkers(af){
                 symbol:'circle',symbolSize:9,itemStyle:{color:up?'#58a6ff':'#ff9e4f'},
                 label:{show:true,formatter:(ev.kind||'').substring(0,7),fontSize:8,color:up?'#58a6ff':'#ff9e4f',position:'top'}});
         });
-        // R110: 子信号顺序标 ①②③… (披露日 / 吸筹确认 / ADX≥20 / 入场(T+1) 等)
-        (leg.sub_signals||[]).forEach(function(ss,si2){
+        // R110: 子信号顺序标 ①②③… —— 仅排不包含"披露日"的; 用户: S1披露日只显示、不参与交易
+        (leg.sub_signals||[]).filter(function(ss){return !/披露日/.test(String(ss.name||''));}).forEach(function(ss,si2){
             var sd8=String(ss.date||'').replace(/-/g,''); var jj=d2i[sd8]; if(jj===undefined)return;
             var close3=(ohlcvData[jj]&&ohlcvData[jj][1])||Number(leg.buy_price)||0;
             var tt3='<b>'+(si2+1)+'. '+(ss.name||'?')+'</b><br/>'+sd8+' @ '+Number(close3).toFixed(2)
@@ -2519,7 +2519,12 @@ function legsDetailHtml(legs){
     return '<h3 style="margin-top:14px">逐腿明细 (①序号=子信号顺序, 与图上跳字一致)</h3>'
         +legs.map(function(leg,i){
             var pnl=Number(leg.pnl||0);
-            var subs=(leg.sub_signals||[]).map(function(s,si2){return '<b>'+(si2+1)+'</b>. '+(s.name||'?')+' @ '+s.date+(s.detail?(' <span style=color:#8b949e>'+String(s.detail).slice(0,60)+'</span>'):'');}).join('<br/>');
+            var subs=(leg.sub_signals||[]).map(function(s,si2){
+                if(/披露日/.test(String(s.name||''))){
+                    return '<span style=color:#6e7681;text-decoration:line-through>—(仅显示,不参与) '+String(s.name||'?')+' @ '+s.date+'</span>';
+                }
+                return '<b>'+(si2+1)+'</b>. '+(s.name||'?')+' @ '+s.date+(s.detail?(' <span style=color:#8b949e>'+String(s.detail).slice(0,60)+'</span>'):'');
+            }).join('<br/>');
             var mfe=fmt6(leg.mfe_pct), mae=fmt6(leg.mae_pct), rr=leg.rr_exit!==undefined&&leg.rr_exit!==''?Number(leg.rr_exit).toFixed(2):'-';
             return '<div style="margin:8px 0;padding:8px 10px;border:1px solid #30363d;border-radius:6px;font-size:11px;color:#c9d1d9">'
                 +'<b style=color:#58a6ff>腿#'+(i+1)+'</b> ['+leg.src+'] 链='+String(leg.signal_chain_kind||'-')
