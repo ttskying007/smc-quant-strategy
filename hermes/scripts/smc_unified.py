@@ -2089,20 +2089,9 @@ function loadKline(){
         window._highlight=d.highlight||[];
         ohlcvData=d.klines.map(function(k){return[k.o,k.c,k.l,k.h]});
         dates=d.klines.map(function(k){return k.date});
-        renderKline(d);
-        // FIX(2026-08-19): 模拟持仓/挂单信号标注（信号点 + 挂单/TP/SL 线 + 条件说明）
         window._simMarkers=d.sim_markers||null;
+        renderKline(d);
         if(window._simMarkers&&(window._simMarkers.points.length||window._simMarkers.lines.length)){
-            var sp=[], sln=[];
-            (window._simMarkers.points||[]).forEach(function(p){
-                sp.push({coord:[p.date,p.price],symbol:'pin',symbolSize:16,itemStyle:{color:p.color||'#58a6ff'},label:{show:true,fontSize:9,color:'#fff',fontWeight:'bold',formatter:p.label||('信号'+p.order)},_tt:p.tt});
-            });
-            (window._simMarkers.lines||[]).forEach(function(l){
-                sln.push({yAxis:l.price,label:{show:true,fontSize:9,color:l.color||'#888',formatter:l.label},lineStyle:{color:l.color||'#888',type:'dashed',width:1.5},_tt:l.label});
-            });
-            if(chart){
-                chart.setOption({series:[{id:'K',name:'K',type:'candlestick',markPoint:{data:sp,label:{show:true,fontSize:9,color:'#fff',fontWeight:'bold'}},markLine:{silent:false,symbol:['none','none'],data:sln,emphasis:{lineStyle:{width:2}}}}]});
-            }
             var condBox=document.getElementById('sim-cond');
             if(condBox&&window._simMarkers.conditions)condBox.innerHTML='<div class="card" style="border-left:3px solid #d29922"><h3>🎯 模拟交易信号标注（买入原因 / TP / SL / 顺序）</h3><p style="color:#8b949e">'+window._simMarkers.conditions+'</p><p style="color:#8b949e;font-size:12px">🔵 ①信号点=事件/信号发生日（含策略原因）②买入点=成交日 ③卖出点=平仓日；🟡入场线 🟢TP线 🔴SL线（悬停彩线查看 TP/SL 条件）。点击图中标记查看详情。</p></div>';
         }
@@ -2514,6 +2503,15 @@ function renderKline(d){
     var allPoints=fp.concat(tm.entries).concat(tm.exits).concat(lm.points);
     var allLines=fl.concat(tm.sllines).concat(tm.tplines).concat(lm.lines);
     fa=fa.concat(lm.areas);
+    // R88c: 模拟持仓/挂单标记 回归主通道(以前单独 setOption 会把 K 系列其它标全洗掉)
+    if(window._simMarkers){
+        (window._simMarkers.points||[]).forEach(function(p){
+            allPoints.push({coord:[p.date,p.price],symbol:'pin',symbolSize:16,itemStyle:{color:p.color||'#58a6ff'},label:{show:true,fontSize:9,color:'#fff',fontWeight:'bold',formatter:p.label||('信号'+p.order)},_tt:p.tt});
+        });
+        (window._simMarkers.lines||[]).forEach(function(l){
+            allLines.push({yAxis:l.price,label:{show:true,fontSize:9,color:l.color||'#888',formatter:l.label},lineStyle:{color:l.color||'#888',type:'dashed',width:1.5},_tt:l.label});
+        });
+    }
     if(af['swings'])allLines=allLines.concat(swl);
 
     chart.clear();
