@@ -123,3 +123,12 @@ WEAK_MARKET_WEIGHT = False         # 总开关(WF 不稳健 → 禁用, 2026-09-
 WEAK_MARKET_K = 2.0                # 加权系数: w = clip(1 - k×proxy, 0.3, 2.0)
 WEAK_MARKET_W_MIN = 0.3            # 最小权重(强市降仓下限)
 WEAK_MARKET_W_MAX = 2.0            # 最大权重(弱市加仓上限)
+
+# ---- R108 (goal round 19): v23_v2 狠打影子 → 生产挂单权重桥 (复盘日决定) ----
+# 等权 v24 v1 生产 挂单从 R70 起只打 v23 (旧 pivot=3 链 + 非自适应 enrich).
+# R94/R101 已完毕 v2 全链凭据: 2024段 PF +1.01 / 2026 OOS PF +0.32, 分股权翼健康.
+# 本 flag 只在 2026-10-23 复盘后判定 v1(/audit 中"未召升") 才切换;
+# 默认 False (不发生生产 推动 / 决策), True 时 paper_sim._v23v2_of 的狠打公式会
+# 计 算被入生产 order 使的 stack — 外置: 不改默认, 需用户亲和并确认.
+V23_V2_AS_PRODUCER = _env_bool("SMC_V23V2_AS_PRODUCER", False)
+
