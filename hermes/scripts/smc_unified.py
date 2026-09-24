@@ -1789,6 +1789,14 @@ def _load_v22_legs(symbol):
                         shadow[r['symbol'] + '|' + r['entry_date']] = r
             except Exception:
                 shadow = {}
+            # R96 (goal round 8): 再读 v2 全链狠打影子 (combo_v23_shadow_v3.csv)
+            shadow3 = {}
+            try:
+                with open(r'E:\test\smc_project\research\combo_v23_shadow_v3.csv', encoding='utf-8-sig') as fh:
+                    for r in _csv.DictReader(fh):
+                        shadow3[r['symbol'] + '|' + r['entry_date']] = r
+            except Exception:
+                shadow3 = {}
             # 再读 R76/77 引擎增强(sweep/BSL/SSL/FVG/OTE/MSS 流动性判定)
             enrich = {}
             try:
@@ -1804,6 +1812,8 @@ def _load_v22_legs(symbol):
                     sh = shadow.get(key) or {}
                     leg['v23_weight'] = sh.get('v23_weight', '1.0')
                     leg['v23_flags'] = sh.get('v23_flags', 'none')
+                    sh3 = shadow3.get(key) or {}
+                    leg['v23_weight_v2'] = sh3.get('_w', '1.0')
                     en = enrich.get(key) or {}
                     for ek in ('sweeps_10b', 'sweep_dir', 'dist_to_ssl', 'dist_to_bsl',
                                'tp_above_bsl', 'sl_below_ssl', 'in_ob', 'in_fvg', 'in_ote',
@@ -2360,6 +2370,7 @@ function buildLegMarkers(af){
         var tt='<b>'+tag+'</b><br/>'+ed+' → '+sd+'<br/>买: '+Number(leg.buy_price).toFixed(2)+' / 卖: '+Number(leg.sell_price).toFixed(2)
             +'<br/>PnL: <b style="color:'+(won?'#3fb950':'#f85149')+'">'+(pnl>=0?'+':'')+pnl.toFixed(2)+'%</b> | exit: '+(leg.reason||'-')
             +'<br/>v23影子权重: <b style="color:#d29922">'+Number(leg.v23_weight||1).toFixed(2)+'</b> ['+(leg.v23_flags||'none')+']'
+            +'<br/>v2全链影子: <b style="color:#bc8cff">'+Number(leg.v23_weight_v2||1).toFixed(2)+'</b> (R94狠打)'
             +'<br/>rank: '+leg.rank+' | risk: '+Number(leg.risk_pct||0).toFixed(2)+'% | 趋势: '+(leg.trend_state||'-');
         // 入场大标(青色五边形)
         points.push({name:tag,coord:[dates[ei],Number(leg.buy_price)],value:tag,_tt:tt,
@@ -2457,7 +2468,7 @@ function renderLegsTable(legs){
         +'<th>出场(哪天/什么理由)</th>'
         +'<th>TP 设计(在什么水平/为什么这么设)</th>'
         +'<th>SL 设计(在什么水平/为什么这么设)</th>'
-        +'<th>PnL</th><th>持有bar</th><th>v24影子权重+flags</th>'
+        +'<th>PnL</th><th>持有bar</th><th>v24影子权重+flags</th><th>v2全链影子(R94)</th>'
         +'<th>引擎信号序列(按时间)</th></tr></thead><tbody>'
         +legs.map(function(leg,i){
             var pnl=Number(leg.pnl||0), cls=pnl>0?'green':'red';
@@ -2467,6 +2478,8 @@ function renderLegsTable(legs){
                 +(leg.events_tail||[]).map(function(e){return (e.kind||'?')+' <span style=color:#8b949e>@'+(e.date||'?')+'</span>';}).join('<br/>');
             var w=Number(leg.v23_weight||1);
             var wc=w<0.7?'#f85149':(w>=1?'#3fb950':'#d29922');
+            var w2=Number(leg.v23_weight_v2||1);
+            var wc2=w2<0.7?'#f85149':(w2>=1?'#3fb950':'#d29922');
             return '<tr><td class=mono>'+(i+1)+'</td><td>'+leg.src+'</td>'
                 +'<td style="color:'+((leg.trend_state==='up')?'#3fb950':'#ff6b6b')+';font-weight:bold">'+(leg.trend_state||'-')+'</td>'
                 +'<td class=mono>'+brk+'</td>'
@@ -2478,6 +2491,7 @@ function renderLegsTable(legs){
                 +'<td class='+cls+'><b>'+(pnl>=0?'+':'')+pnl.toFixed(2)+'%</b></td>'
                 +'<td class=mono>'+(leg.hold_bars||0)+'</td>'
                 +'<td style="color:'+wc+';font-weight:bold">'+w.toFixed(2)+'<br/><span style="font-size:9px;color:#8b949e">'+(leg.v23_flags||'none')+'</span></td>'
+                +'<td style="color:'+wc2+';font-weight:bold">'+w2.toFixed(2)+'</td>'
                 +'<td style="font-size:9px">'+sweepNote(leg)+'<br/>'+(seq||'-')+'</td></tr>';
         }).join('')+'</tbody></table>';
 }
@@ -4087,7 +4101,7 @@ def build_audit_portal(slug=''):
     try:
         _led = _json.loads(Path(r'E:\test\smc_project\research\paper_ledger.json').read_text(encoding='utf-8'))
         _orders = _led if isinstance(_led, list) else (_led.get('orders') or [])
-        _tv = [o for o in _orders if isinstance(o, dict) and (o.get('v23') or o.get('jev'))]
+        _tv = [o for o in _orders if isinstance(o, dict) and (o.get('v23') or o.get('v23_v2') or o.get('jev'))]
         _tv.sort(key=lambda o: str(o.get('signal_date') or ''), reverse=True)
         _tv = _tv[:40]
         def _cell_flags(o):
@@ -4096,6 +4110,14 @@ def build_audit_portal(slug=''):
                 return '<span style="color:#8b949e">未标(v23上线前)</span>'
             fl = ' · '.join(v.get('flags') or [])
             return f"<span style='color:#d29922'>w={v.get('weight')}</span> <span style='color:#8b949e;font-size:0.85em'>{html.escape(fl)}</span>"
+        def _cell_v2(o):
+            v2 = o.get('v23_v2') or {}
+            if not v2:
+                return '<span style="color:#8b949e">未标(v2上线前)</span>'
+            fl = ' · '.join((v2.get('flags') or [])[:6])
+            w = float(v2.get('weight') or 1)
+            wc = '#f85149' if w < 0.7 else ('#3fb950' if w >= 1 else '#d29922')
+            return f"<span style='color:{wc};font-weight:bold'>w={w}</span> <span style='color:#8b949e;font-size:0.85em'>{html.escape(fl)}</span>"
         def _cell_jev(o):
             j = o.get('jev') or {}
             if not j:
@@ -4105,12 +4127,12 @@ def build_audit_portal(slug=''):
             f"<tr><td class='mono'>{html.escape(str(o.get('code') or ''))}</td>"
             f"<td>{html.escape(str(o.get('signal_date') or ''))}</td>"
             f"<td>{html.escape(str(o.get('status') or ''))}</td>"
-            f"<td>{_cell_jev(o)}</td><td>{_cell_flags(o)}</td></tr>"
+            f"<td>{_cell_jev(o)}</td><td>{_cell_flags(o)}</td><td>{_cell_v2(o)}</td></tr>"
             for o in _tv)
         shadow_card = (f"<div class='card' style='border-left:3px solid #d29922'><h2>生产影子池(R87 值守) "
                        f"— 近 {len(_tv)} 张带标签单</h2>"
-                       f"<p style='color:#8b949e'>v23 权重=13手术合成(S1-S14); Jev=事件判型; 只记录不决策; 复盘日: 2026-10-23</p>"
-                       f"<table><thead><tr><th>代码</th><th>信号日</th><th>状态</th><th>Jev判型</th><th>v23影子标签</th></tr></thead>"
+                       f"<p style='color:#8b949e'>v23 权重=14手术合成(S1-S14, 生产 v1 链); v2 全链影子=自适应chain+狠打手术(s1-s21, R94 回测 PF 6.98 胜 v1=5.89); Jev=事件判型; 三者只记录不决策; 复盘日: 2026-10-23</p>"
+                       f"<table><thead><tr><th>代码</th><th>信号日</th><th>状态</th><th>Jev判型</th><th>v23影子(v1)</th><th>v2全链影子(新自适应)</th></tr></thead>"
                        f"<tbody>{_trs}</tbody></table></div>")
     except Exception as _e:
         shadow_card = f"<div class='card' style='color:#f85149'>影子池读取失败: {html.escape(str(_e))}</div>"
@@ -7275,6 +7297,7 @@ class Handler(BaseHTTPRequestHandler):
                                     'reason': _lg.get('reason'),
                                     'rank': _lg.get('rank'), 'risk_pct': _lg.get('risk_pct'),
                                     'v23_weight': float(_lg.get('v23_weight') or 1),
+                                    'v23_weight_v2': float(_lg.get('v23_weight_v2') or 1),
                                     'v23_flags': _lg.get('v23_flags'),
                                     'trend_state': ch.get('trend_state'),
                                     'events_tail': (ch.get('events_tail') or [])[-6:],
@@ -8502,6 +8525,7 @@ class Handler(BaseHTTPRequestHandler):
                         # 引擎增强 (BSL/SSL/sweep/FVG/OTE/MSS 判定)
                         'enrich': {k[7:]: _lg.get(k) for k in _lg if k.startswith('enrich_')},
                         'v23_weight': float(_lg.get('v23_weight') or 1),
+                        'v23_weight_v2': float(_lg.get('v23_weight_v2') or 1),
                         'v23_flags': _lg.get('v23_flags'),
                         'trend_state': ch.get('trend_state') or _lg.get('trend_state'),
                         'events_tail': (ch.get('events_tail') or [])[-6:],
