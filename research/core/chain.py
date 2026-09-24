@@ -91,6 +91,61 @@ def _swing_levels(bs, i, pivot=PIVOT, lookback=90):
     return highs[-6:], lows[-6:]
 
 
+def _hh_ll_sequence(bs, i, pivot=PIVOT, lookback=90):
+    """R101 (goal round 13): 显式 HH/HL/LH/LL 序列 —— 目标里点名的、此前缺口的指标.
+
+    取 [i-lookback, i] 内已确认的摆动高/低 (与 _swing_levels 同参数),
+    按时间序交错合并, 相邻同类比较打标签:
+      高点序列: 新高 → HH, 低于前高 → LH
+      低点序列: 新低 → LL, 高于前低 → HL
+    返回 dict:
+      seq: [{'t','side'('H'/'L'),'price','label'('HH'/'LH'/'HL'/'LL')}] 最近 8 个
+      structure_state: 最近两条高低的状态合成:
+        H结构 'HH'/'LH', L结构 'HL'/'LL' →
+          'HH+HL' (牛势), 'LH+LL' (熊势), 'HH+LL' (扩张),
+          'LH+HL' (收敛), 'LH+LH' (不明), '不略'
+    全部只用甚至为 i 已确认信息 （防未来)"""
+    raw = []
+    for j in range(max(pivot, i - lookback), i - pivot + 1):
+        win = bs[j - pivot:j + pivot + 1]
+        if all(bs[j]["h"] >= b["h"] for b in win):
+            raw.append((j, 'H', bs[j]["h"]))
+        if all(bs[j]["l"] <= b["l"] for b in win):
+            raw.append((j, 'L', bs[j]["l"]))
+    raw.sort(key=lambda x: x[0])
+    seq = []
+    prev = {'H': None, 'L': None}
+    for j, side, price in raw:
+        label = None
+        if prev[side] is not None:
+            if side == 'H':
+                label = 'HH' if price > prev['H'] else 'LH'
+            else:
+                label = 'LL' if price < prev['L'] else 'HL'
+        seq.append({'t': bs[j]['t'], 'side': side, 'price': round(price, 3), 'label': label})
+        prev[side] = price
+    # 结构合成: 最近扫 H 标签 与 L 标签
+    last_H = next((s for s in reversed(seq) if s['side'] == 'H' and s['label']), None)
+    last_L = next((s for s in reversed(seq) if s['side'] == 'L' and s['label']), None)
+    if last_H and last_L:
+        hlab, llab = last_H['label'], last_L['label']
+        if hlab == 'HH' and llab == 'HL':
+            sst = 'bull(HH+HL)'
+        elif hlab == 'LH' and llab == 'LL':
+            sst = 'bear(LH+LL)'
+        elif hlab == 'HH' and llab == 'LL':
+            sst = 'expansion(HH+LL)'
+        elif hlab == 'LH' and llab == 'HL':
+            sst = 'compress(LH+HL)'
+        else:
+            sst = f'mixed({hlab}+{llab})'
+    else:
+        sst = 'none'
+    return {'seq': seq[-8:], 'structure_state': sst,
+            'last_high_label': last_H['label'] if last_H else None,
+            'last_low_label': last_L['label'] if last_L else None}
+
+
 def _retrace_state(bs, i, events):
     """最近结构事件的回踩分析:
     对最近一个 BOS/CHoCH(突破水平L), 逐bar检查 i 内:
@@ -150,8 +205,11 @@ def build_chain(bs, i, ret_bars=90, mode='fixed'):
     obs = _order_blocks(bs, i, events)
     highs, lows = _swing_levels(bs, i, pivot=_pivot)
     rt = _retrace_state(bs, i, events)
+    hhll = _hh_ll_sequence(bs, i, pivot=_pivot)   # R101: HH/HL/LH/LL 显式结构
     return {
         "trend_state": trend,
+        "structure_state": hhll['structure_state'],
+        "swing_seq": hhll['seq'],
         "events_tail": [ {"date": e["date"], "kind": e["kind"], "level": round(e["level"], 3)}
                          for e in [x for x in events if x["bar"] <= i][-4:] ],
         "bsl_levels": [{**h, "price": round(h["price"], 3)} for h in highs],
