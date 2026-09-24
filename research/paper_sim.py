@@ -561,6 +561,216 @@ def _v23_of(order, chain):
         return None
 
 
+def _v23v2_of(order, chain_v2=None):
+    """R95 (goal round 7): v2 自适应链影子 — 只记录, 不参与决策。
+
+    参数集 = R94 终版 "狠打+轻s21" (回测 PF 6.98, v1 为 5.89):
+      chain 用 norm 模式 (build_chain(..., mode='auto')) 重出 → s1(0.4) / s7(0.5)
+      enrich 用 detect_smc_signals(mode='norm') → s8(0.6)/s9(0.7)/s10(0.8)/s11(0.7)/s12(0.7)
+      R93 狠打猎桶: s18/s19/s20 ×0.35, s15 ×0.5, s16 ×0.6, s17 ×1.1, s21 ×0.4
+      其余 (s4/s5/s6/s13/s14) 与 v1 相同参数
+    失败一律 None, 不阻断任何生产行为。
+    """
+    try:
+        import sqlite3
+        from datetime import datetime as _dt, timedelta as _td
+        from core.chain import build_chain as _bc2
+        # 在 signal 日期 (T) 内 重建 norm 链 — 无前视
+        if chain_v2 is None:
+            _sd = str(order.get("signal_date") or "").replace("-", "")
+            _sym = order.get("code", "")
+            _fn = None
+            for _suf in ("_SH", "_SZ", "_BJ"):
+                _p = os.path.join(CFG.KT_CACHE, _sym + _suf + "_daily_800.json")
+                if os.path.exists(_p):
+                    _fn = _p
+                    break
+            if not _fn:
+                return None
+            raw = json.load(open(_fn, encoding="utf-8"))
+            bars2 = [{"t": str(b["t"]), "o": float(b["o"]), "h": float(b["h"]),
+                      "l": float(b["l"]), "c": float(b["c"]), "v": float(b.get("v", 0))}
+                     for b in raw]
+            idxs = [i for i, b in enumerate(bars2) if b["t"] <= _sd]
+            if len(idxs) < 61:
+                return None
+            idx = idxs[-1]
+            ch = _bc2(bars2, idx, mode='auto')
+            bars = bars2[:idx + 2]  # 给 enrich 用 (含 entry day)
+        else:
+            ch = chain_v2
+            _sd = str(order.get("signal_date") or "").replace("-", "")
+            _sym = order.get("code", "")
+            _fn = None
+            for _suf in ("_SH", "_SZ", "_BJ"):
+                _p = os.path.join(CFG.KT_CACHE, _sym + _suf + "_daily_800.json")
+                if os.path.exists(_p):
+                    _fn = _p
+                    break
+            if not _fn:
+                return None
+            raw = json.load(open(_fn, encoding="utf-8"))
+            bars = [{"t": str(b["t"]), "o": float(b["o"]), "h": float(b["h"]),
+                     "l": float(b["l"]), "c": float(b["c"]), "v": float(b.get("v", 0))}
+                    for b in raw if str(b["t"]) <= _sd]
+        w = 1.0
+        flags = []
+        ch = ch or {}
+        bk = ((ch.get("breakout") or {}).get("kind") or "")
+        rt_st = ((ch.get("retrace") or {}).get("state") or "")
+        tr = ch.get("trend_state") or ""
+        # s1 v2 (狠打: 0.4)
+        if "CHoCH" in bk:
+            w *= 0.4; flags.append("s1v2_choch:" + bk)
+        # s7 v2 (狠打: 0.5)
+        if tr == "up":
+            w *= 0.5; flags.append("s7v2_up")
+        # s4/s5 同 v1
+        if str(order.get("rank_score")) == "2":
+            w *= 0.5; flags.append("s4_rank2")
+        try:
+            if float(order.get("risk_dist_pct") or 0) < 5:
+                w *= 0.6; flags.append("s5_risk_lt5")
+        except Exception:
+            pass
+        # s6 whale 同 v1
+        n_ev = None
+        try:
+            from core.events import classify_title
+            d0 = _dt.strptime(str(order.get("signal_date", "")).replace("-", ""), "%Y%m%d")
+            lo = (d0 - _td(days=90)).strftime("%Y-%m-%d")
+            hi = d0.strftime("%Y-%m-%d")
+            conn = sqlite3.connect(CFG.ANNOUNCE_DB)
+            n_ev = 0
+            for (t,) in conn.execute(
+                    "SELECT title FROM announce WHERE stock_code=? AND date BETWEEN ? AND ?",
+                    (order.get("code"), lo, hi)):
+                is_ev, _, pol, _, _ = classify_title(t)
+                if is_ev and pol > 0:
+                    n_ev += 1
+            conn.close()
+        except Exception:
+            n_ev = None
+        if n_ev is not None:
+            if n_ev >= 3:
+                w *= 1.2; flags.append(f"s6_whale_x{n_ev}")
+            elif n_ev <= 1:
+                w *= 0.7; flags.append(f"s6_whale_x{n_ev}")
+        # s8-s12 norm enrich (v25 detector mode='norm', R94 一致)
+        try:
+            import importlib.util as _ilu
+            import json as _json
+            _sd = str(order.get("signal_date") or "").replace("-", "")
+            _sym = order.get("code", "")
+            _fn = None
+            for _suf in ("_SH", "_SZ", "_BJ"):
+                _p = os.path.join(CFG.KT_CACHE, _sym + _suf + "_daily_800.json")
+                if os.path.exists(_p):
+                    _fn = _p
+                    break
+            if _fn:
+                raw = json.loads(open(_fn, encoding="utf-8").read())
+                bars = [{"t": str(b["t"]), "o": float(b["o"]), "h": float(b["h"]),
+                         "l": float(b["l"]), "c": float(b["c"]), "v": float(b.get("v", 0))}
+                        for b in raw if str(b["t"]) <= _sd]
+                if len(bars) >= 30:
+                    _spec = _ilu.spec_from_file_location(
+                        "smc_detector", os.path.join(os.path.dirname(os.path.dirname(CFG.KT_CACHE)),
+                                                     "scripts", "v25", "smc_detector.py"))
+                    _mod = _ilu.module_from_spec(_spec)
+                    _spec.loader.exec_module(_mod)
+                    sigs = _mod.detect_smc_signals(bars, mode='norm')
+                    n10 = len(bars) - 12
+                    sw = [s for s in sigs if "Sweep" in s.type and s.bar >= n10]
+                    if sw:
+                        nb = sum(1 for s in sw if s.dir == "bear")
+                        nbull = sum(1 for s in sw if s.dir == "bull")
+                        if nb > nbull:
+                            w *= 0.6; flags.append(f"s8v2_sweep_bear_x{nb}")
+                    highs = [s for s in sigs if s.type in ("BOS_Bull", "CHOCH_Bull")]
+                    if highs and order.get("entry_price"):
+                        bsl = sorted(highs, key=lambda s: -s.bar)[0].meta.get("swing_price")
+                        if bsl:
+                            d = (float(bsl) - float(order["entry_price"])) / float(order["entry_price"]) * 100
+                            if d < 5:
+                                w *= 0.7; flags.append(f"s9v2_bsl_tight_{d:.1f}%")
+                    obs = [s for s in sigs if s.type.startswith("OB")]
+                    if obs and order.get("entry_price"):
+                        lo_ob = float((obs[-1].meta or {}).get("ob_low") or obs[-1].price)
+                        hi_ob = float((obs[-1].meta or {}).get("ob_high") or obs[-1].price)
+                        if lo_ob <= float(order["entry_price"]) <= hi_ob:
+                            w *= 0.8; flags.append("s10v2_in_ob")
+                    mss = [s for s in sigs if s.type.startswith("MSS_Bull")]
+                    if mss and (len(bars) - 1 - mss[-1].bar) <= 2:
+                        w *= 0.7; flags.append(f"s11v2_mss_bull@{len(bars)-1-mss[-1].bar}")
+                    # s12 norm OTE — 用 detector 自适应 wing
+                    try:
+                        wing, _ = _mod.pick_wing_by_density(bars)
+                        h_sw, l_sw = _mod.find_swings(bars, min_bars=wing)
+                        candidates = [(l, h) for l in l_sw for h in h_sw
+                                      if h["bar"] > l["bar"] and h["bar"] - l["bar"] < 30]
+                        if candidates and order.get("entry_price"):
+                            l0, h0 = candidates[-1]
+                            hi_p, lo_p = h0["price"], l0["price"]
+                            if hi_p > lo_p:
+                                ote_lo = hi_p - (hi_p - lo_p) * 0.79
+                                ote_hi = hi_p - (hi_p - lo_p) * 0.618
+                                ep = float(order["entry_price"])
+                                if ote_lo <= ep <= ote_hi:
+                                    w *= 0.7; flags.append("s12v2_in_ote")
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        # s13 rank components
+        try:
+            rc = order.get("rank_components")
+            if isinstance(rc, str):
+                import json as _j3
+                rc = _j3.loads(rc or "{}")
+            if (rc or {}).get("vr2") == 1 or (rc or {}).get("vol_cont") == 1:
+                w *= 0.7; flags.append("s13_rank_vc")
+        except Exception:
+            pass
+        # s14 同 v1
+        try:
+            _idxp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "idx_sh000001.json")
+            if os.path.exists(_idxp):
+                _idx = json.load(open(_idxp, encoding="utf-8"))
+                _d = str(order.get("signal_date") or "").replace("-", "")
+                _j = -1
+                for _i in range(len(_idx) - 1, -1, -1):
+                    if str(_idx[_i]["t"]) <= _d:
+                        _j = _i
+                        break
+                if _j >= 20:
+                    _r20 = (float(_idx[_j]["c"]) / float(_idx[_j - 20]["c"]) - 1) * 100
+                    if _r20 < -2:
+                        w *= 0.5; flags.append(f"s14_mkt_weak_{_r20:.1f}%")
+        except Exception:
+            pass
+        # R93 狠打猎桶 (用 v2 链 breakout × retrace)
+        if bk == "CHoCH↑" and rt_st == "no_retrace":
+            w *= 0.35; flags.append("s18_chup_noret_toX0.35")
+        if bk == "CHoCH↑" and rt_st == "retrace_fail":
+            w *= 0.35; flags.append("s19_chup_retfail_toX0.35")
+        if bk == "CHoCH↓" and rt_st == "retrace_fail":
+            w *= 0.35; flags.append("s20_chdn_retfail_toX0.35")
+        if bk == "BOS↑" and rt_st == "retrace_fail":
+            w *= 0.4; flags.append("s21_bosup_retfail_toX0.4")
+        if bk in ("BOS↓", "CHoCH↓") and rt_st == "retrace_fail":
+            w *= 0.5; flags.append("s15_bosdn_retfail_toX0.5")
+        if tr == "up" and rt_st == "no_retrace":
+            w *= 0.6; flags.append("s16_up_noret_toX0.6")
+        if tr == "down" and rt_st == "retrace_ok":
+            w *= 1.1; flags.append("s17_dn_retok_toX1.1")
+        return {"weight": round(w, 3), "flags": flags, "whale_90d_n": n_ev,
+                "mode": "norm_chain+norm_enrich+hard_soc_v21",
+                "date": time.strftime("%Y-%m-%d")}
+    except Exception:
+        return None
+
+
 def is_swing_high(bs, j):
     return _csh(bs, j, PIVOT)
 
@@ -1176,6 +1386,14 @@ def daily_selection():
             if _v is not None:
                 led[-1]["v23"] = _v
                 _sel_stats["v23_tagged"] = _sel_stats.get("v23_tagged", 0) + 1
+            # R95 (goal round 7): v2 自适应链影子 (与 v23 并存, 不入决策)
+            try:
+                _v2 = _v23v2_of(led[-1])
+                if _v2 is not None:
+                    led[-1]["v23_v2"] = _v2
+                    _sel_stats["v23v2_tagged"] = _sel_stats.get("v23v2_tagged", 0) + 1
+            except Exception:
+                pass
             new_orders.append((code, name, dd, limit_px))
             _event_order_count += 1
     conn.close()
@@ -1272,6 +1490,14 @@ def daily_selection():
             if _vc is not None:
                 led[-1]["v23"] = _vc
                 _sel_stats["v23_tagged"] = _sel_stats.get("v23_tagged", 0) + 1
+            # R95 (goal round 7): 同打 v2 自适应链影子标
+            try:
+                _vc2 = _v23v2_of(led[-1])
+                if _vc2 is not None:
+                    led[-1]["v23_v2"] = _vc2
+                    _sel_stats["v23v2_tagged"] = _sel_stats.get("v23v2_tagged", 0) + 1
+            except Exception:
+                pass
         except Exception:
             pass
     # FIX(2026-09-05, 审计 G03): SMC 腿接入生产选股 —— 读取 smc_candidates → PENDING(next_open)
