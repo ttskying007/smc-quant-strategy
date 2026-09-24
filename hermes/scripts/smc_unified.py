@@ -1797,14 +1797,15 @@ def _load_v22_legs(symbol):
                         shadow3[r['symbol'] + '|' + r['entry_date']] = r
             except Exception:
                 shadow3 = {}
-            # 再读 R76/77 引擎增强(sweep/BSL/SSL/FVG/OTE/MSS 流动性判定)
-            enrich = {}
+            sh2 = {}
             try:
-                with open(r'E:\test\smc_project\research\combo_v22_smc_full.csv', encoding='utf-8-sig') as fh:
+                with open(r'E:\test\smc_project\research\combo_v22_chain_v2_hhll.csv', encoding='utf-8-sig') as fh:
                     for r in _csv.DictReader(fh):
-                        enrich[r['symbol'] + '|' + r['entry_date']] = r
+                        sh2[r['symbol'] + '|' + r['entry_date']] = r
             except Exception:
-                enrich = {}
+                sh2 = {}
+            # 再读 v2 全链狠打影子 (R101-s22/s23 终版, R105 重写)
+            hhll = sh2  # 复用变量名以贴合 R106 代码
             with open(r'E:\test\smc_project\research\combo_v22_trades.csv', encoding='utf-8-sig') as fh:
                 for r in _csv.DictReader(fh):
                     leg = dict(r)
@@ -1813,7 +1814,8 @@ def _load_v22_legs(symbol):
                     leg['v23_weight'] = sh.get('v23_weight', '1.0')
                     leg['v23_flags'] = sh.get('v23_flags', 'none')
                     sh3 = shadow3.get(key) or {}
-                    leg['v23_weight_v2'] = sh3.get('_w', '1.0')
+                    leg['v23_weight_v2'] = sh3.get('v23_weight_v2', '1.0')
+                    leg['v23_flags_v2'] = sh3.get('v23_flags_v2', 'none')
                     en = enrich.get(key) or {}
                     for ek in ('sweeps_10b', 'sweep_dir', 'dist_to_ssl', 'dist_to_bsl',
                                'tp_above_bsl', 'sl_below_ssl', 'in_ob', 'in_fvg', 'in_ote',
@@ -1823,6 +1825,11 @@ def _load_v22_legs(symbol):
                         leg['chain'] = json.loads(r.get('chain_json') or '{}')
                     except Exception:
                         leg['chain'] = {}
+                    # R107 (goal round 19): 回归 v2 chain HH/LL 结构状态 (终版)
+                    try:
+                        leg['_v2_structure_state'] = (hhll.get(r['symbol'] + '|' + r['entry_date']) or {}).get('structure_state') or ''
+                    except Exception:
+                        leg['_v2_structure_state'] = ''
                     legs.append(leg)
         except Exception:
             legs = []
@@ -2468,7 +2475,7 @@ function renderLegsTable(legs){
         +'<th>出场(哪天/什么理由)</th>'
         +'<th>TP 设计(在什么水平/为什么这么设)</th>'
         +'<th>SL 设计(在什么水平/为什么这么设)</th>'
-        +'<th>PnL</th><th>持有bar</th><th>v24影子权重+flags</th><th>v2全链影子(R94)</th>'
+        +'<th>PnL</th><th>持有bar</th><th>v24影子权重+flags</th><th>v2全链影子(R94)</th><th>结构状态(R101)</th>'
         +'<th>引擎信号序列(按时间)</th></tr></thead><tbody>'
         +legs.map(function(leg,i){
             var pnl=Number(leg.pnl||0), cls=pnl>0?'green':'red';
@@ -2492,6 +2499,7 @@ function renderLegsTable(legs){
                 +'<td class=mono>'+(leg.hold_bars||0)+'</td>'
                 +'<td style="color:'+wc+';font-weight:bold">'+w.toFixed(2)+'<br/><span style="font-size:9px;color:#8b949e">'+(leg.v23_flags||'none')+'</span></td>'
                 +'<td style="color:'+wc2+';font-weight:bold">'+w2.toFixed(2)+'</td>'
+                +'<td style="font-size:9px;color:#a5b1c2">'+(((leg.structure_state||'')).split('(')[0]||'-')+'</td>'
                 +'<td style="font-size:9px">'+sweepNote(leg)+'<br/>'+(seq||'-')+'</td></tr>';
         }).join('')+'</tbody></table>';
 }
@@ -7343,6 +7351,7 @@ class Handler(BaseHTTPRequestHandler):
                                     'v23_weight': float(_lg.get('v23_weight') or 1),
                                     'v23_weight_v2': float(_lg.get('v23_weight_v2') or 1),
                                     'v23_flags': _lg.get('v23_flags'),
+                                    'structure_state': _lg.get('_v2_structure_state'),
                                     'trend_state': ch.get('trend_state'),
                                     'events_tail': (ch.get('events_tail') or [])[-6:],
                                     'bsl_levels': (ch.get('bsl_levels') or [])[-3:],
@@ -8571,6 +8580,7 @@ class Handler(BaseHTTPRequestHandler):
                         'v23_weight': float(_lg.get('v23_weight') or 1),
                         'v23_weight_v2': float(_lg.get('v23_weight_v2') or 1),
                         'v23_flags': _lg.get('v23_flags'),
+                        'structure_state': _lg.get('_v2_structure_state'),
                         'trend_state': ch.get('trend_state') or _lg.get('trend_state'),
                         'events_tail': (ch.get('events_tail') or [])[-6:],
                         'bsl_levels': (ch.get('bsl_levels') or [])[-3:],
