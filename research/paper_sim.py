@@ -764,6 +764,12 @@ def _v23v2_of(order, chain_v2=None):
             w *= 0.6; flags.append("s16_up_noret_toX0.6")
         if tr == "down" and rt_st == "retrace_ok":
             w *= 1.1; flags.append("s17_dn_retok_toX1.1")
+        # R101/R102 (goal round 13-14): HH/HL/LH/LL 显式结构 → s22/s23 打得紧
+        sst = (ch.get("structure_state") or "none")
+        if sst.startswith("bull") and bk == "BOS↑" and rt_st == "retrace_ok":
+            w *= 0.15; flags.append("s22_bull_BOSup_retok_toX0.15")
+        if sst.startswith("bear") and bk == "CHoCH↑" and rt_st == "no_retrace":
+            w *= 0.15; flags.append("s23_bear_CHoCHup_noret_toX0.15")
         return {"weight": round(w, 3), "flags": flags, "whale_90d_n": n_ev,
                 "mode": "norm_chain+norm_enrich+hard_soc_v21",
                 "date": time.strftime("%Y-%m-%d")}

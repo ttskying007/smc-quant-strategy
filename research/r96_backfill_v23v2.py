@@ -26,9 +26,7 @@ for o in lg:
                 skip1 += 1
         except Exception:
             skip1 += 1
-    if o.get('v23_v2'):
-        skip += 1
-        continue
+    # R102: 永远重算 v23_v2 (s22/s23 新伤桶 surgical 也许加入)
     try:
         r = paper_sim._v23v2_of(o)
         if r:
