@@ -2413,6 +2413,16 @@ function buildLegMarkers(af){
                 symbol:'circle',symbolSize:9,itemStyle:{color:up?'#58a6ff':'#ff9e4f'},
                 label:{show:true,formatter:(ev.kind||'').substring(0,7),fontSize:8,color:up?'#58a6ff':'#ff9e4f',position:'top'}});
         });
+        // R110: 子信号顺序标 ①②③… (披露日 / 吸筹确认 / ADX≥20 / 入场(T+1) 等)
+        (leg.sub_signals||[]).forEach(function(ss,si2){
+            var sd8=String(ss.date||'').replace(/-/g,''); var jj=d2i[sd8]; if(jj===undefined)return;
+            var close3=(ohlcvData[jj]&&ohlcvData[jj][1])||Number(leg.buy_price)||0;
+            var tt3='<b>'+(si2+1)+'. '+(ss.name||'?')+'</b><br/>'+sd8+' @ '+Number(close3).toFixed(2)
+                +(ss.detail?('<br/>'+String(ss.detail).slice(0,120)):'');
+            points.push({coord:[dates[jj],close3],value:(si2+1),_tt:tt3,
+                symbol:'circle',symbolSize:15,itemStyle:{color:'#d29922',borderColor:'#fff',borderWidth:1},
+                label:{show:true,formatter:String(si2+1),fontSize:10,color:'#0d1117',fontWeight:'bold'}});
+        });
         // BSL/SSL 最近三级水平线(带扫未扫标记)
         (leg.bsl_levels||[]).forEach(function(lv){
             var d8=String(lv.t||'').replace(/-/g,''); var j=d2i[d8]; if(j===undefined)return;
@@ -2501,7 +2511,31 @@ function renderLegsTable(legs){
                 +'<td style="color:'+wc2+';font-weight:bold">'+w2.toFixed(2)+'</td>'
                 +'<td style="font-size:9px;color:#a5b1c2">'+(((leg.structure_state||'')).split('(')[0]||'-')+'</td>'
                 +'<td style="font-size:9px">'+sweepNote(leg)+'<br/>'+(seq||'-')+'</td></tr>';
-        }).join('')+'</tbody></table>';
+        }).join('')+'</tbody></table>' + legsDetailHtml(legs);
+}
+// R110: 逐腿明细详表 — 买/卖日期/价格, TP/SL 价格+范围, 子信号按序(类型/日期/价格), 触发价, 出场信号/类型, 持仓
+function legsDetailHtml(legs){
+    function fmt6(x){var n=parseFloat(x); return (isNaN(n)?'-':n.toFixed(2));}
+    return '<h3 style="margin-top:14px">逐腿明细 (①序号=子信号顺序, 与图上跳字一致)</h3>'
+        +legs.map(function(leg,i){
+            var pnl=Number(leg.pnl||0);
+            var subs=(leg.sub_signals||[]).map(function(s,si2){return '<b>'+(si2+1)+'</b>. '+(s.name||'?')+' @ '+s.date+(s.detail?(' <span style=color:#8b949e>'+String(s.detail).slice(0,60)+'</span>'):'');}).join('<br/>');
+            var mfe=fmt6(leg.mfe_pct), mae=fmt6(leg.mae_pct), rr=leg.rr_exit!==undefined&&leg.rr_exit!==''?Number(leg.rr_exit).toFixed(2):'-';
+            return '<div style="margin:8px 0;padding:8px 10px;border:1px solid #30363d;border-radius:6px;font-size:11px;color:#c9d1d9">'
+                +'<b style=color:#58a6ff>腿#'+(i+1)+'</b> ['+leg.src+'] 链='+String(leg.signal_chain_kind||'-')
+                +' | 趋势=<b>'+(leg.trend_state||'-')+'</b> | PnL=<b style=color:'+(pnl>0?'#3fb950':'#f85149')+'>'+(pnl>=0?'+':'')+pnl.toFixed(2)+'%</b> | 持仓 <b>'+(leg.hold_bars||0)+'</b> bar</br>'
+                +'①信号填报(需出现) → <b>'+(leg.entry_date||'-')+'</b> ④平仓 '+String(leg.sell_date||'-')
+                +' | 买入日=<b class=mono>'+(leg.buy_date||'-')+'</b> @ <b class=mono>'+fmt6(leg.buy_price)+'</b>'
+                +' | 卖出日=<b class=mono>'+(leg.sell_date||'-')+'</b> @ <b class=mono>'+fmt6(leg.sell_price)+'</b>'
+                +' | 出场类型=<b style=color:#d29922>'+(leg.reason||'-')+'</b>'
+                +'<br/>触发信号: 突破类型=<b>'+(leg.breakout_kind||'-')+'</b> @ '+(leg.breakout_date||'-')
+                +' / 突破价=<b class=mono>'+fmt6(leg.breakout_price)+'</b>'
+                +' | 回踩状态=<b>'+(leg.retrace_state||'-')+'</b> 回踩价=<b class=mono>'+fmt6(leg.retrace_price)+'</b>'
+                +'<br/>TP=<b style=color:#3fb950>'+fmt6(leg.tp)+'</b> SL=<b style=color:#f85149>'+fmt6(leg.sl)+'</b>'
+                +' | 区间宽度=<b class=mono>'+fmt6(leg.risk_pct)+'%</b> | MFE=+'+mfe+'% MAE='+mae+'% | RR='+rr
+                +'<br/><span style=color:#8b949e>子信号按序:</span><br/>'+(subs||'<span style=color:#8b949e>无</span>')
+                +'</div>';
+        }).join('');
 }
 function renderKline(d){
     if(!chart){chart=echarts.init(document.getElementById('chart'),'dark');window.addEventListener('resize',function(){chart.resize()});}
@@ -7352,6 +7386,16 @@ class Handler(BaseHTTPRequestHandler):
                                     'v23_weight_v2': float(_lg.get('v23_weight_v2') or 1),
                                     'v23_flags': _lg.get('v23_flags'),
                                     'structure_state': _lg.get('_v2_structure_state'),
+                                    # R110: 明细全链字段 (逐腿 tooltips/表格用)
+                                    'mfe_pct': _lg.get('mfe_pct'), 'mae_pct': _lg.get('mae_pct'),
+                                    'rr_exit': _lg.get('rr_exit'), 'signal_chain_kind': _lg.get('signal_chain'),
+                                    'breakout_date': (ch.get('breakout') or {}).get('date'),
+                                    'breakout_price': (ch.get('breakout') or {}).get('price'),
+                                    'breakout_kind': (ch.get('breakout') or {}).get('kind'),
+                                    'retrace_price': (ch.get('retrace') or {}).get('price'),
+                                    'retrace_state': (ch.get('retrace') or {}).get('state'),
+                                    'sub_signals': (_lg.get('sub_signals') if isinstance(_lg.get('sub_signals'), list)
+                                                    else (json.loads(_lg.get('sub_signals') or '[]') if _lg.get('sub_signals') else [])),
                                     'trend_state': ch.get('trend_state'),
                                     'events_tail': (ch.get('events_tail') or [])[-6:],
                                     'bsl_levels': (ch.get('bsl_levels') or [])[-3:],
@@ -8581,6 +8625,11 @@ class Handler(BaseHTTPRequestHandler):
                         'v23_weight_v2': float(_lg.get('v23_weight_v2') or 1),
                         'v23_flags': _lg.get('v23_flags'),
                         'structure_state': _lg.get('_v2_structure_state'),
+                        # R110: 明细全链字段
+                        'mfe_pct': _lg.get('mfe_pct'), 'mae_pct': _lg.get('mae_pct'),
+                        'rr_exit': _lg.get('rr_exit'), 'signal_chain_kind': _lg.get('signal_chain'),
+                        'sub_signals': (_lg.get('sub_signals') if isinstance(_lg.get('sub_signals'), list)
+                                        else (json.loads(_lg.get('sub_signals') or '[]') if _lg.get('sub_signals') else [])),
                         'trend_state': ch.get('trend_state') or _lg.get('trend_state'),
                         'events_tail': (ch.get('events_tail') or [])[-6:],
                         'bsl_levels': (ch.get('bsl_levels') or [])[-3:],
