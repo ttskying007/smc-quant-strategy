@@ -4096,6 +4096,19 @@ def build_audit_portal(slug=''):
     kpis = index_data.get('kpis') or []
     reports = index_data.get('reports') or []
 
+    # ═══ R100 (goal round 12): 复盘判定卡 (读 R99 判定器输出, 若存在) ═══
+    _review_card = ''
+    try:
+        _rgp = Path(r'E:\test\smc_project\research\handover\_复盘_R99_judgment.md')
+        if _rgp.exists():
+            _rgmd = _rgp.read_text(encoding='utf-8')
+            _review_card = (f"<div class='card' style='border-left:3px solid #3fb950'>"
+                            f"<h2>双链复盘判定 (R99, 2026-10-23 复核可重跑)</h2>"
+                            f"{_audit_md_to_html(_rgmd)}</div>")
+    except Exception:
+        pass
+
+
     # ═══ R87: 生产影子池卡(近挂单 + v23权重/flags + Jev判定) ═══
     shadow_card = ''
     try:
@@ -4193,7 +4206,7 @@ def build_audit_portal(slug=''):
             body = '<div class="card">报告不存在: ' + html.escape(slug) + '</div>'
     else:
         preview = ''.join(f'<div class="card"><a href="/audit?r={html.escape(r["slug"])}" style="font-size:1.1em;color:#58a6ff">{html.escape(r["title"])}</a><div style="color:#8b949e">{html.escape(r["tag"])}</div></div>' for r in reports)
-        body = f'{shadow_card}<div class="card" style="border-left:3px solid #58a6ff"><h2>研究审计门户</h2><p>R60-R86 全部自动化报告在一起。K线链 / 逐腿审计 / 手术预注册 / 熊市追踪 / 全信号家族都在这里。</p></div>{preview}'
+        body = f'{_review_card}{shadow_card}<div class="card" style="border-left:3px solid #58a6ff"><h2>研究审计门户</h2><p>R60-R99 全部自动化报告在一起。K线链 / 逐腿审计 / 手术预注册 / 熊市追踪 / 全信号家族都在这里。</p></div>{preview}'
 
     return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"><title>研究审计门户</title><style>{CSS} .stats{{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}} .stat{{flex:1;min-width:180px;background:#161b22;border-radius:8px;padding:10px 14px}} .val{{font-size:1.3em;font-weight:700}} .lbl{{color:#8b949e;font-size:0.85em}} table{{width:100%;border-collapse:collapse;font-size:0.86em}} th,td{{padding:5px 8px;border:1px solid #30363d;text-align:left}} th{{background:#161b22}} pre{{background:#0d1117;padding:8px;border-radius:6px;font-size:0.85em;overflow:auto}}</style></head><body>{build_nav()}<div class="container" style="max-width:1400px">
 <div class="stats">{kpi_html}</div>
