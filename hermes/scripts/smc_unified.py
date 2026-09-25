@@ -2173,14 +2173,17 @@ function loadKline(){
                         label:{show:true,formatter:e.kind+' 枢轴 '+e.level,fontSize:8,color:segColor,position:'insideStart'}},
                         {coord:[e.x,e.level]}]);
                 }
-                var lbl=e.kind+(isCur?'【当前】':'')+((e.pen_pct!==undefined)?'\n'+(e.pen_pct>=0?'+':'')+e.pen_pct+'%':'');
+                var lbl=e.kind+(isCur?'【当前】':'')+((e.pen_pct!==undefined)?'\n'+(e.pen_pct>=0?'+':'')+e.pen_pct+'%':'')
+                    +(e.conflu_pool?'\n🧲'+e.conflu_pool+'共振':'');
                 ovMP.push({coord:[e.x,e.level],value:e.kind,_tt:
                     '<b>'+e.kind+'</b> @ '+e.x+(isCur?' <b style="color:#3fb950">【当前结构】</b>':'')
                     +'<br/>破枢轴: '+e.level+' ('+(e.level_date||'?')+')'
                     +'<br/>穿透: '+(e.pen_pct!==undefined?e.pen_pct+'%':'-')
-                    +(e.wick_first?'<br/>◌ 影线先行触及(先扫后破)':''),
+                    +(e.wick_first?'<br/>◌ 影线先行触及(先扫后破)':'')
+                    +(e.conflu_pool?'<br/>🧲 <b style="color:#d29922">'+e.conflu_pool+' 磁区共振</b>(扫池→破位, 强信号)':''),
                     symbol:cho?'diamond':'triangle',symbolSize:cho?(isCur?16:13):(isCur?12:10),symbolRotate:up?0:180,
-                    itemStyle:{color:segColor,opacity:evOp,shadowBlur:isCur?8:0,shadowColor:segColor},
+                    itemStyle:{color:segColor,opacity:evOp,shadowBlur:isCur?8:0,shadowColor:segColor,
+                        borderColor:e.conflu_pool?'#d29922':'transparent',borderWidth:e.conflu_pool?2:0},
                     label:{show:true,fontSize:8,color:isCur?'#3fb950':segColor,formatter:lbl}});
             });
             if(sc.breakout&&sc.breakout.x&&sc.breakout.price){
@@ -2199,7 +2202,7 @@ function loadKline(){
             hp.push('<div class="card" style="border-left:3px solid #bc8cff"><h2>🧬 SMC 信号链(当前)</h2>');
             hp.push('<p>趋势: <b style="color:'+(sc.trend_state==='up'?'#3fb950':'#f85149')+'">'+(sc.trend_state||'-')+'</b> | 现价 '+sc.current_price+'</p>');
             hp.push('<table><thead><tr><th>环节</th><th>时间</th><th>价格</th><th>类型/信号</th></tr></thead><tbody>');
-            (sc.events_tail||[]).forEach(function(e){hp.push('<tr><td>结构事件</td><td class=mono>'+e.date+'</td><td class=mono>'+e.level+' <span style=color:#8b949e>(破 '+(e.level_date||'?')+' 枢轴, 穿 '+(e.pen_pct!==undefined?e.pen_pct:'-')+'%'+(e.wick_first?' ◌影线先扫':'')+')</span></td><td>'+e.kind+'</td></tr>');});
+            (sc.events_tail||[]).forEach(function(e){hp.push('<tr><td>结构事件</td><td class=mono>'+e.date+'</td><td class=mono>'+e.level+' <span style=color:#8b949e>(破 '+(e.level_date||'?')+' 枢轴, 穿 '+(e.pen_pct!==undefined?e.pen_pct:'-')+'%'+(e.wick_first?' ◌影线先扫':'')+')</span></td><td>'+e.kind+(e.conflu_pool?' <b style=color:#d29922>🧲'+e.conflu_pool+'共振</b>':'')+(e.is_current?' <b style=color:#3fb950>【当前】</b>':'')+'</td></tr>');});
             (sc.bsl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前高(BSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.sweep_state||((s.swept?'实收穿越':'未扫')))+'</td></tr>');});
             (sc.ssl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前低(SSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.sweep_state||((s.swept?'实收穿越':'未扫')))+'</td></tr>');});
             (sc.eqh||[]).slice(-3).forEach(function(q){var st=q.sweep_state||'未扫';var dc=(st==='未扫')?'#3fb950':(st==='影线假扫回收'?'#9e6ae8':'#6e7681');hp.push('<tr><td>流动性池EQH</td><td class=mono>'+q.t+'~'+q.t2+'</td><td class=mono>'+q.price+'</td><td>等高 ×'+q.count+(q.conflu?' <b style=color:#d29922>共振</b>':'')+' <span style=color:'+dc+'>'+st+'</span></td></tr>');});
@@ -8729,6 +8732,16 @@ class Handler(BaseHTTPRequestHandler):
                             return out
                         _eqh = _merge_pool(_eqh, _core_bsl, 'eqh')
                         _eql = _merge_pool(_eql, _core_ssl, 'eql')
+                        # R119: 事件×磁区共振 — 事件价位恰在活跃磁区内(扫池→破位的强信号)
+                        _active_pools = ([{'side': 'EQH', 'price': q['price']} for q in _eqh
+                                          if q.get('sweep_state') in ('未扫', '影线假扫回收')]
+                                         + [{'side': 'EQL', 'price': q['price']} for q in _eql
+                                            if q.get('sweep_state') in ('未扫', '影线假扫回收')])
+                        for _ev in _core_events:
+                            _lv = float(_ev.get('level') or 0)
+                            _hit = next((p for p in _active_pools
+                                         if _lv > 0 and abs(p['price'] - _lv) / _lv <= 0.005), None)
+                            _ev['conflu_pool'] = _hit['side'] if _hit else ''
                         # 趋势同口径修正为 HH/LL 序列(与 chain.build_chain 一致)
                         _sev_dir = [e['kind'] for e in _cev[-4:]]
                         if _core_events:
