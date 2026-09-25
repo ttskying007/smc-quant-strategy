@@ -2166,6 +2166,23 @@ function loadKline(){
                     label:{formatter:'EQL '+q.price+' ×'+q.count+(dead?'(已失效)':''),fontSize:9,color:dead?'#6e7681':'#8d9e6a',position:'insideEndBottom'}},
                     {coord:[endX,q.price]}]);
             });
+            // R126: 二测拒绝信号 — 假扫回收池被二测反弹时标菱形(拒绝→空/多, R125 证据: 20/20全胜)
+            (sc.eqh||[]).forEach(function(q){ if(!q.retest_x)return;
+                ovMP.push({coord:[q.retest_x,q.price],_tt:
+                    '<b style="color:#f85149">'+(q.retest_dir||'拒绝')+'</b> @ '+q.retest_x
+                    +'<br/>EQH池 '+q.price+' (假扫回收后二测反弹)'
+                    +'<br/>R125: 反向入场 10bar avg+9.95% WR100%',
+                    symbol:'diamond',symbolSize:12,itemStyle:{color:'#f85149',borderColor:'#ffb3b3',borderWidth:1},
+                    label:{show:true,fontSize:8,color:'#f85149',formatter:q.retest_dir||'拒绝',position:'top'}});
+            });
+            (sc.eql||[]).forEach(function(q){ if(!q.retest_x)return;
+                ovMP.push({coord:[q.retest_x,q.price],_tt:
+                    '<b style="color:#3fb950">'+(q.retest_dir||'拒绝')+'</b> @ '+q.retest_x
+                    +'<br/>EQL池 '+q.price+' (假扫回收后二测反弹)'
+                    +'<br/>R125: 反向入场 10bar avg+8.40% WR100%',
+                    symbol:'diamond',symbolSize:12,itemStyle:{color:'#3fb950',borderColor:'#b3ffb3',borderWidth:1},
+                    label:{show:true,fontSize:8,color:'#3fb950',formatter:q.retest_dir||'拒绝',position:'bottom'}});
+            });
             (sc.fvg_bull||[]).forEach(function(f){ if(!f.x)return;
                 var dead=f.fill_state==='filled';
                 var nm=(f.ifvg?'IFVG+':(dead?'FVG+(已失效)':'FVG+'));
@@ -8719,20 +8736,41 @@ class Handler(BaseHTTPRequestHandler):
                                     #   仅影线触及但收回 → 假扫回收(池仍在, 反而强化)
                                     pj = max(js); pp = sum(ps) / len(ps)
                                     p_wick = False; p_state = '未扫'
-                                    for kk in _cks[pj + 1:]:
+                                    p_sweep_i = -1; p_retest_i = -1
+                                    for kk_i, kk in enumerate(_cks[pj + 1:]):
+                                        _ki = pj + 1 + kk_i
                                         if side == 'eqh':
-                                            if kk['h'] > pp: p_wick = True
+                                            if kk['h'] > pp:
+                                                p_wick = True
+                                                if p_sweep_i < 0: p_sweep_i = _ki
                                             if kk['c'] > pp: p_state = '实收穿越'; break
                                         else:
-                                            if kk['l'] < pp: p_wick = True
+                                            if kk['l'] < pp:
+                                                p_wick = True
+                                                if p_sweep_i < 0: p_sweep_i = _ki
                                             if kk['c'] < pp: p_state = '实收穿越'; break
                                     else:
                                         p_state = '影线假扫回收' if p_wick else '未扫'
+                                    # R126: 二测反弹检测 — sweep 后 20 bar 内回池且 close 收回(未先破)
+                                    p_retest_dir = ''
+                                    if p_state == '影线假扫回收' and p_sweep_i >= 0:
+                                        for k in range(p_sweep_i + 1, min(p_sweep_i + 21, len(_cks))):
+                                            if side == 'eqh':
+                                                if _cks[k]['c'] > pp: break
+                                                if _cks[k]['h'] > pp and _cks[k]['c'] <= pp:
+                                                    p_retest_i = k; p_retest_dir = '拒绝→空'; break
+                                            else:
+                                                if _cks[k]['c'] < pp: break
+                                                if _cks[k]['l'] < pp and _cks[k]['c'] >= pp:
+                                                    p_retest_i = k; p_retest_dir = '拒绝→多'; break
                                     out.append({'t': _cks[min(js)]['t'], 'x': _xd(_cks[min(js)]['t']),
                                                 't2': _cks[max(js)]['t'], 'x2': _xd(_cks[max(js)]['t']),
                                                 'price': round(pp, 2), 'count': len(members),
                                                 'sweep_state': p_state,
-                                                'swept': p_state == '实收穿越'})
+                                                'swept': p_state == '实收穿越',
+                                                'retest_x': (_xd(_cks[p_retest_i]['t']) if p_retest_i >= 0 else ''),
+                                                'retest_date': (_cks[p_retest_i]['t'] if p_retest_i >= 0 else ''),
+                                                'retest_dir': p_retest_dir})
                             return out[:3]
                         _eqh = _eq_cluster(_cph, 'eqh')
                         _eql = _eq_cluster(_cpl, 'eql')

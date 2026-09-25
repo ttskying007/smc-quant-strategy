@@ -1,0 +1,70 @@
+{
+ "total": 20,
+ "overlap_n": 7,
+ "unique_n": 13,
+ "overlap": [
+  {
+   "symbol": "000338.SZ",
+   "side": "EQH",
+   "pool_price": "35.37",
+   "sweep_date": "20260527",
+   "signal_date": "20260529",
+   "entry_price": "34.97",
+   "ret_10b_signed": "20.99"
+  },
+  {
+   "symbol": "000534.SZ",
+   "side": "EQH",
+   "pool_price": "33.2",
+   "sweep_date": "20260706",
+   "signal_date": "20260707",
+   "entry_price": "31.54",
+   "ret_10b_signed": "20.74"
+  },
+  {
+   "symbol": "000559.SZ",
+   "side": "EQH",
+   "pool_price": "18.38",
+   "sweep_date": "20260518",
+   "signal_date": "20260519",
+   "entry_price": "18.12",
+   "ret_10b_signed": "17.6"
+  },
+  {
+   "symbol": "000589.SZ",
+   "side": "EQH",
+   "pool_price": "5.12",
+   "sweep_date": "20260225",
+   "signal_date": "20260227",
+   "entry_price": "5.11",
+   "ret_10b_signed": "4.11"
+  },
+  {
+   "symbol": "000695.SZ",
+   "side": "EQL",
+   "pool_price": "11.65",
+   "sweep_date": "20260714",
+   "signal_date": "20260715",
+   "entry_price": "11.79",
+   "ret_10b_signed": "10.18"
+  },
+  {
+   "symbol": "000701.SZ",
+   "side": "EQL",
+   "pool_price": "4.3",
+   "sweep_date": "20260721",
+   "signal_date": "20260722",
+   "entry_price": "4.34",
+   "ret_10b_signed": "13.36"
+  },
+  {
+   "symbol": "000826.SZ",
+   "side": "EQH",
+   "pool_price": "2.01",
+   "sweep_date": "20260825",
+   "signal_date": "20260826",
+   "entry_price": "1.96",
+   "ret_10b_signed": "5.61"
+  }
+ ]
+}
