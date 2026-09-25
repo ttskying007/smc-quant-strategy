@@ -4319,6 +4319,41 @@ def build_audit_portal(slug=''):
     except Exception:
         pass
 
+    # R127: 反向候选卡 (sweep→reverse 2.0, R125 证据链) — /autopsy 展示
+    try:
+        import csv as _csv_rev
+        _rev_rows = list(_csv_rev.DictReader(open(r'E:\test\smc_project\research\combo_reverse_candidates.csv', encoding='utf-8-sig')))
+        _rev_eqh = [r for r in _rev_rows if r['side'] == 'EQH']
+        _rev_eql = [r for r in _rev_rows if r['side'] == 'EQL']
+
+        def _rev_avg(rs):
+            if not rs:
+                return 'n=0'
+            p = [float(r['ret_10b_signed']) for r in rs]
+            return f"n={len(rs)} avg={sum(p)/len(p):+.2f}% WR={sum(1 for v in p if v>0)/len(rs)*100:.0f}%"
+
+        try:
+            _ov = json.load(open(r'E:\test\smc_project\research\handover\_r126_overlap.json', encoding='utf-8'))
+            _ov_txt = f"引擎已覆盖 {_ov.get('overlap_n')} / 增量 {_ov.get('unique_n')}"
+        except Exception:
+            _ov_txt = '重叠分析未运行'
+        _rev_list = ''.join(
+            f"<span class='mono' style='display:inline-block;margin:2px;padding:1px 6px;border:1px solid #30363d;border-radius:3px;font-size:0.85em'>"
+            f"{html.escape(r['symbol'])} <b style='color:{'#f85149' if r['side']=='EQH' else '#3fb950'}'>{r['side']}拒绝</b> {r['signal_date']} → {r['ret_10b_signed']}%</span>"
+            for r in _rev_rows[:20])
+        _rev_card = ("<div class='card' style='border-left:3px solid #3fb950'>"
+                     "<h2>🔄 反向候选 sweep→reverse 2.0 (R125, 300股)</h2>"
+                     "<p style='color:#8b949e'>影线假扫回收池 → 二测反弹 → <b>反向</b>入场 (EQH拒绝→空 / EQL拒绝→多); R122b 证伪顺向做多后方向修正</p>"
+                     "<table><thead><tr><th>候选</th><th>10bar 反向收益</th></tr></thead><tbody>"
+                     f"<tr><td>EQH 拒绝→空</td><td class='mono'>{_rev_avg(_rev_eqh)}</td></tr>"
+                     f"<tr><td>EQL 拒绝→多</td><td class='mono'>{_rev_avg(_rev_eql)}</td></tr>"
+                     "</tbody></table>"
+                     f"<p style='color:#8b949e'>V517 引擎重叠: {_ov_txt} — 增量 setup 是池级二测拒绝逻辑的潜在补充。</p>"
+                     f"<div style='margin-top:6px'>{_rev_list}</div>"
+                     "</div>")
+    except Exception:
+        pass
+
 
     # ═══ R87: 生产影子池卡(近挂单 + v23权重/flags + Jev判定) ═══
     shadow_card = ''
@@ -4417,7 +4452,7 @@ def build_audit_portal(slug=''):
             body = '<div class="card">报告不存在: ' + html.escape(slug) + '</div>'
     else:
         preview = ''.join(f'<div class="card"><a href="/audit?r={html.escape(r["slug"])}" style="font-size:1.1em;color:#58a6ff">{html.escape(r["title"])}</a><div style="color:#8b949e">{html.escape(r["tag"])}</div></div>' for r in reports)
-        body = f'{_review_card}{_eq_card}{shadow_card}<div class="card" style="border-left:3px solid #58a6ff"><h2>研究审计门户</h2><p>R60-R99 全部自动化报告在一起。K线链 / 逐腿审计 / 手术预注册 / 熊市追踪 / 全信号家族都在这里。</p></div>{preview}'
+        body = f'{_review_card}{_eq_card}{_rev_card}{shadow_card}<div class="card" style="border-left:3px solid #58a6ff"><h2>研究审计门户</h2><p>R60-R99 全部自动化报告在一起。K线链 / 逐腿审计 / 手术预注册 / 熊市追踪 / 全信号家族都在这里。</p></div>{preview}'
 
     return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"><title>研究审计门户</title><style>{CSS} .stats{{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}} .stat{{flex:1;min-width:180px;background:#161b22;border-radius:8px;padding:10px 14px}} .val{{font-size:1.3em;font-weight:700}} .lbl{{color:#8b949e;font-size:0.85em}} table{{width:100%;border-collapse:collapse;font-size:0.86em}} th,td{{padding:5px 8px;border:1px solid #30363d;text-align:left}} th{{background:#161b22}} pre{{background:#0d1117;padding:8px;border-radius:6px;font-size:0.85em;overflow:auto}}</style></head><body>{build_nav()}<div class="container" style="max-width:1400px">
 <div class="stats">{kpi_html}</div>

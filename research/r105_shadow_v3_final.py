@@ -21,6 +21,13 @@ ENR2 = {r['symbol'] + '|' + r['entry_date']: r
 # R117: 活跃磁区因子表 (r117_eq_magnet_factor.py 产出)
 EQM = {r['symbol'] + '|' + r['entry_date']: r
        for r in csv.DictReader(open(ROOT / 'research/combo_v22_eq_magnet.csv', encoding='utf-8-sig'))}
+# R127: 二测拒绝反向候选表 (r125_reverse_candidates.py 产出) — symbol -> [(signal_date, side)]
+REV = {}
+try:
+    for _r in csv.DictReader(open(ROOT / 'research/combo_reverse_candidates.csv', encoding='utf-8-sig')):
+        REV.setdefault(_r['symbol'], []).append((str(_r['signal_date']).replace('-', ''), _r['side']))
+except Exception:
+    REV = {}
 rows = list(csv.DictReader(open(ROOT / 'research/combo_v22_trades.csv', encoding='utf-8-sig')))
 
 conn = sqlite3.connect(CFG.ANNOUNCE_DB)
@@ -84,6 +91,11 @@ def w_final(r):
             w *= 0.15; flags.append('s24_eql_risk')
         elif _eqh_n >= 1:
             w *= 1.0; flags.append('s24_eqh_target')  # 上方磁吸目标: 记录不加权
+    # R127: 二测拒绝反向 (sweep→reverse 2.0, r125 证据 20/20 全胜) — 记录-only, 不加权
+    _rev_hits = [s for sd8, s in REV.get(r['symbol'], [])
+                 if abs(int(sd8 or 0) - int(r['entry_date'] or 0)) <= 3]
+    if _rev_hits:
+        flags.append('s25_reverse_' + '+'.join(_rev_hits))
     if 'CHoCH' in bk:
         w *= 0.4; flags.append(f's1v2_{bk}')
     if tr == 'up':

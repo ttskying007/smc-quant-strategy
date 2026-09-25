@@ -37,6 +37,28 @@ def _eqm_table():
         _EQM_TABLE = tbl
     return _EQM_TABLE
 
+
+# R127: 二测拒绝反向候选表 (r125 产出) — code -> [rows], 惰性加载
+_REV_TABLE = None
+
+
+def _rev_candidates():
+    global _REV_TABLE
+    if _REV_TABLE is None:
+        import csv as _csv_r
+        tbl = {}
+        try:
+            fp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "combo_reverse_candidates.csv")
+            with open(fp, encoding="utf-8-sig") as fh:
+                for r in _csv_r.DictReader(fh):
+                    sym = str(r.get("symbol") or "")
+                    code = sym.split(".")[0]
+                    tbl.setdefault(code, []).append(r)
+        except Exception:
+            tbl = {}
+        _REV_TABLE = tbl
+    return _REV_TABLE
+
 ROOT = CFG.RESEARCH_DIR
 KT = CFG.KT_CACHE
 LEDGER = CFG.LEDGER
@@ -811,6 +833,17 @@ def _v23v2_of(order, chain_v2=None):
                         w *= 0.15; flags.append("s24_eql_risk")
                     elif _row.get("eq_near_active") == "True" and int(_row.get("eqh_active_n") or 0) >= 1:
                         flags.append("s24_eqh_target")  # 仅记录
+        except Exception:
+            pass
+        # R127: 二测拒绝反向 (sweep→reverse 2.0) — 记录-only, 不加权
+        try:
+            _revc = _rev_candidates().get(order.get("code", ""))
+            if _revc:
+                _sd8 = str(order.get("signal_date") or "").replace("-", "")
+                _hits = [str(r.get("side") or "") for r in _revc
+                         if abs(int(str(r.get("signal_date") or "").replace("-", "") or 0) - int(_sd8 or 0)) <= 3]
+                if _hits:
+                    flags.append("s25_reverse_" + "+".join(_hits))
         except Exception:
             pass
         return {"weight": round(w, 3), "flags": flags, "whale_90d_n": n_ev,
