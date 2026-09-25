@@ -1804,6 +1804,14 @@ def _load_v22_legs(symbol):
                         sh2[r['symbol'] + '|' + r['entry_date']] = r
             except Exception:
                 sh2 = {}
+            # R121: 共振破位表 (r120_resonance_break.py 产出)
+            RES_BRK = {}
+            try:
+                with open(r'E:\test\smc_project\research\combo_v22_resonance_break.csv', encoding='utf-8-sig') as fh:
+                    for r in _csv.DictReader(fh):
+                        RES_BRK[r['symbol'] + '|' + r['entry_date']] = r
+            except Exception:
+                RES_BRK = {}
             # 再读 v2 全链狠打影子 (R101-s22/s23 终版, R105 重写)
             hhll = sh2  # 复用变量名以贴合 R106 代码
             # FIX(R111c): 恢复 R88b 的 enrich 块 —— R107 编辑中丢失, 导致 legs 全空
@@ -1838,6 +1846,13 @@ def _load_v22_legs(symbol):
                         leg['_v2_structure_state'] = (hhll.get(r['symbol'] + '|' + r['entry_date']) or {}).get('structure_state') or ''
                     except Exception:
                         leg['_v2_structure_state'] = ''
+                    # R121: 共振破位 (r120 产出) — 腿表共振列
+                    try:
+                        _rb2 = RES_BRK.get(r['symbol'] + '|' + r['entry_date']) or {}
+                        leg['_resonance_break'] = _rb2.get('resonance_break') or ''
+                        leg['_resonance_side'] = _rb2.get('resonance_side') or ''
+                    except Exception:
+                        leg['_resonance_break'] = ''
                     legs.append(leg)
         except Exception:
             legs = []
@@ -2576,6 +2591,7 @@ function renderLegsTable(legs){
         +'<th>出场(哪天/什么理由)</th>'
         +'<th>TP 设计(在什么水平/为什么这么设)</th>'
         +'<th>SL 设计(在什么水平/为什么这么设)</th>'
+        +'<th>共振破位(R121)</th>'
         +'<th>PnL</th><th>持有bar</th><th>v24影子权重+flags</th><th>v2全链影子(R94)</th><th>结构状态(R101)</th>'
         +'<th>引擎信号序列(按时间)</th></tr></thead><tbody>'
         +legs.map(function(leg,i){
@@ -2596,6 +2612,7 @@ function renderLegsTable(legs){
                 +'<td class=mono><b>'+(leg.sell_date||'')+'</b><br/>@ '+Number(leg.sell_price).toFixed(2)+'<br/><span style=color:#8b949e>('+(leg.reason||'-')+')</span></td>'
                 +'<td class=mono style=color:#3fb950><b>'+Number(leg.tp).toFixed(2)+'</b><br/><span style="font-size:9px;color:#8b949e">'+tpNote(leg)+'</span></td>'
                 +'<td class=mono style=color:#f85149><b>'+Number(leg.sl).toFixed(2)+'</b><br/><span style="font-size:9px;color:#8b949e">'+slNote(leg)+'</span></td>'
+                +'<td class=mono>'+(leg.resonance_break==='True'?('<b style=color:#d29922>共振('+(leg.resonance_side||'?')+')</b>'):'<span style=color:#8b949e>-</span>')+'</td>'
                 +'<td class='+cls+'><b>'+(pnl>=0?'+':'')+pnl.toFixed(2)+'%</b></td>'
                 +'<td class=mono>'+(leg.hold_bars||0)+'</td>'
                 +'<td style="color:'+wc+';font-weight:bold">'+w.toFixed(2)+'<br/><span style="font-size:9px;color:#8b949e">'+(leg.v23_flags||'none')+'</span></td>'
@@ -7515,6 +7532,9 @@ class Handler(BaseHTTPRequestHandler):
                                     'v23_weight_v2': float(_lg.get('v23_weight_v2') or 1),
                                     'v23_flags': _lg.get('v23_flags'),
                                     'structure_state': _lg.get('_v2_structure_state'),
+                                    # R121: 共振破位
+                                    'resonance_break': _lg.get('_resonance_break'),
+                                    'resonance_side': _lg.get('_resonance_side'),
                                     # R110: 明细全链字段 (逐腿 tooltips/表格用)
                                     'mfe_pct': _lg.get('mfe_pct'), 'mae_pct': _lg.get('mae_pct'),
                                     'rr_exit': _lg.get('rr_exit'), 'signal_chain_kind': _lg.get('signal_chain'),
@@ -8928,6 +8948,9 @@ class Handler(BaseHTTPRequestHandler):
                         'v23_weight_v2': float(_lg.get('v23_weight_v2') or 1),
                         'v23_flags': _lg.get('v23_flags'),
                         'structure_state': _lg.get('_v2_structure_state'),
+                        # R121: 共振破位 (腿表共振列)
+                        'resonance_break': _lg.get('_resonance_break'),
+                        'resonance_side': _lg.get('_resonance_side'),
                         # R110: 明细全链字段
                         'mfe_pct': _lg.get('mfe_pct'), 'mae_pct': _lg.get('mae_pct'),
                         'rr_exit': _lg.get('rr_exit'), 'signal_chain_kind': _lg.get('signal_chain'),
