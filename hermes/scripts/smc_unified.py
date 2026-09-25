@@ -2136,6 +2136,17 @@ function loadKline(){
                 var t3=st3==='影线假扫回收'?'dotted':'dashed';
                 ovML.push([{coord:[s.x,s.price],lineStyle:{color:c3,type:t3,width:1},label:{formatter:'SSL '+s.price+(st3==='未扫'?'':'('+st3+')'),fontSize:9,color:c3,position:'insideEndBottom'}},{coord:[endX,s.price]}]);
             });
+            // R114: EQH/EQL 流动性池(等高等低, 池=磁区)
+            (sc.eqh||[]).forEach(function(q){ if(!q.x)return;
+                ovML.push([{coord:[q.x,q.price],lineStyle:{color:'#b0bec5',type:'dashed',width:2},
+                    label:{formatter:'EQH '+q.price+' ×'+q.count,fontSize:9,color:'#b0bec5',position:'insideEndTop'}},
+                    {coord:[endX,q.price]}]);
+            });
+            (sc.eql||[]).forEach(function(q){ if(!q.x)return;
+                ovML.push([{coord:[q.x,q.price],lineStyle:{color:'#8d9e6a',type:'dashed',width:2},
+                    label:{formatter:'EQL '+q.price+' ×'+q.count,fontSize:9,color:'#8d9e6a',position:'insideEndBottom'}},
+                    {coord:[endX,q.price]}]);
+            });
             (sc.fvg_bull||[]).forEach(function(f){ if(!f.x)return;
                 ovMA.push([{name:(f.ifvg?'IFVG+':'FVG+'),xAxis:f.x,yAxis:f.low,itemStyle:{color:f.ifvg?'rgba(188,140,255,0.20)':'rgba(63,185,80,0.13)',borderColor:f.ifvg?'#bc8cff':'#3fb950',borderWidth:1}},{xAxis:endX,yAxis:f.high}]);
             });
@@ -2182,6 +2193,8 @@ function loadKline(){
             (sc.events_tail||[]).forEach(function(e){hp.push('<tr><td>结构事件</td><td class=mono>'+e.date+'</td><td class=mono>'+e.level+' <span style=color:#8b949e>(破 '+(e.level_date||'?')+' 枢轴, 穿 '+(e.pen_pct!==undefined?e.pen_pct:'-')+'%'+(e.wick_first?' ◌影线先扫':'')+')</span></td><td>'+e.kind+'</td></tr>');});
             (sc.bsl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前高(BSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.sweep_state||((s.swept?'实收穿越':'未扫')))+'</td></tr>');});
             (sc.ssl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前低(SSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.sweep_state||((s.swept?'实收穿越':'未扫')))+'</td></tr>');});
+            (sc.eqh||[]).slice(-3).forEach(function(q){hp.push('<tr><td>流动性池EQH</td><td class=mono>'+q.t+'~'+q.t2+'</td><td class=mono>'+q.price+'</td><td>等高 ×'+q.count+' (池=磁区)</td></tr>');});
+            (sc.eql||[]).slice(-3).forEach(function(q){hp.push('<tr><td>流动性池EQL</td><td class=mono>'+q.t+'~'+q.t2+'</td><td class=mono>'+q.price+'</td><td>等低 ×'+q.count+' (池=磁区)</td></tr>');});
             (sc.ob||[]).slice(-2).forEach(function(o){hp.push('<tr><td>订单块</td><td class=mono>'+o.t+'</td><td class=mono>'+o.low+'~'+o.high+'</td><td>'+o.side+' → '+o.broke_kind+' @'+o.broke_at+'</td></tr>');});
             var nf=(sc.fvg_bull||[]).length, nb=(sc.fvg_bear||[]).length, nfvg=(sc.fvg_bull||[]).concat(sc.fvg_bear||[]).filter(function(f){return f.ifvg;}).length;
             hp.push('<tr><td>缺口</td><td class=mono>近30日</td><td class=mono>FVG多 '+nf+' / 空 '+nb+'</td><td>其中 IFVG(逆缺口) '+nfvg+'</td></tr>');
@@ -8551,6 +8564,7 @@ class Handler(BaseHTTPRequestHandler):
                     # R112: BOS/CHoCH/BSL/SSL 单源化 —— 改用 core.structure.mode='auto'
                     # (与回测 paper_sim 同一实现), 替代引擎快照里 pivot=3 的旧事件, 修图上错标。
                     _core_events, _core_bsl, _core_ssl = [], [], []
+                    _eqh, _eql = [], []
                     try:
                         import sys as _sx
                         if r'E:\test\smc_project\research' not in _sx.path:
@@ -8594,6 +8608,32 @@ class Handler(BaseHTTPRequestHandler):
                                       'swept': _core_swept(j, p, 'ssl') == '实收穿越',
                                       'sweep_state': _core_swept(j, p, 'ssl')}
                                      for j, p in _cpl[-3:]]
+                        # R114: EQH/EQL 流动性池 — 近12个月摆动点按容差聚类, ≥2个同价位为池
+                        _eqh, _eql = [], []
+                        def _eq_cluster(pivs, side, lookback_bars=250, tol_ratio=0.008):
+                            # 只看近 lookback 的摆点
+                            cut = len(_cks) - lookback_bars
+                            cand = [(j, p) for j, p in pivs if j >= cut]
+                            cand.sort(key=lambda x: -x[0])  # 新→旧
+                            used = [False] * len(cand)
+                            out = []
+                            for a in range(len(cand)):
+                                if used[a]: continue
+                                j1, p1 = cand[a]
+                                members = [a]
+                                for b in range(a + 1, len(cand)):
+                                    j2, p2 = cand[b]
+                                    if abs(p2 - p1) / p1 <= tol_ratio:
+                                        members.append(b); used[b] = True
+                                if len(members) >= 2:
+                                    js = [cand[m][0] for m in members]
+                                    ps = [cand[m][1] for m in members]
+                                    out.append({'t': _cks[min(js)]['t'], 'x': _xd(_cks[min(js)]['t']),
+                                                't2': _cks[max(js)]['t'], 'x2': _xd(_cks[max(js)]['t']),
+                                                'price': round(sum(ps) / len(ps), 2), 'count': len(members)})
+                            return out[:3]
+                        _eqh = _eq_cluster(_cph, 'eqh')
+                        _eql = _eq_cluster(_cpl, 'eql')
                         # 趋势同口径修正为 HH/LL 序列(与 chain.build_chain 一致)
                         _sev_dir = [e['kind'] for e in _cev[-4:]]
                         if _core_events:
@@ -8735,6 +8775,7 @@ class Handler(BaseHTTPRequestHandler):
                         'bsl': _bsl, 'ssl': _ssl,
                         'ob': _ob, 'fvg_bull': _fvg_bull, 'fvg_bear': _fvg_bear,
                         'breakout': _brk, 'retrace': _rt,
+                        'eqh': _eqh, 'eql': _eql,
                     }
                     # R61: Jensen Alpha 期望(单源 core/alpha, PF后验基准表)
                     try:
