@@ -1806,6 +1806,14 @@ def _load_v22_legs(symbol):
                 sh2 = {}
             # 再读 v2 全链狠打影子 (R101-s22/s23 终版, R105 重写)
             hhll = sh2  # 复用变量名以贴合 R106 代码
+            # FIX(R111c): 恢复 R88b 的 enrich 块 —— R107 编辑中丢失, 导致 legs 全空
+            enrich = {}
+            try:
+                with open(r'E:\test\smc_project\research\combo_v22_smc_full.csv', encoding='utf-8-sig') as fh:
+                    for r in _csv.DictReader(fh):
+                        enrich[r['symbol'] + '|' + r['entry_date']] = r
+            except Exception:
+                enrich = {}
             with open(r'E:\test\smc_project\research\combo_v22_trades.csv', encoding='utf-8-sig') as fh:
                 for r in _csv.DictReader(fh):
                     leg = dict(r)
@@ -2413,16 +2421,55 @@ function buildLegMarkers(af){
                 symbol:'circle',symbolSize:9,itemStyle:{color:up?'#58a6ff':'#ff9e4f'},
                 label:{show:true,formatter:(ev.kind||'').substring(0,7),fontSize:8,color:up?'#58a6ff':'#ff9e4f',position:'top'}});
         });
-        // R110: 子信号顺序标 ①②③… —— 仅排不包含"披露日"的; 用户: S1披露日只显示、不参与交易
+        // R111: 子信号顺序标 ①②③… —— 红色虚线按序串联 + 实心填充 + 醒目价格字体; S1披露日仍不入链
+        var chain=[];
         (leg.sub_signals||[]).filter(function(ss){return !/披露日/.test(String(ss.name||''));}).forEach(function(ss,si2){
             var sd8=String(ss.date||'').replace(/-/g,''); var jj=d2i[sd8]; if(jj===undefined)return;
             var close3=(ohlcvData[jj]&&ohlcvData[jj][1])||Number(leg.buy_price)||0;
             var tt3='<b>'+(si2+1)+'. '+(ss.name||'?')+'</b><br/>'+sd8+' @ '+Number(close3).toFixed(2)
                 +(ss.detail?('<br/>'+String(ss.detail).slice(0,120)):'');
-            points.push({coord:[dates[jj],close3],value:(si2+1),_tt:tt3,
-                symbol:'circle',symbolSize:15,itemStyle:{color:'#d29922',borderColor:'#fff',borderWidth:1},
-                label:{show:true,formatter:String(si2+1),fontSize:10,color:'#0d1117',fontWeight:'bold'}});
+            chain.push({d:dates[jj],p:close3,n:(si2+1),tt:tt3});
         });
+        chain.sort(function(a,b){return a.d<b.d?-1:(a.d>b.d?1:0);});
+        // R111b: 链尾接入场点(买), 形成 ①→②→…→买入 完整红色虚线箭头流
+        chain.push({d:dates[ei],p:Number(leg.buy_price),n:'买',tt:tt,entry:true});
+        for(var ci=0;ci<chain.length;ci++){
+            var cp=chain[ci];
+            if(cp.entry){
+                points.push({coord:[cp.d,cp.p],value:'买',_tt:cp.tt,
+                    symbol:'pin',symbolSize:34,
+                    itemStyle:{color:'#ff3b30',borderColor:'#ffd700',borderWidth:2,shadowBlur:10,shadowColor:'rgba(255,59,48,.8)'},
+                    label:{show:true,formatter:'买入\n¥'+Number(cp.p).toFixed(2),fontSize:13,color:'#ffd700',fontWeight:'bold',
+                        position:'bottom',textBorderColor:'#000',textBorderWidth:3}});
+            }else{
+                points.push({coord:[cp.d,cp.p],value:cp.n,_tt:cp.tt,
+                    symbol:'circle',symbolSize:24,
+                    itemStyle:{color:'#ff3b30',borderColor:'#ffd700',borderWidth:2,shadowBlur:9,shadowColor:'rgba(255,59,48,.75)'},
+                    label:{show:true,formatter:cp.n+'\n\n¥'+Number(cp.p).toFixed(2),fontSize:12,color:'#ffd700',fontWeight:'bold',
+                        position:'top',textBorderColor:'#000',textBorderWidth:3}});
+            }
+            if(ci>0){
+                var pv=chain[ci-1];
+                lines.push([{xAxis:pv.d,yAxis:pv.p},{xAxis:cp.d,yAxis:cp.p,symbol:['none','arrow'],symbolSize:9,
+                    lineStyle:{color:'#ff3b30',type:'dashed',width:2.6,opacity:0.95}}]);
+            }
+        }
+        // 买入→卖出 也用同色系虚线相连收尾(赢绿输红)
+        if(si!==undefined&&si<dates.length){
+            lines.push([{xAxis:dates[ei],yAxis:Number(leg.buy_price)},{xAxis:dates[si],yAxis:Number(leg.sell_price),symbol:['none','arrow'],symbolSize:9,
+                lineStyle:{color:won?'#3fb950':'#ff6b6b',type:'dashed',width:2.6,opacity:0.95}}]);
+        }
+        // 回踩价显眼标: 加粗横虚线 + 大号字体
+        if(leg.retrace_price){
+            var rp=parseFloat(leg.retrace_price); var rdi=d2i[String(leg.entry_date||'').replace(/-/g,'')];
+            if(!isNaN(rp)&&rdi!==undefined){
+                var rEnd=Math.min(dates.length-1, rdi+8);
+                lines.push([{xAxis:dates[Math.max(0,rdi-8)],yAxis:rp},{xAxis:dates[rEnd],yAxis:rp,
+                    lineStyle:{color:'#ffd700',type:'dashed',width:2,opacity:0.9},
+                    label:{show:true,formatter:'回踩价 ¥'+rp.toFixed(2),color:'#ffd700',fontSize:12,fontWeight:'bold',
+                        textBorderColor:'#000',textBorderWidth:3,position:'insideEndTop'}}]);
+            }
+        }
         // BSL/SSL 最近三级水平线(带扫未扫标记)
         (leg.bsl_levels||[]).forEach(function(lv){
             var d8=String(lv.t||'').replace(/-/g,''); var j=d2i[d8]; if(j===undefined)return;
