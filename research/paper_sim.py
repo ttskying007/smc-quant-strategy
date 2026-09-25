@@ -16,6 +16,27 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config as CFG
 from core.time_cn import cn_now, cn_today  # R21(第八轮 P1-11): 上海时区时间单源  # 审计 P1: 统一路径/参数
 
+# R120: 活跃磁区因子表 (r117_eq_magnet_factor.py 产出) — code -> [rows], 惰性加载
+_EQM_TABLE = None
+
+
+def _eqm_table():
+    global _EQM_TABLE
+    if _EQM_TABLE is None:
+        import csv as _csv_m
+        tbl = {}
+        try:
+            fp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "combo_v22_eq_magnet.csv")
+            with open(fp, encoding="utf-8-sig") as fh:
+                for r in _csv_m.DictReader(fh):
+                    sym = str(r.get("symbol") or "")
+                    code = sym.split(".")[0]
+                    tbl.setdefault(code, []).append(r)
+        except Exception:
+            tbl = {}
+        _EQM_TABLE = tbl
+    return _EQM_TABLE
+
 ROOT = CFG.RESEARCH_DIR
 KT = CFG.KT_CACHE
 LEDGER = CFG.LEDGER
@@ -770,6 +791,28 @@ def _v23v2_of(order, chain_v2=None):
             w *= 0.15; flags.append("s22_bull_BOSup_retok_toX0.15")
         if sst.startswith("bear") and bk == "CHoCH↑" and rt_st == "no_retrace":
             w *= 0.15; flags.append("s23_bear_CHoCHup_noret_toX0.15")
+        # R120 (goal round 18): 活跃磁区 s24 — 入场价1%内下方未扫EQL(SL扫描风险区) → w*0.15
+        try:
+            _eqm = _eqm_table().get(order.get("code", ""))
+            if _eqm:
+                _sd8 = str(order.get("signal_date") or "").replace("-", "")
+                _d0 = _dt.strptime(_sd8, "%Y%m%d")
+                _cand = None
+                for _row in _eqm:
+                    try:
+                        _ed = _dt.strptime(str(_row.get("entry_date") or ""), "%Y%m%d")
+                    except Exception:
+                        continue
+                    if _d0 <= _ed <= _d0 + _td(days=7) and (_cand is None or _ed < _cand[0]):
+                        _cand = (_ed, _row)
+                if _cand:
+                    _row = _cand[1]
+                    if _row.get("eq_near_active") == "True" and int(_row.get("eql_active_n") or 0) >= 1:
+                        w *= 0.15; flags.append("s24_eql_risk")
+                    elif _row.get("eq_near_active") == "True" and int(_row.get("eqh_active_n") or 0) >= 1:
+                        flags.append("s24_eqh_target")  # 仅记录
+        except Exception:
+            pass
         return {"weight": round(w, 3), "flags": flags, "whale_90d_n": n_ev,
                 "mode": "norm_chain+norm_enrich+hard_soc_v21",
                 "date": time.strftime("%Y-%m-%d")}
