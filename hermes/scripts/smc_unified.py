@@ -2140,9 +2140,22 @@ function loadKline(){
                 var isD=(o.side||'').indexOf('demand')>=0;
                 ovMA.push([{name:o.side,xAxis:o.x,yAxis:o.low,itemStyle:{color:isD?'rgba(46,160,67,0.28)':'rgba(240,136,62,0.28)',borderColor:isD?'#2ea043':'#f0883e',borderWidth:1.5}},{xAxis:endX,yAxis:o.high}]);
             });
+            // R112: 结构事件先从 level_date(枢轴点)画水平段到事件bar, 再标事件点
             (sc.events_tail||[]).forEach(function(e){ if(!e.x)return;
                 var up=e.kind.indexOf('↑')>=0, cho=e.kind.indexOf('CHoCH')>=0;
-                ovMP.push({coord:[e.x,e.level],value:e.kind,symbol:cho?'diamond':'triangle',symbolSize:cho?13:10,symbolRotate:up?0:180,itemStyle:{color:cho?'#f0883e':'#d29922'},label:{show:true,fontSize:9,color:'#fff',formatter:e.kind}});
+                var segColor=cho?'#f0883e':'#d29922';
+                if(e.level_date&&e.level_date!==e.x){
+                    ovML.push([{coord:[e.level_date,e.level],lineStyle:{color:segColor,type:'dotted',width:1.2,opacity:0.7},
+                        label:{show:true,formatter:e.kind+' 枢轴 '+e.level,fontSize:8,color:segColor,position:'insideStart'}},
+                        {coord:[e.x,e.level]}]);
+                }
+                var lbl=e.kind+(e.wick_first?'◌':'')+((e.pen_pct!==undefined)?'\n'+(e.pen_pct>=0?'+':'')+e.pen_pct+'%':'');
+                ovMP.push({coord:[e.x,e.level],value:e.kind,_tt:
+                    '<b>'+e.kind+'</b> @ '+e.x+'<br/>破枢轴: '+e.level+' ('+(e.level_date||'?')+')'
+                    +'<br/>穿透: '+(e.pen_pct!==undefined?e.pen_pct+'%':'-')
+                    +(e.wick_first?'<br/>◌ 影线先行触及(先扫后破)':''),
+                    symbol:cho?'diamond':'triangle',symbolSize:cho?13:10,symbolRotate:up?0:180,
+                    itemStyle:{color:segColor},label:{show:true,fontSize:8,color:segColor,formatter:lbl}});
             });
             if(sc.breakout&&sc.breakout.x&&sc.breakout.price){
                 ovML.push([{coord:[sc.breakout.x,sc.breakout.price],lineStyle:{color:'#e3b341',type:'solid',width:1.5},label:{formatter:'突破 '+(sc.breakout.kind||'')+' @'+sc.breakout.price,fontSize:9,color:'#e3b341',position:'insideEndTop'}},{coord:[endX,sc.breakout.price]}]);
@@ -2160,7 +2173,7 @@ function loadKline(){
             hp.push('<div class="card" style="border-left:3px solid #bc8cff"><h2>🧬 SMC 信号链(当前)</h2>');
             hp.push('<p>趋势: <b style="color:'+(sc.trend_state==='up'?'#3fb950':'#f85149')+'">'+(sc.trend_state||'-')+'</b> | 现价 '+sc.current_price+'</p>');
             hp.push('<table><thead><tr><th>环节</th><th>时间</th><th>价格</th><th>类型/信号</th></tr></thead><tbody>');
-            (sc.events_tail||[]).forEach(function(e){hp.push('<tr><td>结构事件</td><td class=mono>'+e.date+'</td><td class=mono>'+e.level+'</td><td>'+e.kind+'</td></tr>');});
+            (sc.events_tail||[]).forEach(function(e){hp.push('<tr><td>结构事件</td><td class=mono>'+e.date+'</td><td class=mono>'+e.level+' <span style=color:#8b949e>(破 '+(e.level_date||'?')+' 枢轴, 穿 '+(e.pen_pct!==undefined?e.pen_pct:'-')+'%'+(e.wick_first?' ◌影线先扫':'')+')</span></td><td>'+e.kind+'</td></tr>');});
             (sc.bsl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前高(BSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.swept?'已被扫(假突破回收)':'未扫')+'</td></tr>');});
             (sc.ssl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前低(SSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.swept?'已被扫(诱空回收)':'未扫')+'</td></tr>');});
             (sc.ob||[]).slice(-2).forEach(function(o){hp.push('<tr><td>订单块</td><td class=mono>'+o.t+'</td><td class=mono>'+o.low+'~'+o.high+'</td><td>'+o.side+' → '+o.broke_kind+' @'+o.broke_at+'</td></tr>');});
@@ -8545,10 +8558,13 @@ class Handler(BaseHTTPRequestHandler):
                                  'v': float(k.get('v') or 0)} for k in klines]
                         _cn = len(_cks) - 1
                         _pv, _pvden = _cpiv(_cks, _cn)
-                        _cev = _csev(_cks, None, mode='auto')
+                        _cev = _csev(_cks, None, mode='auto', debounce=3)
                         _core_events = [{'date': _xd(e['date']), 'x': _xd(e['date']),
                                          'level': round(float(e['level']), 2),
                                          'level_date': _xd(e.get('level_date') or ''),
+                                         'level_bar': int(e.get('bar') or 0) - _pv,
+                                         'pen_pct': round(float(e.get('pen_pct') or 0), 2),
+                                         'wick_first': bool(e.get('wick_first')),
                                          'bar': e['bar'], 'kind': e['kind']} for e in _cev[-8:]]
                         # BSL/SSL: 同一 pivot 下已确认摆动高低点(近3), swept = 确认后收盘穿越
                         _cph = [(j, _cks[j]['h']) for j in range(_pv, len(_cks) - _pv) if _cish(_cks, j, _pv)]

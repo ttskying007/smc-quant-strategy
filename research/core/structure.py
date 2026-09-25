@@ -173,7 +173,7 @@ def pick_pivot_by_density(ks, up_to_idx, lookback=250, target_lo=8.0, target_hi=
     return best, meta[best]
 
 
-def structure_events(ks, i_limit=None, pivot=3, mode="fixed"):
+def structure_events(ks, i_limit=None, pivot=3, mode="fixed", debounce=0):
     """逐bar因果 BOS/CHoCH 事件流 —— gen_v21 / paper_sim 共用(单源)。
 
     规则(与 KB internal_and_external_bos_and_choch 对齐):
@@ -186,7 +186,11 @@ def structure_events(ks, i_limit=None, pivot=3, mode="fixed"):
       'fixed' — 原行为 (默认, 向后兼容)
       'auto'  — R90 跨股适应: pivot 按收归密度自选; 额外要求收盘价过枢轴 0.15*ATR%
                 才计事件 (原为 0, 一个基日剩余波动都计 → 高波股无噪声过滤)
-    返回: [{"bar":k, "date":ks[k]["t"], "kind":"BOS↑"|..., "level":被破价位, "level_date":..., "trend":"up"/"down"}]
+    debounce: R112 事件最小间隔 — 距上一条"同向"事件 < debounce bar 的新事件
+                合并: 被破 level 更新为更外侧价位, 不产生重复事件 (图上防抖)。
+    返回: [{"bar":k, "date":ks[k]["t"], "kind":"BOS↑"|..., "level":被破价位,
+            "level_date":..., "trend":"up"/"down", "pen_pct":穿透幅度%,
+            "wick_first":事件日前影线曾触及level但未实收(先扫后破)}]
     """
     # R90: 如果 mode='auto', 先自我标定 pivot + 穿透缘
     if mode == "auto":
@@ -223,14 +227,34 @@ def structure_events(ks, i_limit=None, pivot=3, mode="fixed"):
         # R90: 穿透缘 — 收净价必须高于枢架 (1+pen_edge), 过滤"真回调临界"
         if last_h and c > last_h[0] * (1.0 + pen_edge):
             kind = "CHoCH↑" if trend == "down" else "BOS↑"
-            events.append({"bar": k, "date": ks[k]["t"], "kind": kind,
-                           "level": last_h[0], "level_date": last_h[1], "trend": "up"})
+            # R112: 影线先触及(先扫后破)标注 — 事件日之前有 high > level 但 close 未过
+            wick_first = any(ks[w]["h"] > last_h[0] and not (ks[w]["c"] > last_h[0] * (1.0 + pen_edge))
+                             for w in range(max(k - 10, 0), k))
+            if debounce and events and "↑" in events[-1]["kind"] and k - events[-1]["bar"] < debounce:
+                # 同向过近 → 合并: 更新为新破价位, 不重复发事件
+                events[-1].update(bar=k, date=ks[k]["t"], level=last_h[0],
+                                  level_date=last_h[1], wick_first=wick_first,
+                                  pen_pct=(c / last_h[0] - 1.0) * 100.0)
+            else:
+                events.append({"bar": k, "date": ks[k]["t"], "kind": kind,
+                               "level": last_h[0], "level_date": last_h[1], "trend": "up",
+                               "pen_pct": (c / last_h[0] - 1.0) * 100.0,
+                               "wick_first": wick_first})
             trend = "up"
             last_h = None
         elif last_l and c < last_l[0] * (1.0 - pen_edge):
             kind = "CHoCH↓" if trend == "up" else "BOS↓"
-            events.append({"bar": k, "date": ks[k]["t"], "kind": kind,
-                           "level": last_l[0], "level_date": last_l[1], "trend": "down"})
+            wick_first = any(ks[w]["l"] < last_l[0] and not (ks[w]["c"] < last_l[0] * (1.0 - pen_edge))
+                             for w in range(max(k - 10, 0), k))
+            if debounce and events and "↓" in events[-1]["kind"] and k - events[-1]["bar"] < debounce:
+                events[-1].update(bar=k, date=ks[k]["t"], level=last_l[0],
+                                  level_date=last_l[1], wick_first=wick_first,
+                                  pen_pct=(1.0 - c / last_l[0]) * 100.0)
+            else:
+                events.append({"bar": k, "date": ks[k]["t"], "kind": kind,
+                               "level": last_l[0], "level_date": last_l[1], "trend": "down",
+                               "pen_pct": (1.0 - c / last_l[0]) * 100.0,
+                               "wick_first": wick_first})
             trend = "down"
             last_l = None
     return events
