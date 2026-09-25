@@ -2136,15 +2136,19 @@ function loadKline(){
                 var t3=st3==='影线假扫回收'?'dotted':(st3==='穿越后失效'?'dashed':'dashed');
                 ovML.push([{coord:[s.x,s.price],lineStyle:{color:c3,type:t3,width:1.4},label:{formatter:'SSL '+s.price+(st3==='未扫'?'':'('+st3+')'),fontSize:9,color:c3,position:'insideEndBottom'}},{coord:[endX,s.price]}]);
             });
-            // R114: EQH/EQL 流动性池(等高等低, 池=磁区)
+            // R114/R116: EQH/EQL 流动性池(等高等低, 池=磁区) — 被实收吃掉的灰化(已失效)
             (sc.eqh||[]).forEach(function(q){ if(!q.x)return;
-                ovML.push([{coord:[q.x,q.price],lineStyle:{color:'#b0bec5',type:'dashed',width:2},
-                    label:{formatter:'EQH '+q.price+' ×'+q.count,fontSize:9,color:'#b0bec5',position:'insideEndTop'}},
+                var st=q.sweep_state||'未扫';
+                var dead=(st==='实收穿越'||st==='实收维持'||st==='穿越后失效');
+                ovML.push([{coord:[q.x,q.price],lineStyle:{color:dead?'#6e7681':'#b0bec5',type:'dashed',width:dead?1:2},
+                    label:{formatter:'EQH '+q.price+' ×'+q.count+(dead?'(已失效)':''),fontSize:9,color:dead?'#6e7681':'#b0bec5',position:'insideEndTop'}},
                     {coord:[endX,q.price]}]);
             });
             (sc.eql||[]).forEach(function(q){ if(!q.x)return;
-                ovML.push([{coord:[q.x,q.price],lineStyle:{color:'#8d9e6a',type:'dashed',width:2},
-                    label:{formatter:'EQL '+q.price+' ×'+q.count,fontSize:9,color:'#8d9e6a',position:'insideEndBottom'}},
+                var st=q.sweep_state||'未扫';
+                var dead=(st==='实收穿越'||st==='实收维持'||st==='穿越后失效');
+                ovML.push([{coord:[q.x,q.price],lineStyle:{color:dead?'#6e7681':'#8d9e6a',type:'dashed',width:dead?1:2},
+                    label:{formatter:'EQL '+q.price+' ×'+q.count+(dead?'(已失效)':''),fontSize:9,color:dead?'#6e7681':'#8d9e6a',position:'insideEndBottom'}},
                     {coord:[endX,q.price]}]);
             });
             (sc.fvg_bull||[]).forEach(function(f){ if(!f.x)return;
@@ -2193,8 +2197,8 @@ function loadKline(){
             (sc.events_tail||[]).forEach(function(e){hp.push('<tr><td>结构事件</td><td class=mono>'+e.date+'</td><td class=mono>'+e.level+' <span style=color:#8b949e>(破 '+(e.level_date||'?')+' 枢轴, 穿 '+(e.pen_pct!==undefined?e.pen_pct:'-')+'%'+(e.wick_first?' ◌影线先扫':'')+')</span></td><td>'+e.kind+'</td></tr>');});
             (sc.bsl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前高(BSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.sweep_state||((s.swept?'实收穿越':'未扫')))+'</td></tr>');});
             (sc.ssl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前低(SSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.sweep_state||((s.swept?'实收穿越':'未扫')))+'</td></tr>');});
-            (sc.eqh||[]).slice(-3).forEach(function(q){hp.push('<tr><td>流动性池EQH</td><td class=mono>'+q.t+'~'+q.t2+'</td><td class=mono>'+q.price+'</td><td>等高 ×'+q.count+' (池=磁区)</td></tr>');});
-            (sc.eql||[]).slice(-3).forEach(function(q){hp.push('<tr><td>流动性池EQL</td><td class=mono>'+q.t+'~'+q.t2+'</td><td class=mono>'+q.price+'</td><td>等低 ×'+q.count+' (池=磁区)</td></tr>');});
+            (sc.eqh||[]).slice(-3).forEach(function(q){var st=q.sweep_state||'未扫';var dc=(st==='未扫')?'#3fb950':(st==='影线假扫回收'?'#9e6ae8':'#6e7681');hp.push('<tr><td>流动性池EQH</td><td class=mono>'+q.t+'~'+q.t2+'</td><td class=mono>'+q.price+'</td><td>等高 ×'+q.count+(q.conflu?' <b style=color:#d29922>共振</b>':'')+' <span style=color:'+dc+'>'+st+'</span></td></tr>');});
+            (sc.eql||[]).slice(-3).forEach(function(q){var st=q.sweep_state||'未扫';var dc=(st==='未扫')?'#3fb950':(st==='影线假扫回收'?'#9e6ae8':'#6e7681');hp.push('<tr><td>流动性池EQL</td><td class=mono>'+q.t+'~'+q.t2+'</td><td class=mono>'+q.price+'</td><td>等低 ×'+q.count+(q.conflu?' <b style=color:#d29922>共振</b>':'')+' <span style=color:'+dc+'>'+st+'</span></td></tr>');});
             (sc.ob||[]).slice(-2).forEach(function(o){hp.push('<tr><td>订单块</td><td class=mono>'+o.t+'</td><td class=mono>'+o.low+'~'+o.high+'</td><td>'+o.side+' → '+o.broke_kind+' @'+o.broke_at+'</td></tr>');});
             var nf=(sc.fvg_bull||[]).length, nb=(sc.fvg_bear||[]).length, nfvg=(sc.fvg_bull||[]).concat(sc.fvg_bear||[]).filter(function(f){return f.ifvg;}).length;
             hp.push('<tr><td>缺口</td><td class=mono>近30日</td><td class=mono>FVG多 '+nf+' / 空 '+nb+'</td><td>其中 IFVG(逆缺口) '+nfvg+'</td></tr>');
@@ -8639,9 +8643,24 @@ class Handler(BaseHTTPRequestHandler):
                                 if len(members) >= 2:
                                     js = [cand[m][0] for m in members]
                                     ps = [cand[m][1] for m in members]
+                                    # R116: 池状态 — 末成员bar之后 close 实破 → 已失效(流动性被吃);
+                                    #   仅影线触及但收回 → 假扫回收(池仍在, 反而强化)
+                                    pj = max(js); pp = sum(ps) / len(ps)
+                                    p_wick = False; p_state = '未扫'
+                                    for kk in _cks[pj + 1:]:
+                                        if side == 'eqh':
+                                            if kk['h'] > pp: p_wick = True
+                                            if kk['c'] > pp: p_state = '实收穿越'; break
+                                        else:
+                                            if kk['l'] < pp: p_wick = True
+                                            if kk['c'] < pp: p_state = '实收穿越'; break
+                                    else:
+                                        p_state = '影线假扫回收' if p_wick else '未扫'
                                     out.append({'t': _cks[min(js)]['t'], 'x': _xd(_cks[min(js)]['t']),
                                                 't2': _cks[max(js)]['t'], 'x2': _xd(_cks[max(js)]['t']),
-                                                'price': round(sum(ps) / len(ps), 2), 'count': len(members)})
+                                                'price': round(pp, 2), 'count': len(members),
+                                                'sweep_state': p_state,
+                                                'swept': p_state == '实收穿越'})
                             return out[:3]
                         _eqh = _eq_cluster(_cph, 'eqh')
                         _eql = _eq_cluster(_cpl, 'eql')
