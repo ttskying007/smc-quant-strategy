@@ -18,6 +18,9 @@ CH2 = {r['symbol'] + '|' + r['entry_date']: r
        for r in csv.DictReader(open(ROOT / 'research/combo_v22_chain_v2_hhll.csv', encoding='utf-8-sig'))}
 ENR2 = {r['symbol'] + '|' + r['entry_date']: r
         for r in csv.DictReader(open(ROOT / 'research/combo_v22_smc_full_v2.csv', encoding='utf-8-sig'))}
+# R117: 活跃磁区因子表 (r117_eq_magnet_factor.py 产出)
+EQM = {r['symbol'] + '|' + r['entry_date']: r
+       for r in csv.DictReader(open(ROOT / 'research/combo_v22_eq_magnet.csv', encoding='utf-8-sig'))}
 rows = list(csv.DictReader(open(ROOT / 'research/combo_v22_trades.csv', encoding='utf-8-sig')))
 
 conn = sqlite3.connect(CFG.ANNOUNCE_DB)
@@ -69,6 +72,18 @@ def w_final(r):
     rt = ch2.get('retrace_state_v2') or ''
     tr = ch2.get('trend_v2') or ''
     sst = ch2.get('structure_state') or ''
+    # R117: 活跃磁区因子 — 入场价1%内下方有未扫EQL(SL扫描风险区) → 毒性桶 s24
+    eqm = EQM.get(r['symbol'] + '|' + r['entry_date'])
+    if eqm and eqm.get('eq_near_active') == 'True':
+        try:
+            _eql_n = int(eqm.get('eql_active_n') or 0)
+            _eqh_n = int(eqm.get('eqh_active_n') or 0)
+        except Exception:
+            _eql_n = _eqh_n = 0
+        if _eql_n >= 1:
+            w *= 0.15; flags.append('s24_eql_risk')
+        elif _eqh_n >= 1:
+            w *= 1.0; flags.append('s24_eqh_target')  # 上方磁吸目标: 记录不加权
     if 'CHoCH' in bk:
         w *= 0.4; flags.append(f's1v2_{bk}')
     if tr == 'up':
