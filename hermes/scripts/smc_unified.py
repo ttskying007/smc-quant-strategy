@@ -4292,7 +4292,7 @@ def build_audit_portal(slug=''):
                         f"<tr><td>上方EQH磁吸(仅记录)</td><td class='mono'>{_eq_bucket(lambda r: r.get('eqh_active_n') not in ('','0'))}</td></tr>"
                         "</tbody></table>"
                         "<p style='color:#8b949e'>二次测试磁区 (R122, 120股): 影线假扫回收池被二测时 <b style='color:#3fb950'>EQH 6胜0败 / EQL 3胜0败 (100%)</b> — sweep→reverse 可靠性确认。</p>"
-                        "<p style='color:#8b949e'>s22/s23 年度稳定性 (R122): s22 2024 PF1.00/2025 PF0.78/2026 PF5.15; s23 2024 PF4.59/2025 PF1.13/2026 PF0.13 — s23 狠打按年翻转符号, 观察中。</p>"
+                        "<p style='color:#8b949e'>s22/s23 regime 门控 (R123): 5 种门控(市场弱/强/个股反向/组合)无一能让狠打\"全年<1\" — 桶整体盈利(PF1.75), ×0.15 是相对弱势压制; s23 按年翻转(2024 PF4.59/2026 PF0.13)观察中。</p>"
                         "<p style='color:#8b949e;font-size:0.85em'>s24_eql_risk 已写入 combo_v23_shadow_v3 (影子列, 生产不动); 观察期后由用户决定是否升级生产。</p>"
                         "</div>")
     except Exception:
