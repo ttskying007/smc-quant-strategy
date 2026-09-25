@@ -13,6 +13,43 @@
   "no_retest": 8,
   "win_rate": 100.0
  },
+ "retest_fwd": [
+  {
+   "sym": "000020.SZ",
+   "side": "eqh",
+   "sweep_date": "20260420",
+   "retest_date": "20260429",
+   "ret_10b": -15.32
+  },
+  {
+   "sym": "000068.SZ",
+   "side": "eqh",
+   "sweep_date": "20260908",
+   "retest_date": "20260909",
+   "ret_10b": -1.81
+  },
+  {
+   "sym": "000338.SZ",
+   "side": "eqh",
+   "sweep_date": "20260527",
+   "retest_date": "20260529",
+   "ret_10b": -20.99
+  },
+  {
+   "sym": "000534.SZ",
+   "side": "eqh",
+   "sweep_date": "20260706",
+   "retest_date": "20260707",
+   "ret_10b": -20.74
+  },
+  {
+   "sym": "000100.SZ",
+   "side": "eql",
+   "sweep_date": "20260515",
+   "retest_date": "20260518",
+   "ret_10b": 4.36
+  }
+ ],
  "yearly": {
   "s22_2024": {
    "n": 13,
@@ -90,10 +127,11 @@
    "eqh": [],
    "eql": [
     {
-     "symbol_t": "20260902",
+     "sym_t": "20260902",
      "price": 3.68,
      "sweep_date": "20260916",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ]
   },
@@ -116,10 +154,11 @@
   "000020.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260414",
+     "sym_t": "20260414",
      "price": 16.06,
      "sweep_date": "20260420",
-     "verdict": "retest_win"
+     "verdict": "retest_win",
+     "retest_date": "20260429"
     }
    ],
    "eql": []
@@ -152,10 +191,11 @@
    "eqh": [],
    "eql": [
     {
-     "symbol_t": "20260916",
+     "sym_t": "20260916",
      "price": 2.1,
      "sweep_date": "20260917",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ]
   },
@@ -167,10 +207,11 @@
    "eqh": [],
    "eql": [
     {
-     "symbol_t": "20260825",
+     "sym_t": "20260825",
      "price": 22.63,
      "sweep_date": "20260911",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ]
   },
@@ -197,10 +238,11 @@
   "000045.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260512",
+     "sym_t": "20260512",
      "price": 12.5,
      "sweep_date": "20260521",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []
@@ -220,10 +262,11 @@
   "000055.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260123",
+     "sym_t": "20260123",
      "price": 4.32,
      "sweep_date": "20260129",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []
@@ -239,10 +282,11 @@
   "000061.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260506",
+     "sym_t": "20260506",
      "price": 7.53,
      "sweep_date": "20260507",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []
@@ -266,18 +310,20 @@
   "000068.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260828",
+     "sym_t": "20260828",
      "price": 3.35,
      "sweep_date": "20260908",
-     "verdict": "retest_win"
+     "verdict": "retest_win",
+     "retest_date": "20260909"
     }
    ],
    "eql": [
     {
-     "symbol_t": "20260907",
+     "sym_t": "20260907",
      "price": 3.18,
      "sweep_date": "20260911",
-     "verdict": "retest_win"
+     "verdict": "retest_win",
+     "retest_date": "20260916"
     }
    ]
   },
@@ -304,10 +350,11 @@
   "000090.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260908",
+     "sym_t": "20260908",
      "price": 3.68,
      "sweep_date": "20260921",
-     "verdict": "retest_win"
+     "verdict": "retest_win",
+     "retest_date": "20260923"
     }
    ],
    "eql": []
@@ -323,24 +370,27 @@
   "000100.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260831",
+     "sym_t": "20260831",
      "price": 5.09,
      "sweep_date": "20260901",
-     "verdict": "retest_win"
+     "verdict": "retest_win",
+     "retest_date": "20260922"
     }
    ],
    "eql": [
     {
-     "symbol_t": "20260611",
+     "sym_t": "20260611",
      "price": 4.46,
      "sweep_date": "20260612",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     },
     {
-     "symbol_t": "20260424",
+     "sym_t": "20260424",
      "price": 4.08,
      "sweep_date": "20260515",
-     "verdict": "retest_win"
+     "verdict": "retest_win",
+     "retest_date": "20260518"
     }
    ]
   },
@@ -351,10 +401,11 @@
   "000153.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260415",
+     "sym_t": "20260415",
      "price": 7.01,
      "sweep_date": "20260819",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []
@@ -394,10 +445,11 @@
   "000338.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260515",
+     "sym_t": "20260515",
      "price": 35.37,
      "sweep_date": "20260527",
-     "verdict": "retest_win"
+     "verdict": "retest_win",
+     "retest_date": "20260529"
     }
    ],
    "eql": []
@@ -409,10 +461,11 @@
   "000401.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260908",
+     "sym_t": "20260908",
      "price": 3.71,
      "sweep_date": "20260923",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []
@@ -420,10 +473,11 @@
   "000403.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260311",
+     "sym_t": "20260311",
      "price": 14.43,
      "sweep_date": "20260313",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []
@@ -443,10 +497,11 @@
   "000409.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260310",
+     "sym_t": "20260310",
      "price": 11.61,
      "sweep_date": "20260311",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []
@@ -454,10 +509,11 @@
   "000410.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260302",
+     "sym_t": "20260302",
      "price": 7.87,
      "sweep_date": "20260311",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []
@@ -474,20 +530,22 @@
    "eqh": [],
    "eql": [
     {
-     "symbol_t": "20260722",
+     "sym_t": "20260722",
      "price": 4.39,
      "sweep_date": "20260723",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ]
   },
   "000420.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260828",
+     "sym_t": "20260828",
      "price": 3.87,
      "sweep_date": "20260904",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []
@@ -532,10 +590,11 @@
    "eqh": [],
    "eql": [
     {
-     "symbol_t": "20260915",
+     "sym_t": "20260915",
      "price": 4.84,
      "sweep_date": "20260916",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ]
   },
@@ -551,10 +610,11 @@
    "eqh": [],
    "eql": [
     {
-     "symbol_t": "20260916",
+     "sym_t": "20260916",
      "price": 8.21,
      "sweep_date": "20260917",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ]
   },
@@ -574,20 +634,22 @@
    "eqh": [],
    "eql": [
     {
-     "symbol_t": "20260904",
+     "sym_t": "20260904",
      "price": 15.64,
      "sweep_date": "20260911",
-     "verdict": "retest_win"
+     "verdict": "retest_win",
+     "retest_date": "20260914"
     }
    ]
   },
   "000513.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260730",
+     "sym_t": "20260730",
      "price": 31.33,
      "sweep_date": "20260803",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []
@@ -600,10 +662,11 @@
    "eqh": [],
    "eql": [
     {
-     "symbol_t": "20260904",
+     "sym_t": "20260904",
      "price": 4.04,
      "sweep_date": "20260907",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ]
   },
@@ -634,10 +697,11 @@
   "000525.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260305",
+     "sym_t": "20260305",
      "price": 7.33,
      "sweep_date": "20260313",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []
@@ -649,10 +713,11 @@
   "000528.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260126",
+     "sym_t": "20260126",
      "price": 12.11,
      "sweep_date": "20260227",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []
@@ -676,10 +741,11 @@
   "000534.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260622",
+     "sym_t": "20260622",
      "price": 33.2,
      "sweep_date": "20260706",
-     "verdict": "retest_win"
+     "verdict": "retest_win",
+     "retest_date": "20260707"
     }
    ],
    "eql": []
@@ -691,10 +757,11 @@
   "000537.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260513",
+     "sym_t": "20260513",
      "price": 11.56,
      "sweep_date": "20260514",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []
@@ -702,10 +769,11 @@
   "000538.SZ": {
    "eqh": [
     {
-     "symbol_t": "20260107",
+     "sym_t": "20260107",
      "price": 56.17,
      "sweep_date": "20260206",
-     "verdict": "no_retest"
+     "verdict": "no_retest",
+     "retest_date": ""
     }
    ],
    "eql": []

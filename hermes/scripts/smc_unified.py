@@ -2167,10 +2167,14 @@ function loadKline(){
                     {coord:[endX,q.price]}]);
             });
             (sc.fvg_bull||[]).forEach(function(f){ if(!f.x)return;
-                ovMA.push([{name:(f.ifvg?'IFVG+':'FVG+'),xAxis:f.x,yAxis:f.low,itemStyle:{color:f.ifvg?'rgba(188,140,255,0.20)':'rgba(63,185,80,0.13)',borderColor:f.ifvg?'#bc8cff':'#3fb950',borderWidth:1}},{xAxis:endX,yAxis:f.high}]);
+                var dead=f.fill_state==='filled';
+                var nm=(f.ifvg?'IFVG+':(dead?'FVG+(已失效)':'FVG+'));
+                ovMA.push([{name:nm,xAxis:f.x,yAxis:f.low,itemStyle:{color:dead?'rgba(110,119,129,0.10)':(f.ifvg?'rgba(188,140,255,0.20)':'rgba(63,185,80,0.13)'),borderColor:dead?'#6e7681':(f.ifvg?'#bc8cff':'#3fb950'),borderWidth:1}},{xAxis:endX,yAxis:f.high}]);
             });
             (sc.fvg_bear||[]).forEach(function(f){ if(!f.x)return;
-                ovMA.push([{name:(f.ifvg?'IFVG-':'FVG-'),xAxis:f.x,yAxis:f.low,itemStyle:{color:f.ifvg?'rgba(188,140,255,0.20)':'rgba(248,81,73,0.13)',borderColor:f.ifvg?'#bc8cff':'#f85149',borderWidth:1}},{xAxis:endX,yAxis:f.high}]);
+                var dead=f.fill_state==='filled';
+                var nm=(f.ifvg?'IFVG-':(dead?'FVG-(已失效)':'FVG-'));
+                ovMA.push([{name:nm,xAxis:f.x,yAxis:f.low,itemStyle:{color:dead?'rgba(110,119,129,0.10)':(f.ifvg?'rgba(188,140,255,0.20)':'rgba(248,81,73,0.13)'),borderColor:dead?'#6e7681':(f.ifvg?'#bc8cff':'#f85149'),borderWidth:1}},{xAxis:endX,yAxis:f.high}]);
             });
             (sc.ob||[]).forEach(function(o){ if(!o.x)return;
                 var isD=(o.side||'').indexOf('demand')>=0;
@@ -4291,7 +4295,7 @@ def build_audit_portal(slug=''):
                         f"<tr><td style='color:#f85149'>下方EQL风险(s24毒性桶)</td><td class='mono' style='color:#f85149'>{_s24_txt} → w×0.15</td></tr>"
                         f"<tr><td>上方EQH磁吸(仅记录)</td><td class='mono'>{_eq_bucket(lambda r: r.get('eqh_active_n') not in ('','0'))}</td></tr>"
                         "</tbody></table>"
-                        "<p style='color:#8b949e'>二次测试磁区 (R122, 120股): 影线假扫回收池被二测时 <b style='color:#3fb950'>EQH 6胜0败 / EQL 3胜0败 (100%)</b> — sweep→reverse 可靠性确认。</p>"
+"<p style='color:#8b949e'>二次测试磁区 (R122b, 120股): 影线假扫回收池被二测时微观反弹 <b>9胜0败</b>; 但二测反弹 bar 入场做多后 10 bar <b style='color:#f85149'>avg -10.9% (4/5 跌)</b> — 正确解读: EQH 二测反弹=<b style='color:#f85149'>拒绝→做空</b> (反向 n=5 avg+10.9% WR80%), 朴素「二测=做多」证伪。</p>"
                         "<p style='color:#8b949e'>s22/s23 regime 门控 (R123): 5 种门控(市场弱/强/个股反向/组合)无一能让狠打\"全年<1\" — 桶整体盈利(PF1.75), ×0.15 是相对弱势压制; s23 按年翻转(2024 PF4.59/2026 PF0.13)观察中。</p>"
                         "<p style='color:#8b949e;font-size:0.85em'>s24_eql_risk 已写入 combo_v23_shadow_v3 (影子列, 生产不动); 观察期后由用户决定是否升级生产。</p>"
                         "</div>")
@@ -8907,6 +8911,34 @@ class Handler(BaseHTTPRequestHandler):
                         'breakout': _brk, 'retrace': _rt,
                         'eqh': _eqh, 'eql': _eql,
                     }
+                    # R124: FVG 失效态 — 多头缺口 close<下沿 / 空头缺口 close>上沿 → filled(失效灰化);
+                    #   影线进入但未实破 → tested; 从未进入 → untouched
+                    def _fvg_filled(row, side):
+                        try:
+                            lo = float(row['low']); hi = float(row['high'])
+                            fi = next((i for i, k in enumerate(klines)
+                                       if str(k['date'])[:10].replace('-', '') == str(row.get('t') or '').replace('-', '')), None)
+                            if fi is None:
+                                return 'unknown'
+                            touched = False
+                            for kk in klines[fi + 1:]:
+                                if side == 'bull':
+                                    if kk['l'] <= hi and kk['h'] >= lo:
+                                        touched = True
+                                    if kk['c'] < lo:
+                                        return 'filled'
+                                else:
+                                    if kk['l'] <= hi and kk['h'] >= lo:
+                                        touched = True
+                                    if kk['c'] > hi:
+                                        return 'filled'
+                            return 'tested' if touched else 'untouched'
+                        except Exception:
+                            return 'unknown'
+                    for _row in _fvg_bull:
+                        _row['fill_state'] = _fvg_filled(_row, 'bull')
+                    for _row in _fvg_bear:
+                        _row['fill_state'] = _fvg_filled(_row, 'bear')
                     # R61: Jensen Alpha 期望(单源 core/alpha, PF后验基准表)
                     try:
                         import sys as _s2

@@ -95,20 +95,22 @@ def retest_stats(ks, tol_ratio=0.008, lookback=250):
             pp = q['price']
             si = q['sweep_i']
             verdict = 'no_retest'
+            retest_i = -1
             for k in range(si + 1, min(si + N_RETEST, len(ks))):
                 if side == 'eqh':
                     if ks[k]['c'] > pp:
                         verdict = 'retest_fail'; break
                     if ks[k]['h'] > pp and ks[k]['c'] <= pp:
                         # 回到池位且收回 → bounce (取 sweep 后首次回测)
-                        verdict = 'retest_win'; break
+                        verdict = 'retest_win'; retest_i = k; break
                 else:
                     if ks[k]['c'] < pp:
                         verdict = 'retest_fail'; break
                     if ks[k]['l'] < pp and ks[k]['c'] >= pp:
-                        verdict = 'retest_win'; break
-            out[key].append({'symbol_t': ks[q['last_j']]['t'], 'price': round(pp, 2),
-                             'sweep_date': ks[si]['t'], 'verdict': verdict})
+                        verdict = 'retest_win'; retest_i = k; break
+            out[key].append({'sym_t': ks[q['last_j']]['t'], 'price': round(pp, 2),
+                             'sweep_date': ks[si]['t'], 'verdict': verdict,
+                             'retest_date': ks[retest_i]['t'] if retest_i >= 0 else ''})
     return out
 
 
@@ -126,7 +128,7 @@ def main():
         r = retest_stats(ks)
         detail[s] = r
         for k in ('eqh', 'eql'):
-            tot[k].extend(r[k])
+            tot[k].extend([dict(x, sym=s) for x in r[k]])
 
     print('=== R122 二次测试磁区 (sweep→reverse, N=%d bar) ===' % N_RETEST)
     jout = {}
@@ -138,6 +140,30 @@ def main():
         wr = (w / (w + f) * 100) if (w + f) else 0
         print(f'{k.upper()}: 假扫回收池 n={len(rows)} | 二测win={w} fail={f} 无二测={nr} | 二测胜率 {wr:.1f}%')
         jout[k] = {'n': len(rows), 'win': w, 'fail': f, 'no_retest': nr, 'win_rate': round(wr, 1)}
+
+    # C) sweep→reverse 2.0 远期收益: 入场 = 二测反弹 bar close (retest_date), 之后 10 bar
+    print('\n=== C. retest 入场远期收益 (10 bar, 入场=二测bar) ===')
+    fwd = []
+    for k in ('eqh', 'eql'):
+        for r in tot[k]:
+            if r['verdict'] != 'retest_win' or not r.get('retest_date'):
+                continue
+            sym = r.get('sym') or ''
+            ks = load_klines(sym) if sym else None
+            if not ks:
+                continue
+            ri = next((i for i, kk in enumerate(ks) if kk['t'] == r['retest_date']), None)
+            if ri is None or ri + 10 >= len(ks):
+                continue
+            ret = (ks[ri + 10]['c'] / ks[ri]['c'] - 1) * 100
+            fwd.append({'sym': sym, 'side': k, 'sweep_date': r['sweep_date'],
+                        'retest_date': r['retest_date'], 'ret_10b': round(ret, 2)})
+    for x in fwd:
+        print(f"  {x['sym']} {x['side'].upper()} sweep={x['sweep_date']} → 10b {x['ret_10b']:+.2f}%")
+    if fwd:
+        rets = [x['ret_10b'] for x in fwd]
+        print(f"  汇总: n={len(fwd)} avg={sum(rets)/len(rets):+.2f}% WR={sum(1 for v in rets if v>0)/len(rets)*100:.1f}%")
+    jout['retest_fwd'] = fwd
 
     # B) s22/s23 年度稳定性
     try:
