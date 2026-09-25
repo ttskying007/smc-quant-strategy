@@ -1,0 +1,522 @@
+[
+ {
+  "symbol": "688381.SH",
+  "bars": 800,
+  "pivot": 4,
+  "density": 12.8,
+  "n_events": 37,
+  "kinds": {
+   "BOS↑": 4,
+   "BOS↓": 14,
+   "CHoCH↑": 10,
+   "CHoCH↓": 9
+  },
+  "problems": [],
+  "events_sample": [
+   {
+    "bar": 692,
+    "date": "20260422",
+    "kind": "CHoCH↑",
+    "level": 26.2,
+    "level_date": "20260317",
+    "trend": "up"
+   },
+   {
+    "bar": 704,
+    "date": "20260513",
+    "kind": "BOS↑",
+    "level": 35.21,
+    "level_date": "20260427",
+    "trend": "up"
+   },
+   {
+    "bar": 737,
+    "date": "20260630",
+    "kind": "BOS↑",
+    "level": 52.52,
+    "level_date": "20260525",
+    "trend": "up"
+   },
+   {
+    "bar": 749,
+    "date": "20260716",
+    "kind": "CHoCH↓",
+    "level": 41.63,
+    "level_date": "20260624",
+    "trend": "down"
+   },
+   {
+    "bar": 759,
+    "date": "20260730",
+    "kind": "BOS↓",
+    "level": 25.0,
+    "level_date": "20260721",
+    "trend": "down"
+   },
+   {
+    "bar": 791,
+    "date": "20260914",
+    "kind": "CHoCH↑",
+    "level": 37.98,
+    "level_date": "20260818",
+    "trend": "up"
+   }
+  ]
+ },
+ {
+  "symbol": "600519.SH",
+  "bars": 800,
+  "pivot": 5,
+  "density": 12.4,
+  "n_events": 37,
+  "kinds": {
+   "BOS↑": 7,
+   "BOS↓": 5,
+   "CHoCH↑": 12,
+   "CHoCH↓": 13
+  },
+  "problems": [],
+  "events_sample": [
+   {
+    "bar": 729,
+    "date": "20260617",
+    "kind": "BOS↓",
+    "level": 1222.076,
+    "level_date": "20260527",
+    "trend": "down"
+   },
+   {
+    "bar": 748,
+    "date": "20260715",
+    "kind": "CHoCH↑",
+    "level": 1215.52,
+    "level_date": "20260702",
+    "trend": "up"
+   },
+   {
+    "bar": 759,
+    "date": "20260730",
+    "kind": "BOS↑",
+    "level": 1344.7,
+    "level_date": "20260721",
+    "trend": "up"
+   },
+   {
+    "bar": 771,
+    "date": "20260817",
+    "kind": "CHoCH↓",
+    "level": 1300.01,
+    "level_date": "20260806",
+    "trend": "down"
+   },
+   {
+    "bar": 785,
+    "date": "20260904",
+    "kind": "CHoCH↑",
+    "level": 1317.0,
+    "level_date": "20260825",
+    "trend": "up"
+   },
+   {
+    "bar": 793,
+    "date": "20260916",
+    "kind": "CHoCH↓",
+    "level": 1270.33,
+    "level_date": "20260824",
+    "trend": "down"
+   }
+  ]
+ },
+ {
+  "symbol": "300750.SZ",
+  "bars": 800,
+  "pivot": 4,
+  "density": 12.8,
+  "n_events": 40,
+  "kinds": {
+   "BOS↑": 9,
+   "BOS↓": 13,
+   "CHoCH↑": 9,
+   "CHoCH↓": 9
+  },
+  "problems": [
+   [
+    "C",
+    "300750.SZ",
+    "20260708",
+    "BOS↓",
+    "与前一同向事件仅隔 2 bar"
+   ]
+  ],
+  "events_sample": [
+   {
+    "bar": 707,
+    "date": "20260518",
+    "kind": "CHoCH↓",
+    "level": 421.598,
+    "level_date": "20260428",
+    "trend": "down"
+   },
+   {
+    "bar": 722,
+    "date": "20260608",
+    "kind": "BOS↓",
+    "level": 398.598,
+    "level_date": "20260525",
+    "trend": "down"
+   },
+   {
+    "bar": 741,
+    "date": "20260706",
+    "kind": "BOS↓",
+    "level": 378.628,
+    "level_date": "20260611",
+    "trend": "down"
+   },
+   {
+    "bar": 743,
+    "date": "20260708",
+    "kind": "BOS↓",
+    "level": 368.598,
+    "level_date": "20260701",
+    "trend": "down"
+   },
+   {
+    "bar": 777,
+    "date": "20260825",
+    "kind": "BOS↓",
+    "level": 382.758,
+    "level_date": "20260806",
+    "trend": "down"
+   },
+   {
+    "bar": 792,
+    "date": "20260915",
+    "kind": "BOS↓",
+    "level": 326.0,
+    "level_date": "20260908",
+    "trend": "down"
+   }
+  ]
+ },
+ {
+  "symbol": "002594.SZ",
+  "bars": 800,
+  "pivot": 4,
+  "density": 13.6,
+  "n_events": 33,
+  "kinds": {
+   "BOS↑": 7,
+   "BOS↓": 12,
+   "CHoCH↑": 7,
+   "CHoCH↓": 7
+  },
+  "problems": [],
+  "events_sample": [
+   {
+    "bar": 637,
+    "date": "20260126",
+    "kind": "CHoCH↓",
+    "level": 93.142,
+    "level_date": "20251218",
+    "trend": "down"
+   },
+   {
+    "bar": 656,
+    "date": "20260302",
+    "kind": "CHoCH↑",
+    "level": 92.592,
+    "level_date": "20260211",
+    "trend": "up"
+   },
+   {
+    "bar": 663,
+    "date": "20260311",
+    "kind": "BOS↑",
+    "level": 96.892,
+    "level_date": "20260302",
+    "trend": "up"
+   },
+   {
+    "bar": 706,
+    "date": "20260515",
+    "kind": "CHoCH↓",
+    "level": 98.342,
+    "level_date": "20260424",
+    "trend": "down"
+   },
+   {
+    "bar": 722,
+    "date": "20260608",
+    "kind": "BOS↓",
+    "level": 92.252,
+    "level_date": "20260522",
+    "trend": "down"
+   },
+   {
+    "bar": 783,
+    "date": "20260902",
+    "kind": "BOS↓",
+    "level": 88.44,
+    "level_date": "20260819",
+    "trend": "down"
+   }
+  ]
+ },
+ {
+  "symbol": "601318.SH",
+  "bars": 800,
+  "pivot": 4,
+  "density": 11.2,
+  "n_events": 48,
+  "kinds": {
+   "BOS↑": 19,
+   "BOS↓": 9,
+   "CHoCH↑": 10,
+   "CHoCH↓": 10
+  },
+  "problems": [],
+  "events_sample": [
+   {
+    "bar": 700,
+    "date": "20260507",
+    "kind": "CHoCH↑",
+    "level": 58.09,
+    "level_date": "20260410",
+    "trend": "up"
+   },
+   {
+    "bar": 706,
+    "date": "20260515",
+    "kind": "CHoCH↓",
+    "level": 55.31,
+    "level_date": "20260424",
+    "trend": "down"
+   },
+   {
+    "bar": 730,
+    "date": "20260618",
+    "kind": "BOS↓",
+    "level": 51.15,
+    "level_date": "20260608",
+    "trend": "down"
+   },
+   {
+    "bar": 748,
+    "date": "20260715",
+    "kind": "CHoCH↑",
+    "level": 50.22,
+    "level_date": "20260707",
+    "trend": "up"
+   },
+   {
+    "bar": 759,
+    "date": "20260730",
+    "kind": "BOS↑",
+    "level": 54.65,
+    "level_date": "20260721",
+    "trend": "up"
+   },
+   {
+    "bar": 778,
+    "date": "20260826",
+    "kind": "BOS↑",
+    "level": 55.8,
+    "level_date": "20260730",
+    "trend": "up"
+   }
+  ]
+ },
+ {
+  "symbol": "000858.SZ",
+  "bars": 800,
+  "pivot": 4,
+  "density": 12.8,
+  "n_events": 44,
+  "kinds": {
+   "BOS↑": 3,
+   "BOS↓": 20,
+   "CHoCH↑": 10,
+   "CHoCH↓": 11
+  },
+  "problems": [],
+  "events_sample": [
+   {
+    "bar": 722,
+    "date": "20260608",
+    "kind": "BOS↓",
+    "level": 80.88,
+    "level_date": "20260529",
+    "trend": "down"
+   },
+   {
+    "bar": 743,
+    "date": "20260708",
+    "kind": "BOS↓",
+    "level": 71.75,
+    "level_date": "20260629",
+    "trend": "down"
+   },
+   {
+    "bar": 759,
+    "date": "20260730",
+    "kind": "CHoCH↑",
+    "level": 76.76,
+    "level_date": "20260721",
+    "trend": "up"
+   },
+   {
+    "bar": 770,
+    "date": "20260814",
+    "kind": "CHoCH↓",
+    "level": 74.01,
+    "level_date": "20260807",
+    "trend": "down"
+   },
+   {
+    "bar": 784,
+    "date": "20260903",
+    "kind": "BOS↓",
+    "level": 70.88,
+    "level_date": "20260824",
+    "trend": "down"
+   },
+   {
+    "bar": 790,
+    "date": "20260911",
+    "kind": "BOS↓",
+    "level": 70.55,
+    "level_date": "20260903",
+    "trend": "down"
+   }
+  ]
+ },
+ {
+  "symbol": "600036.SH",
+  "bars": 800,
+  "pivot": 4,
+  "density": 13.6,
+  "n_events": 45,
+  "kinds": {
+   "BOS↑": 11,
+   "BOS↓": 11,
+   "CHoCH↑": 12,
+   "CHoCH↓": 11
+  },
+  "problems": [],
+  "events_sample": [
+   {
+    "bar": 726,
+    "date": "20260612",
+    "kind": "CHoCH↑",
+    "level": 37.877,
+    "level_date": "20260602",
+    "trend": "up"
+   },
+   {
+    "bar": 734,
+    "date": "20260625",
+    "kind": "CHoCH↓",
+    "level": 35.777,
+    "level_date": "20260527",
+    "trend": "down"
+   },
+   {
+    "bar": 751,
+    "date": "20260720",
+    "kind": "CHoCH↑",
+    "level": 38.367,
+    "level_date": "20260615",
+    "trend": "up"
+   },
+   {
+    "bar": 757,
+    "date": "20260728",
+    "kind": "BOS↑",
+    "level": 39.4,
+    "level_date": "20260721",
+    "trend": "up"
+   },
+   {
+    "bar": 771,
+    "date": "20260817",
+    "kind": "CHoCH↓",
+    "level": 38.47,
+    "level_date": "20260806",
+    "trend": "down"
+   },
+   {
+    "bar": 782,
+    "date": "20260901",
+    "kind": "CHoCH↑",
+    "level": 40.55,
+    "level_date": "20260730",
+    "trend": "up"
+   }
+  ]
+ },
+ {
+  "symbol": "000001.SZ",
+  "bars": 800,
+  "pivot": 4,
+  "density": 11.6,
+  "n_events": 40,
+  "kinds": {
+   "BOS↑": 7,
+   "BOS↓": 11,
+   "CHoCH↑": 11,
+   "CHoCH↓": 11
+  },
+  "problems": [],
+  "events_sample": [
+   {
+    "bar": 707,
+    "date": "20260518",
+    "kind": "CHoCH↓",
+    "level": 10.56,
+    "level_date": "20260424",
+    "trend": "down"
+   },
+   {
+    "bar": 723,
+    "date": "20260609",
+    "kind": "CHoCH↑",
+    "level": 10.74,
+    "level_date": "20260602",
+    "trend": "up"
+   },
+   {
+    "bar": 735,
+    "date": "20260626",
+    "kind": "CHoCH↓",
+    "level": 10.26,
+    "level_date": "20260529",
+    "trend": "down"
+   },
+   {
+    "bar": 758,
+    "date": "20260729",
+    "kind": "CHoCH↑",
+    "level": 11.25,
+    "level_date": "20260612",
+    "trend": "up"
+   },
+   {
+    "bar": 772,
+    "date": "20260818",
+    "kind": "CHoCH↓",
+    "level": 11.1,
+    "level_date": "20260807",
+    "trend": "down"
+   },
+   {
+    "bar": 778,
+    "date": "20260826",
+    "kind": "CHoCH↑",
+    "level": 11.66,
+    "level_date": "20260803",
+    "trend": "up"
+   }
+  ]
+ }
+]

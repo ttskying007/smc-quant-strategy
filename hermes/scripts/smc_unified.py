@@ -8529,7 +8529,48 @@ class Handler(BaseHTTPRequestHandler):
                             _trend = 'up'
                         elif _hs[-1]['price'] < _hs[-2]['price'] and _ls[-1]['price'] < _ls[-2]['price']:
                             _trend = 'down'
-                    # BSL/SSL: 引擎摆动高低点 + swept 判定(确认后才允许扫)
+                    # R112: BOS/CHoCH/BSL/SSL 单源化 —— 改用 core.structure.mode='auto'
+                    # (与回测 paper_sim 同一实现), 替代引擎快照里 pivot=3 的旧事件, 修图上错标。
+                    _core_events, _core_bsl, _core_ssl = [], [], []
+                    try:
+                        import sys as _sx
+                        if r'E:\test\smc_project\research' not in _sx.path:
+                            _sx.path.insert(0, r'E:\test\smc_project\research')
+                        from core.structure import (structure_events as _csev,
+                                                    is_swing_high as _cish, is_swing_low as _cisl,
+                                                    pick_pivot_by_density as _cpiv)
+                        _cks = [{'t': str(k['date'])[:10].replace('-', ''),
+                                 'o': float(k['o']), 'h': float(k['h']),
+                                 'l': float(k['l']), 'c': float(k['c']),
+                                 'v': float(k.get('v') or 0)} for k in klines]
+                        _cn = len(_cks) - 1
+                        _pv, _pvden = _cpiv(_cks, _cn)
+                        _cev = _csev(_cks, None, mode='auto')
+                        _core_events = [{'date': _xd(e['date']), 'x': _xd(e['date']),
+                                         'level': round(float(e['level']), 2),
+                                         'level_date': _xd(e.get('level_date') or ''),
+                                         'bar': e['bar'], 'kind': e['kind']} for e in _cev[-8:]]
+                        # BSL/SSL: 同一 pivot 下已确认摆动高低点(近3), swept = 确认后收盘穿越
+                        _cph = [(j, _cks[j]['h']) for j in range(_pv, len(_cks) - _pv) if _cish(_cks, j, _pv)]
+                        _cpl = [(j, _cks[j]['l']) for j in range(_pv, len(_cks) - _pv) if _cisl(_cks, j, _pv)]
+                        def _core_swept(j, p, side):
+                            for kk in _cks[j + _pv + 1:]:
+                                if side == 'bsl' and kk['c'] > p: return True
+                                if side == 'ssl' and kk['c'] < p: return True
+                            return False
+                        _core_bsl = [{'t': _cks[j]['t'], 'x': _xd(_cks[j]['t']),
+                                      'price': round(p, 2), 'swept': _core_swept(j, p, 'bsl')}
+                                     for j, p in _cph[-3:]]
+                        _core_ssl = [{'t': _cks[j]['t'], 'x': _xd(_cks[j]['t']),
+                                      'price': round(p, 2), 'swept': _core_swept(j, p, 'ssl')}
+                                     for j, p in _cpl[-3:]]
+                        # 趋势同口径修正为 HH/LL 序列(与 chain.build_chain 一致)
+                        _sev_dir = [e['kind'] for e in _cev[-4:]]
+                        if _core_events:
+                            _trend = _core_events[-1]['kind'][-1] == '↑' and 'up' or 'down'
+                    except Exception:
+                        _core_events, _core_bsl, _core_ssl = [], [], []
+                    # BSL/SSL: 引擎摆动高低点 + swept 判定(确认后才允许扫) [旧口径, 仅 core 不可用时回退]
                     def _sweep_state(sw, side):
                         b = int(sw.get('confirm_bar') or sw.get('bar') or 0)
                         p = float(sw['price'])
@@ -8540,22 +8581,27 @@ class Handler(BaseHTTPRequestHandler):
                             if side == 'ssl' and c < p:
                                 return True
                         return False
-                    _bsl = [{'t': _xd(klines[int(s['bar'])]['date'] if 0 <= int(s['bar']) < len(klines) else None),
+                    # 结构事件/BSL/SSL: 优先 core auto (R112), 回退引擎快照旧口径
+                    if _core_events:
+                        _evtail = _core_events
+                        _bsl = _core_bsl; _ssl = _core_ssl
+                    else:
+                        _evs = [s for s in signals_list if str(s.get('family', '')).lower() in ('bos', 'choch')]
+                        _evs = sorted(_evs, key=lambda s: (str(s.get('date') or ''), s.get('idx') or 0))[-8:]
+                        _evtail = [{'date': str(s.get('date') or ''), 'x': _xd(s.get('date')),
+                                    'level': round(float(s.get('price') or 0), 2),
+                                    'kind': ('CHoCH' if str(s.get('family')).lower() == 'choch' else 'BOS') +
+                                            ('↑' if str(s.get('direction')) == 'bull' else '↓')}
+                                   for s in _evs]
+                        _bsl = [{'t': _xd(klines[int(s['bar'])]['date'] if 0 <= int(s['bar']) < len(klines) else None),
                              'price': round(float(s['price']), 2), 'swept': _sweep_state(s, 'bsl')}
                             for s in _hs[-3:]]
-                    _ssl = [{'t': _xd(klines[int(s['bar'])]['date'] if 0 <= int(s['bar']) < len(klines) else None),
-                             'price': round(float(s['price']), 2), 'swept': _sweep_state(s, 'ssl')}
-                            for s in _ls[-3:]]
+                        _ssl = [{'t': _xd(klines[int(s['bar'])]['date'] if 0 <= int(s['bar']) < len(klines) else None),
+                                 'price': round(float(s['price']), 2), 'swept': _sweep_state(s, 'ssl')}
+                                for s in _ls[-3:]]
                     for _row in _bsl + _ssl:
-                        _row['x'] = _row['t']
-                    # 结构事件: 引擎 BOS/CHoCH 末 8 条(带极性)
-                    _evs = [s for s in signals_list if str(s.get('family', '')).lower() in ('bos', 'choch')]
-                    _evs = sorted(_evs, key=lambda s: (str(s.get('date') or ''), s.get('idx') or 0))[-8:]
-                    _evtail = [{'date': str(s.get('date') or ''), 'x': _xd(s.get('date')),
-                                'level': round(float(s.get('price') or 0), 2),
-                                'kind': ('CHoCH' if str(s.get('family')).lower() == 'choch' else 'BOS') +
-                                        ('↑' if str(s.get('direction')) == 'bull' else '↓')}
-                               for s in _evs]
+                        if not _row.get('x'):
+                            _row['x'] = _row['t']
                     # OB(引擎 order-block) / FVG-IFVG(引擎缺口), 只取近端
                     def _obrows(fam, keep):
                         out = []
@@ -8598,7 +8644,33 @@ class Handler(BaseHTTPRequestHandler):
                     _brk_rows = [s for s in signals_list if str(s.get('family', '')).lower() == 'bos']
                     _brk = {}
                     _rt = {'price': None, 'state': 'no_retrace', 'signal': ''}
-                    if _brk_rows:
+                    # R112: 最近突破同源 core auto 事件(优先, 含 CHoCH)
+                    if _core_events:
+                        _ce0 = _core_events[-1]
+                        _brk = {'date': _ce0['date'], 'x': _ce0['x'], 'price': _ce0['level'],
+                                'kind': _ce0['kind']}
+                        _bi = _ce0.get('bar')
+                        _bp = float(_ce0['level'] or 0)
+                        _bbull = _ce0['kind'].endswith('↑')
+                        if _bi is not None and _bp > 0:
+                            _win = klines[_bi:]
+                            if _bbull:
+                                mn = min(float(kk['l']) for kk in _win)
+                                if mn > _bp * 1.03:
+                                    _rt = {'price': round(mn, 2), 'state': 'no_retrace', 'signal': '未回踩(走势延续)'}
+                                elif _cur >= _bp:
+                                    _rt = {'price': round(mn, 2), 'state': 'retrace_ok', 'signal': '回踩确认(缺口/结构内)'}
+                                else:
+                                    _rt = {'price': round(mn, 2), 'state': 'retrace_fail', 'signal': '回踩跌破(突破失败)'}
+                            else:
+                                mx = max(float(kk['h']) for kk in _win)
+                                if mx < _bp * 0.97:
+                                    _rt = {'price': round(mx, 2), 'state': 'no_retrace', 'signal': '未反抽(弱势延续)'}
+                                elif _cur <= _bp:
+                                    _rt = {'price': round(mx, 2), 'state': 'retrace_ok', 'signal': '反抽受阻(结构内)'}
+                                else:
+                                    _rt = {'price': round(mx, 2), 'state': 'retrace_fail', 'signal': '反抽收复(破位失败)'}
+                    elif _brk_rows:
                         _bs = sorted(_brk_rows, key=lambda s: (str(s.get('date') or ''), s.get('idx') or 0))[-1]
                         _bp = float(_bs.get('price') or 0)
                         _bbull = str(_bs.get('direction')) == 'bull'
