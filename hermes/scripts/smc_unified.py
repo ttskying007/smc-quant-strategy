@@ -2125,10 +2125,16 @@ function loadKline(){
             var sc=d.smc_chain, endX=dates[dates.length-1];
             var ovML=[], ovMA=[], ovMP=[];
             (sc.bsl||[]).forEach(function(s){ if(!s.x)return;
-                ovML.push([{coord:[s.x,s.price],lineStyle:{color:'#58a6ff',type:'dashed',width:1},label:{formatter:'BSL '+s.price+(s.swept?'(已扫)':''),fontSize:9,color:'#58a6ff',position:'insideEndTop'}},{coord:[endX,s.price]}]);
+                var st3=s.sweep_state||(s.swept?'实收穿越':'未扫');
+                var c3=st3==='影线假扫回收'?'#9e6ae8':'#58a6ff';
+                var t3=st3==='影线假扫回收'?'dotted':'dashed';
+                ovML.push([{coord:[s.x,s.price],lineStyle:{color:c3,type:t3,width:1},label:{formatter:'BSL '+s.price+(st3==='未扫'?'':'('+st3+')'),fontSize:9,color:c3,position:'insideEndTop'}},{coord:[endX,s.price]}]);
             });
             (sc.ssl||[]).forEach(function(s){ if(!s.x)return;
-                ovML.push([{coord:[s.x,s.price],lineStyle:{color:'#f85149',type:'dashed',width:1},label:{formatter:'SSL '+s.price+(s.swept?'(已扫)':''),fontSize:9,color:'#f85149',position:'insideEndBottom'}},{coord:[endX,s.price]}]);
+                var st3=s.sweep_state||(s.swept?'实收穿越':'未扫');
+                var c3=st3==='影线假扫回收'?'#9e6ae8':'#f85149';
+                var t3=st3==='影线假扫回收'?'dotted':'dashed';
+                ovML.push([{coord:[s.x,s.price],lineStyle:{color:c3,type:t3,width:1},label:{formatter:'SSL '+s.price+(st3==='未扫'?'':'('+st3+')'),fontSize:9,color:c3,position:'insideEndBottom'}},{coord:[endX,s.price]}]);
             });
             (sc.fvg_bull||[]).forEach(function(f){ if(!f.x)return;
                 ovMA.push([{name:(f.ifvg?'IFVG+':'FVG+'),xAxis:f.x,yAxis:f.low,itemStyle:{color:f.ifvg?'rgba(188,140,255,0.20)':'rgba(63,185,80,0.13)',borderColor:f.ifvg?'#bc8cff':'#3fb950',borderWidth:1}},{xAxis:endX,yAxis:f.high}]);
@@ -2174,8 +2180,8 @@ function loadKline(){
             hp.push('<p>趋势: <b style="color:'+(sc.trend_state==='up'?'#3fb950':'#f85149')+'">'+(sc.trend_state||'-')+'</b> | 现价 '+sc.current_price+'</p>');
             hp.push('<table><thead><tr><th>环节</th><th>时间</th><th>价格</th><th>类型/信号</th></tr></thead><tbody>');
             (sc.events_tail||[]).forEach(function(e){hp.push('<tr><td>结构事件</td><td class=mono>'+e.date+'</td><td class=mono>'+e.level+' <span style=color:#8b949e>(破 '+(e.level_date||'?')+' 枢轴, 穿 '+(e.pen_pct!==undefined?e.pen_pct:'-')+'%'+(e.wick_first?' ◌影线先扫':'')+')</span></td><td>'+e.kind+'</td></tr>');});
-            (sc.bsl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前高(BSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.swept?'已被扫(假突破回收)':'未扫')+'</td></tr>');});
-            (sc.ssl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前低(SSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.swept?'已被扫(诱空回收)':'未扫')+'</td></tr>');});
+            (sc.bsl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前高(BSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.sweep_state||((s.swept?'实收穿越':'未扫')))+'</td></tr>');});
+            (sc.ssl||[]).slice(-3).forEach(function(s){hp.push('<tr><td>前低(SSL)</td><td class=mono>'+s.t+'</td><td class=mono>'+s.price+'</td><td>'+(s.sweep_state||((s.swept?'实收穿越':'未扫')))+'</td></tr>');});
             (sc.ob||[]).slice(-2).forEach(function(o){hp.push('<tr><td>订单块</td><td class=mono>'+o.t+'</td><td class=mono>'+o.low+'~'+o.high+'</td><td>'+o.side+' → '+o.broke_kind+' @'+o.broke_at+'</td></tr>');});
             var nf=(sc.fvg_bull||[]).length, nb=(sc.fvg_bear||[]).length, nfvg=(sc.fvg_bull||[]).concat(sc.fvg_bear||[]).filter(function(f){return f.ifvg;}).length;
             hp.push('<tr><td>缺口</td><td class=mono>近30日</td><td class=mono>FVG多 '+nf+' / 空 '+nb+'</td><td>其中 IFVG(逆缺口) '+nfvg+'</td></tr>');
@@ -8570,15 +8576,23 @@ class Handler(BaseHTTPRequestHandler):
                         _cph = [(j, _cks[j]['h']) for j in range(_pv, len(_cks) - _pv) if _cish(_cks, j, _pv)]
                         _cpl = [(j, _cks[j]['l']) for j in range(_pv, len(_cks) - _pv) if _cisl(_cks, j, _pv)]
                         def _core_swept(j, p, side):
+                            """R113b: 三类演变 — 未扫 / 影线假扫回收(wick) / 实收穿越(close)"""
+                            wick = False
                             for kk in _cks[j + _pv + 1:]:
-                                if side == 'bsl' and kk['c'] > p: return True
-                                if side == 'ssl' and kk['c'] < p: return True
-                            return False
-                        _core_bsl = [{'t': _cks[j]['t'], 'x': _xd(_cks[j]['t']),
-                                      'price': round(p, 2), 'swept': _core_swept(j, p, 'bsl')}
+                                if side == 'bsl':
+                                    if kk['c'] > p: return '实收穿越'
+                                    if kk['h'] > p: wick = True
+                                else:
+                                    if kk['c'] < p: return '实收穿越'
+                                    if kk['l'] < p: wick = True
+                            return '影线假扫回收' if wick else '未扫'
+                        _core_bsl = [{'t': _cks[j]['t'], 'x': _xd(_cks[j]['t']), 'price': round(p, 2),
+                                      'swept': _core_swept(j, p, 'bsl') == '实收穿越',
+                                      'sweep_state': _core_swept(j, p, 'bsl')}
                                      for j, p in _cph[-3:]]
-                        _core_ssl = [{'t': _cks[j]['t'], 'x': _xd(_cks[j]['t']),
-                                      'price': round(p, 2), 'swept': _core_swept(j, p, 'ssl')}
+                        _core_ssl = [{'t': _cks[j]['t'], 'x': _xd(_cks[j]['t']), 'price': round(p, 2),
+                                      'swept': _core_swept(j, p, 'ssl') == '实收穿越',
+                                      'sweep_state': _core_swept(j, p, 'ssl')}
                                      for j, p in _cpl[-3:]]
                         # 趋势同口径修正为 HH/LL 序列(与 chain.build_chain 一致)
                         _sev_dir = [e['kind'] for e in _cev[-4:]]
