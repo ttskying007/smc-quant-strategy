@@ -2125,16 +2125,16 @@ function loadKline(){
             var sc=d.smc_chain, endX=dates[dates.length-1];
             var ovML=[], ovMA=[], ovMP=[];
             (sc.bsl||[]).forEach(function(s){ if(!s.x)return;
-                var st3=s.sweep_state||(s.swept?'实收穿越':'未扫');
-                var c3=st3==='影线假扫回收'?'#9e6ae8':'#58a6ff';
-                var t3=st3==='影线假扫回收'?'dotted':'dashed';
-                ovML.push([{coord:[s.x,s.price],lineStyle:{color:c3,type:t3,width:1},label:{formatter:'BSL '+s.price+(st3==='未扫'?'':'('+st3+')'),fontSize:9,color:c3,position:'insideEndTop'}},{coord:[endX,s.price]}]);
+                var st3=s.sweep_state||(s.swept?'实收维持':'未扫');
+                var c3=st3==='影线假扫回收'?'#9e6ae8':(st3==='穿越后失效'?'#6e7681':'#58a6ff');
+                var t3=st3==='影线假扫回收'?'dotted':(st3==='穿越后失效'?'dashed':'dashed');
+                ovML.push([{coord:[s.x,s.price],lineStyle:{color:c3,type:t3,width:1.4},label:{formatter:'BSL '+s.price+(st3==='未扫'?'':'('+st3+')'),fontSize:9,color:c3,position:'insideEndTop'}},{coord:[endX,s.price]}]);
             });
             (sc.ssl||[]).forEach(function(s){ if(!s.x)return;
-                var st3=s.sweep_state||(s.swept?'实收穿越':'未扫');
-                var c3=st3==='影线假扫回收'?'#9e6ae8':'#f85149';
-                var t3=st3==='影线假扫回收'?'dotted':'dashed';
-                ovML.push([{coord:[s.x,s.price],lineStyle:{color:c3,type:t3,width:1},label:{formatter:'SSL '+s.price+(st3==='未扫'?'':'('+st3+')'),fontSize:9,color:c3,position:'insideEndBottom'}},{coord:[endX,s.price]}]);
+                var st3=s.sweep_state||(s.swept?'实收维持':'未扫');
+                var c3=st3==='影线假扫回收'?'#9e6ae8':(st3==='穿越后失效'?'#6e7681':'#f85149');
+                var t3=st3==='影线假扫回收'?'dotted':(st3==='穿越后失效'?'dashed':'dashed');
+                ovML.push([{coord:[s.x,s.price],lineStyle:{color:c3,type:t3,width:1.4},label:{formatter:'SSL '+s.price+(st3==='未扫'?'':'('+st3+')'),fontSize:9,color:c3,position:'insideEndBottom'}},{coord:[endX,s.price]}]);
             });
             // R114: EQH/EQL 流动性池(等高等低, 池=磁区)
             (sc.eqh||[]).forEach(function(q){ if(!q.x)return;
@@ -8590,22 +8590,33 @@ class Handler(BaseHTTPRequestHandler):
                         _cph = [(j, _cks[j]['h']) for j in range(_pv, len(_cks) - _pv) if _cish(_cks, j, _pv)]
                         _cpl = [(j, _cks[j]['l']) for j in range(_pv, len(_cks) - _pv) if _cisl(_cks, j, _pv)]
                         def _core_swept(j, p, side):
-                            """R113b: 三类演变 — 未扫 / 影线假扫回收(wick) / 实收穿越(close)"""
-                            wick = False
-                            for kk in _cks[j + _pv + 1:]:
+                            """R113b/R115: 四类演变 — 未扫 / 影线假扫回收 / 实收穿越后回收失效 / 实收维持"""
+                            wick = False; crossed = False; cross_i = -1
+                            for kx in range(j + _pv + 1, len(_cks)):
+                                kk = _cks[kx]
                                 if side == 'bsl':
-                                    if kk['c'] > p: return '实收穿越'
                                     if kk['h'] > p: wick = True
+                                    if not crossed and kk['c'] > p:
+                                        crossed = True; cross_i = kx
+                                        continue
+                                    if crossed and kk['c'] < p:  # 穿越后收回 → 失效
+                                        return '穿越后失效'
                                 else:
-                                    if kk['c'] < p: return '实收穿越'
                                     if kk['l'] < p: wick = True
+                                    if not crossed and kk['c'] < p:
+                                        crossed = True; cross_i = kx
+                                        continue
+                                    if crossed and kk['c'] > p:
+                                        return '穿越后失效'
+                            if crossed: return '实收维持'
                             return '影线假扫回收' if wick else '未扫'
+                        def _swept_bool(st): return st in ('实收维持', '穿越后失效')
                         _core_bsl = [{'t': _cks[j]['t'], 'x': _xd(_cks[j]['t']), 'price': round(p, 2),
-                                      'swept': _core_swept(j, p, 'bsl') == '实收穿越',
+                                      'swept': _swept_bool(_core_swept(j, p, 'bsl')),
                                       'sweep_state': _core_swept(j, p, 'bsl')}
                                      for j, p in _cph[-3:]]
                         _core_ssl = [{'t': _cks[j]['t'], 'x': _xd(_cks[j]['t']), 'price': round(p, 2),
-                                      'swept': _core_swept(j, p, 'ssl') == '实收穿越',
+                                      'swept': _swept_bool(_core_swept(j, p, 'ssl')),
                                       'sweep_state': _core_swept(j, p, 'ssl')}
                                      for j, p in _cpl[-3:]]
                         # R114: EQH/EQL 流动性池 — 近12个月摆动点按容差聚类, ≥2个同价位为池
@@ -8634,6 +8645,28 @@ class Handler(BaseHTTPRequestHandler):
                             return out[:3]
                         _eqh = _eq_cluster(_cph, 'eqh')
                         _eql = _eq_cluster(_cpl, 'eql')
+                        # R115: BSL×EQH / SSL×EQL 共振磁区 — 价位接近时合并高亮标记
+                        def _merge_pool(pool, lv_rows, side):
+                            out = []
+                            used_b = set()
+                            for q in pool:
+                                near = None
+                                for bi, b in enumerate(lv_rows):
+                                    if bi in used_b: continue
+                                    if abs(b['price'] - q['price']) / q['price'] <= 0.01:
+                                        near = bi; used_b.add(bi); break
+                                if near is not None:
+                                    b2 = lv_rows[near]
+                                    out.append({'t': min(q['t'], b2['t']), 'x': _xd(min(q['t'], b2['t'])),
+                                                't2': max(q['t2'], b2['t']), 'x2': _xd(max(q['t2'], b2['t'])),
+                                                'price': q['price'], 'count': q['count'],
+                                                'swept': b2.get('swept'), 'sweep_state': b2.get('sweep_state'),
+                                                'conflu': True})
+                                else:
+                                    out.append(dict(q, conflu=False))
+                            return out
+                        _eqh = _merge_pool(_eqh, _core_bsl, 'eqh')
+                        _eql = _merge_pool(_eql, _core_ssl, 'eql')
                         # 趋势同口径修正为 HH/LL 序列(与 chain.build_chain 一致)
                         _sev_dir = [e['kind'] for e in _cev[-4:]]
                         if _core_events:
