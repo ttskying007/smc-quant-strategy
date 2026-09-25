@@ -4243,6 +4243,39 @@ def build_audit_portal(slug=''):
     except Exception:
         pass
 
+    # ═══ R117/R118: 活跃磁区卡 (r117 因子回测: 近活跃磁区分桶 + s24 毒性桶) ═══
+    _eq_card = ''
+    try:
+        import csv as _csv_eq
+        _eqrows = list(_csv_eq.DictReader(open(r'E:\test\smc_project\research\combo_v22_eq_magnet.csv', encoding='utf-8-sig')))
+        _eq_ok = [r for r in _eqrows if r.get('eq_near_active') in ('True', 'False')]
+        if _eq_ok:
+            def _eq_bucket(sel):
+                b = [r for r in _eq_ok if sel(r)]
+                if not b:
+                    return 'n=0'
+                p = [float(r['net_pnl_pct']) for r in b]
+                gp = sum(x for x in p if x > 0)
+                gl = -sum(x for x in p if x < 0)
+                pf = (gp / gl) if gl > 0 else float('inf')
+                return f"n={len(b)} avg={sum(p)/len(p):+.2f}% PF={pf:.2f}"
+            _s24 = [r for r in _eq_ok if int(r.get('eql_active_n') or 0) >= 1 and r.get('eq_near_active') == 'True']
+            _s24p = [float(r['net_pnl_pct']) for r in _s24]
+            _s24_txt = (f"n={len(_s24)} avg={sum(_s24p)/len(_s24p):+.2f}%" if _s24p else 'n=0')
+            _eq_card = ("<div class='card' style='border-left:3px solid #d29922'>"
+                        "<h2>🧲 活跃磁区因子 (R117 回测, s24 影子已接入)</h2>"
+                        "<p style='color:#8b949e'>入场价1%内存在未扫EQH/EQL池(只用入场前已确认信息, 因果安全)</p>"
+                        "<table><thead><tr><th>分桶</th><th>回测</th></tr></thead><tbody>"
+                        f"<tr><td>近活跃磁区 True</td><td class='mono'>{_eq_bucket(lambda r: r['eq_near_active']=='True')}</td></tr>"
+                        f"<tr><td>近活跃磁区 False</td><td class='mono'>{_eq_bucket(lambda r: r['eq_near_active']=='False')}</td></tr>"
+                        f"<tr><td style='color:#f85149'>下方EQL风险(s24毒性桶)</td><td class='mono' style='color:#f85149'>{_s24_txt} → w×0.15</td></tr>"
+                        f"<tr><td>上方EQH磁吸(仅记录)</td><td class='mono'>{_eq_bucket(lambda r: r.get('eqh_active_n') not in ('','0'))}</td></tr>"
+                        "</tbody></table>"
+                        "<p style='color:#8b949e;font-size:0.85em'>s24_eql_risk 已写入 combo_v23_shadow_v3 (影子列, 生产不动); 观察期后由用户决定是否升级生产。</p>"
+                        "</div>")
+    except Exception:
+        pass
+
 
     # ═══ R87: 生产影子池卡(近挂单 + v23权重/flags + Jev判定) ═══
     shadow_card = ''
@@ -4341,7 +4374,7 @@ def build_audit_portal(slug=''):
             body = '<div class="card">报告不存在: ' + html.escape(slug) + '</div>'
     else:
         preview = ''.join(f'<div class="card"><a href="/audit?r={html.escape(r["slug"])}" style="font-size:1.1em;color:#58a6ff">{html.escape(r["title"])}</a><div style="color:#8b949e">{html.escape(r["tag"])}</div></div>' for r in reports)
-        body = f'{_review_card}{shadow_card}<div class="card" style="border-left:3px solid #58a6ff"><h2>研究审计门户</h2><p>R60-R99 全部自动化报告在一起。K线链 / 逐腿审计 / 手术预注册 / 熊市追踪 / 全信号家族都在这里。</p></div>{preview}'
+        body = f'{_review_card}{_eq_card}{shadow_card}<div class="card" style="border-left:3px solid #58a6ff"><h2>研究审计门户</h2><p>R60-R99 全部自动化报告在一起。K线链 / 逐腿审计 / 手术预注册 / 熊市追踪 / 全信号家族都在这里。</p></div>{preview}'
 
     return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"><title>研究审计门户</title><style>{CSS} .stats{{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}} .stat{{flex:1;min-width:180px;background:#161b22;border-radius:8px;padding:10px 14px}} .val{{font-size:1.3em;font-weight:700}} .lbl{{color:#8b949e;font-size:0.85em}} table{{width:100%;border-collapse:collapse;font-size:0.86em}} th,td{{padding:5px 8px;border:1px solid #30363d;text-align:left}} th{{background:#161b22}} pre{{background:#0d1117;padding:8px;border-radius:6px;font-size:0.85em;overflow:auto}}</style></head><body>{build_nav()}<div class="container" style="max-width:1400px">
 <div class="stats">{kpi_html}</div>
