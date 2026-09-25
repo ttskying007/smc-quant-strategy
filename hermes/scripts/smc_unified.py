@@ -2933,12 +2933,36 @@ def build_dashboard(qs=None):
             combo_pos_table = f'<div class="card"><h3>模拟持仓/挂单（{sum(1 for t in _led if t.get("status") != "CLOSED")}）</h3><table><thead><tr><th>代码</th><th>名称</th><th>信号组合</th><th>信号日期</th><th>选股日期</th><th>挂单价</th><th>TP</th><th>SL</th><th>状态</th><th>成交时间</th><th>盈亏</th></tr></thead><tbody>{_pos_rows or "<tr><td colspan=11>无</td></tr>"}</tbody></table><p style="color:#8b949e">点击代码跳转 K 线查看。选股日期=该股票被选股纳入的日期。状态：PENDING_ORDER=挂单中（实时价未达挂单价）/ FILLED=已成交 / OPEN=旧持仓。</p></div>'
         except Exception:
             combo_pos_table = ''
+        # R127: 增量反向候选行 (r125 产出 × r126 overlap 未覆盖) — 仅研究记录
+        _rev_inc_rows = ''
+        try:
+            import csv as _csv_inc
+            _rev_all = list(_csv_inc.DictReader(open(r'E:\test\smc_project\research\combo_reverse_candidates.csv', encoding='utf-8-sig')))
+            try:
+                _ov = json.load(open(r'E:\test\smc_project\research\handover\_r126_overlap.json', encoding='utf-8'))
+                _ov_keys = {str(r.get('symbol') or '') + '|' + str(r.get('sweep_date') or '').replace('-', '')
+                            for r in (_ov.get('overlap') or [])}
+            except Exception:
+                _ov_keys = set()
+            _inc = [r for r in _rev_all
+                    if (r['symbol'] + '|' + str(r['sweep_date']).replace('-', '')) not in _ov_keys]
+            _rev_inc_rows = ''.join(
+                f"<tr><td class=mono>{html.escape(r['symbol'])}</td>"
+                f"<td><b style='color:{'#f85149' if r['side']=='EQH' else '#3fb950'}'>{r['side']}拒绝→{'空' if r['side']=='EQH' else '多'}</b></td>"
+                f"<td class=mono>{r['signal_date']}</td><td class=mono>{r['pool_price']}</td>"
+                f"<td class=mono style='color:#3fb950'><b>+{r['ret_10b_signed']}%</b></td></tr>"
+                for r in _inc[:15])
+        except Exception:
+            _rev_inc_rows = ''
         return f'''<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>SMC 组合策略仪表盘</title><style>{CSS}</style></head><body>{build_nav()}<div class="container">
 <div class="card" style="border-left:3px solid #f0883e"><h2>组合策略准生产（纸面跟踪）</h2>
 <p>策略：SMC 三周期 TP2-R20（动量）+ 内部人事件增持/回购（事件 alpha）；模式：<b>PAPER_PRODUCTION（纸面，非真实资金）</b>；buy_enabled={html.escape(str(registry.get('buy_enabled')))}。</p>
 <p style="color:#8b949e">当前纸面持仓：{paper.get('open_positions',0)}；浮盈：{paper.get('open_avg_mark_pnl',0):+.2f}%（WR {paper.get('open_wr_mark',0)}%）；数据日 {html.escape(str(paper.get('today','')))}；已平仓：{paper.get('closed_trades',0)}。回测年度见下。</p></div>
 {combo_pos_table}
 <div class="card"><h2>组合回测（每年）</h2><table><thead><tr><th>年</th><th>n</th><th>胜率</th><th>平均收益</th><th>PF</th></tr></thead><tbody>{y_rows or '<tr><td colspan=5>无</td></tr>'}</tbody></table></div>
+<div class="card" style="border-left:3px solid #3fb950"><h2>🔄 增量反向候选 sweep→reverse 2.0 (R125/R126)</h2>
+<p style="color:#8b949e">影线假扫回收池→二测反弹→<b>反向</b>入场 (EQH拒绝→空/EQL拒绝→多); 300股回测 20信号全胜 (EQH avg+9.95%/EQL avg+8.40%); 引擎未覆盖的增量 setup 如下 (仅研究记录, 不参与生产选股)。</p>
+<table><thead><tr><th>股票</th><th>方向</th><th>信号日</th><th>池价</th><th>10bar反向收益</th></tr></thead><tbody>{_rev_inc_rows or '<tr><td colspan=5>无</td></tr>'}</tbody></table></div>
 <p><a href="/combo" style="color:#58a6ff">查看组合完整仪表盘（逐月/当前候选）</a></p></div></body></html>'''
     if _production_empty_book():
         research = v517_frontend.bundle()

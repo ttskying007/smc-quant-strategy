@@ -14,3 +14,9 @@
 ## 计算口径
 - 原 v24 升级票: v1 高低差 ≥2pp 且 PF 比 ≥1.5
 - 新 v2 升级票 (自适应链): 分歧单 PF < 一致单 PF (证明 v2 狠打有效)
+
+## 影子因子计数 (R127)
+- s24_eql_risk (磁区毒性): 12 腿 (w×0.15)
+- s25_reverse (二测拒绝反向): 0 腿 (记录-only)
+- s22/s23 (相对弱势压制): 66/38 腿 (w×0.15)
+- 反向候选 (sweep→reverse 2.0): 20 信号全胜 (research/combo_reverse_candidates.csv)

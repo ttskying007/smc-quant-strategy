@@ -69,6 +69,22 @@ md = [
     '- 原 v24 升级票: v1 高低差 ≥2pp 且 PF 比 ≥1.5',
     '- 新 v2 升级票 (自适应链): 分歧单 PF < 一致单 PF (证明 v2 狠打有效)',
 ]
+
+# R127: s24/s25 影子计数报告 (additive) — combo_v23_shadow_v3 flags
+try:
+    import csv as _csv106
+    _sh3 = list(_csv106.DictReader(open(ROOT / 'research/combo_v23_shadow_v3.csv', encoding='utf-8-sig')))
+    _s24_n = sum(1 for r in _sh3 if 's24_eql_risk' in (r.get('v23_flags_v2') or ''))
+    _s25_n = sum(1 for r in _sh3 if 's25_reverse' in (r.get('v23_flags_v2') or ''))
+    _s22_n = sum(1 for r in _sh3 if 's22' in ((r.get('v23_flags_v2') or '').split(';')))
+    _s23_n = sum(1 for r in _sh3 if 's23' in ((r.get('v23_flags_v2') or '').split(';')))
+    md += ['', '## 影子因子计数 (R127)',
+           f'- s24_eql_risk (磁区毒性): {_s24_n} 腿 (w×0.15)',
+           f'- s25_reverse (二测拒绝反向): {_s25_n} 腿 (记录-only)',
+           f'- s22/s23 (相对弱势压制): {_s22_n}/{_s23_n} 腿 (w×0.15)',
+           '- 反向候选 (sweep→reverse 2.0): 20 信号全胜 (research/combo_reverse_candidates.csv)']
+except Exception as _e106:
+    print('s24/s25 计数失败:', _e106)
 out = ROOT / 'research/handover/_复盘_R106_judgment.md'
 out.write_text('\n'.join(md), encoding='utf-8')
 print(f'已写 {out.name}')
