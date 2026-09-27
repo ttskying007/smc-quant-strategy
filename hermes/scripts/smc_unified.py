@@ -4338,6 +4338,7 @@ def build_audit_portal(slug=''):
                         "</tbody></table>"
 "<p style='color:#8b949e'>二次测试磁区 (R125, 300股): 二测反弹 bar 入场做多后 10 bar avg −10.9% — 朴素「二测=做多」证伪; <b style='color:#3fb950'>方向修正后 (R125): EQH 拒绝→空 n=14 avg+9.95% WR100%, EQL 拒绝→多 n=6 avg+8.40% WR100% — 20信号全胜, sweep→reverse 2.0 证据链完成</b> (n=20 仍小, 10bar无费)。</p>"
                         "<p style='color:#8b949e'>s22/s23 regime 门控 (R123): 5 种门控(市场弱/强/个股反向/组合)无一能让狠打\"全年<1\" — 桶整体盈利(PF1.75), ×0.15 是相对弱势压制; s23 按年翻转(2024 PF4.59/2026 PF0.13)观察中。</p>"
+                        "<p style='color:#8b949e'>s23 软化探索 (R129): ×0.15/×0.35/×0.5/移除 → 组合 PF 7.04/7.03/7.03/7.02, P(v2>v1) 88.1%/86.3%/88.6%/88.2% — 全在噪声内, 年度翻转组合层面不实质, 维持现状。</p>"
                         "<p style='color:#8b949e;font-size:0.85em'>s24_eql_risk 已写入 combo_v23_shadow_v3 (影子列, 生产不动); 观察期后由用户决定是否升级生产。</p>"
                         "</div>")
     except Exception:
