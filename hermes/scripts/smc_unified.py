@@ -2937,7 +2937,7 @@ def build_dashboard(qs=None):
         _rev_inc_rows = ''
         try:
             import csv as _csv_inc
-            _rev_all = list(_csv_inc.DictReader(open(r'E:\test\smc_project\research\combo_reverse_candidates.csv', encoding='utf-8-sig')))
+            _rev_all = list(_csv_inc.DictReader(open(r'E:\test\smc_project\research\combo_reverse_candidates_causal.csv', encoding='utf-8-sig')))
             try:
                 _ov = json.load(open(r'E:\test\smc_project\research\handover\_r126_overlap.json', encoding='utf-8'))
                 _ov_keys = {str(r.get('symbol') or '') + '|' + str(r.get('sweep_date') or '').replace('-', '')
@@ -2961,7 +2961,7 @@ def build_dashboard(qs=None):
 {combo_pos_table}
 <div class="card"><h2>组合回测（每年）</h2><table><thead><tr><th>年</th><th>n</th><th>胜率</th><th>平均收益</th><th>PF</th></tr></thead><tbody>{y_rows or '<tr><td colspan=5>无</td></tr>'}</tbody></table></div>
 <div class="card" style="border-left:3px solid #3fb950"><h2>🔄 增量反向候选 sweep→reverse 2.0 (R125/R126)</h2>
-<p style="color:#8b949e">影线假扫回收池→二测反弹→<b>反向</b>入场 (EQH拒绝→空/EQL拒绝→多); 300股回测 20信号全胜 (EQH avg+9.95%/EQL avg+8.40%); 引擎未覆盖的增量 setup 如下 (仅研究记录, 不参与生产选股)。</p>
+<p style="color:#8b949e">影线假扫回收池→二测反弹→<b>反向</b>入场 (EQH拒绝→空/EQL拒绝→多); 300股回测 <b>18/20 因果验证一致, 全部盈利</b> (R130); 引擎未覆盖的增量 setup 如下 (仅研究记录, 不参与生产选股)。</p>
 <table><thead><tr><th>股票</th><th>方向</th><th>信号日</th><th>池价</th><th>10bar反向收益</th></tr></thead><tbody>{_rev_inc_rows or '<tr><td colspan=5>无</td></tr>'}</tbody></table></div>
 <p><a href="/combo" style="color:#58a6ff">查看组合完整仪表盘（逐月/当前候选）</a></p></div></body></html>'''
     if _production_empty_book():
@@ -4336,7 +4336,7 @@ def build_audit_portal(slug=''):
                         f"<tr><td style='color:#f85149'>下方EQL风险(s24毒性桶)</td><td class='mono' style='color:#f85149'>{_s24_txt} → w×0.15</td></tr>"
                         f"<tr><td>上方EQH磁吸(仅记录)</td><td class='mono'>{_eq_bucket(lambda r: r.get('eqh_active_n') not in ('','0'))}</td></tr>"
                         "</tbody></table>"
-"<p style='color:#8b949e'>二次测试磁区 (R125, 300股): 二测反弹 bar 入场做多后 10 bar avg −10.9% — 朴素「二测=做多」证伪; <b style='color:#3fb950'>方向修正后 (R125): EQH 拒绝→空 n=14 avg+9.95% WR100%, EQL 拒绝→多 n=6 avg+8.40% WR100% — 20信号全胜, sweep→reverse 2.0 证据链完成</b> (n=20 仍小, 10bar无费)。</p>"
+"<p style='color:#8b949e'>二次测试磁区 (R125/R130, 300股): 二测反弹 bar 入场做多后 10 bar avg −10.9% — 朴素「二测=做多」证伪; <b style='color:#3fb950'>方向修正后因果验证 (R130): 18/20 通过(2个池聚类前视剔除), 全部盈利 — sweep→reverse 2.0 因果证据链完成</b> (n=18 仍小, 10bar无费)。</p>"
                         "<p style='color:#8b949e'>s22/s23 regime 门控 (R123): 5 种门控(市场弱/强/个股反向/组合)无一能让狠打\"全年<1\" — 桶整体盈利(PF1.75), ×0.15 是相对弱势压制; s23 按年翻转(2024 PF4.59/2026 PF0.13)观察中。</p>"
                         "<p style='color:#8b949e'>s23 软化探索 (R129): ×0.15/×0.35/×0.5/移除 → 组合 PF 7.04/7.03/7.03/7.02, P(v2>v1) 88.1%/86.3%/88.6%/88.2% — 全在噪声内, 年度翻转组合层面不实质, 维持现状。</p>"
                         "<p style='color:#8b949e;font-size:0.85em'>s24_eql_risk 已写入 combo_v23_shadow_v3 (影子列, 生产不动); 观察期后由用户决定是否升级生产。</p>"
@@ -4347,7 +4347,7 @@ def build_audit_portal(slug=''):
     # R127: 反向候选卡 (sweep→reverse 2.0, R125 证据链) — /autopsy 展示
     try:
         import csv as _csv_rev
-        _rev_rows = list(_csv_rev.DictReader(open(r'E:\test\smc_project\research\combo_reverse_candidates.csv', encoding='utf-8-sig')))
+        _rev_rows = list(_csv_rev.DictReader(open(r'E:\test\smc_project\research\combo_reverse_candidates_causal.csv', encoding='utf-8-sig')))
         _rev_eqh = [r for r in _rev_rows if r['side'] == 'EQH']
         _rev_eql = [r for r in _rev_rows if r['side'] == 'EQL']
 

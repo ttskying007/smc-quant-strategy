@@ -83,6 +83,16 @@ try:
            f'- s25_reverse (二测拒绝反向): {_s25_n} 腿 (记录-only)',
            f'- s22/s23 (相对弱势压制): {_s22_n}/{_s23_n} 腿 (w×0.15)',
            '- 反向候选 (sweep→reverse 2.0): 20 信号全胜 (research/combo_reverse_candidates.csv)']
+    # R130b: 观察日期追踪 — s24/s25 首次接入日 + 观察期剩余天数 (30天仪式)
+    import datetime as _dt106
+    _ob_start = _dt106.date(2026, 9, 24)  # s24 影子接入日 (R117/R118)
+    _today = _dt106.date.today()
+    _days_in = (_today - _ob_start).days
+    _days_left = max(0, 30 - _days_in)
+    md += ['', '## 观察期追踪 (R130b)',
+           f'- 观察起始: 2026-09-24 (s24 接入) | 已观察 {_days_in} 天 | 剩余 {_days_left} 天到 30 天仪式',
+           f'- 30 天仪式后: 重跑 r106 对比 v1/v2 (含 s24/s25), 用户决定是否 flip SMC_V23V2_AS_PRODUCER=1',
+           f'- 因果候选集: research/combo_reverse_candidates_causal.csv (R130: 18/20 一致, 全部盈利)']
 except Exception as _e106:
     print('s24/s25 计数失败:', _e106)
 out = ROOT / 'research/handover/_复盘_R106_judgment.md'

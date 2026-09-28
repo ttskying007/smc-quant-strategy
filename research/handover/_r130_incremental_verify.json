@@ -1,0 +1,223 @@
+{
+ "total": 20,
+ "agree": 18,
+ "causal_n": 18,
+ "detail": [
+  {
+   "symbol": "000020.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": false,
+    "reason": "池价不一致 (15.469999999999999 vs 16.06)"
+   },
+   "agree": false
+  },
+  {
+   "symbol": "000068.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": true,
+    "pool": 3.35,
+    "retest_date": "20260909",
+    "ret_10b_signed": 1.81
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000100.SZ",
+   "side": "EQL",
+   "verify": {
+    "ok": true,
+    "pool": 4.09,
+    "retest_date": "20260518",
+    "ret_10b_signed": 4.36
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000338.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": true,
+    "pool": 35.37,
+    "retest_date": "20260529",
+    "ret_10b_signed": 20.99
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000534.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": true,
+    "pool": 33.2,
+    "retest_date": "20260707",
+    "ret_10b_signed": 20.74
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000559.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": true,
+    "pool": 18.38,
+    "retest_date": "20260519",
+    "ret_10b_signed": 17.6
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000571.SZ",
+   "side": "EQL",
+   "verify": {
+    "ok": true,
+    "pool": 5.15,
+    "retest_date": "20260512",
+    "ret_10b_signed": 11.26
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000589.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": true,
+    "pool": 5.12,
+    "retest_date": "20260227",
+    "ret_10b_signed": 4.11
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000590.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": false,
+    "reason": "池价不一致 (12.01 vs 12.68)"
+   },
+   "agree": false
+  },
+  {
+   "symbol": "000631.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": true,
+    "pool": 3.52,
+    "retest_date": "20260529",
+    "ret_10b_signed": 3.47
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000651.SZ",
+   "side": "EQL",
+   "verify": {
+    "ok": true,
+    "pool": 36.68,
+    "retest_date": "20260622",
+    "ret_10b_signed": 5.43
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000695.SZ",
+   "side": "EQL",
+   "verify": {
+    "ok": true,
+    "pool": 11.69,
+    "retest_date": "20260715",
+    "ret_10b_signed": 10.18
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000701.SZ",
+   "side": "EQL",
+   "verify": {
+    "ok": true,
+    "pool": 4.3,
+    "retest_date": "20260722",
+    "ret_10b_signed": 13.36
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000707.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": true,
+    "pool": 6.27,
+    "retest_date": "20260424",
+    "ret_10b_signed": 5.52
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000719.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": true,
+    "pool": 12.94,
+    "retest_date": "20260803",
+    "ret_10b_signed": 5.88
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000752.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": true,
+    "pool": 12.62,
+    "retest_date": "20251203",
+    "ret_10b_signed": 13.5
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000761.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": true,
+    "pool": 2.46,
+    "retest_date": "20260910",
+    "ret_10b_signed": 9.43
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000768.SZ",
+   "side": "EQL",
+   "verify": {
+    "ok": true,
+    "pool": 19.53,
+    "retest_date": "20260715",
+    "ret_10b_signed": 5.8
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000826.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": true,
+    "pool": 2.01,
+    "retest_date": "20260826",
+    "ret_10b_signed": 5.61
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000852.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": true,
+    "pool": 7.38,
+    "retest_date": "20260511",
+    "ret_10b_signed": 14.23
+   },
+   "agree": true
+  }
+ ]
+}
