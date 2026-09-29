@@ -263,11 +263,12 @@ def detect_smc_signals(klines, mode='fixed'):
 
     def _rr_swings(ref_bar, side):
         p = _rr_pick_pivot(ref_bar)
+        # R131b: 修正双重减p bug — j+p<=n 已确认口径, 扫到 n-p (原误扫到 n-2p, 漏最近摆点)
         if side == 'EQH':
             return [{'bar': j, 'price': klines[j]['h']}
-                    for j in range(p, min(ref_bar, n - p) - p + 1) if _rr_is_sh(j, p)]
+                    for j in range(p, min(ref_bar, n - p) + 1) if _rr_is_sh(j, p)]
         return [{'bar': j, 'price': klines[j]['l']}
-                for j in range(p, min(ref_bar, n - p) - p + 1) if _rr_is_sl(j, p)]
+                for j in range(p, min(ref_bar, n - p) + 1) if _rr_is_sl(j, p)]
 
     def _cluster_sw(sw_list, ref_bar, tol_ratio=0.008, lookback=250):
         cut = max(0, ref_bar - lookback)

@@ -2,12 +2,17 @@
  "causal_n": 18,
  "covered_n": 14,
  "missed_n": 4,
- "engine_rr_total": 24,
- "extra_n": 10,
+ "engine_rr_total": 25,
+ "extra_n": 11,
  "extra": [
   [
    "000068.SZ",
    "20260302",
+   "bull"
+  ],
+  [
+   "000068.SZ",
+   "20260916",
    "bull"
   ],
   [
@@ -32,7 +37,7 @@
   ],
   [
    "000589.SZ",
-   "20260917",
+   "20260924",
    "bull"
   ],
   [
