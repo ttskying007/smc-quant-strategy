@@ -4337,6 +4337,7 @@ def build_audit_portal(slug=''):
                         f"<tr><td>上方EQH磁吸(仅记录)</td><td class='mono'>{_eq_bucket(lambda r: r.get('eqh_active_n') not in ('','0'))}</td></tr>"
                         "</tbody></table>"
 "<p style='color:#8b949e'>二次测试磁区 (R125/R130, 300股): 二测反弹 bar 入场做多后 10 bar avg −10.9% — 朴素「二测=做多」证伪; <b style='color:#3fb950'>方向修正后因果验证 (R130): 18/20 通过(2个池聚类前视剔除), 全部盈利 — sweep→reverse 2.0 因果证据链完成</b> (n=18 仍小, 10bar无费)。</p>"
+                        "<p style='color:#8b949e'>引擎接入 (R131): v25 detector 新增 Reclaim_Reject 类型(不含Sweep子串, 避免s8碰撞) — 因果候选覆盖 14/18 + 引擎新增 10 个; <b style='color:#f85149'>但引擎新增 10 个收益为负 (n=7 avg−2.18% PF0.48, detector 实现较宽松稀释 edge)</b> → s25 维持键研究因果集, 引擎 RR 仅记录/展示。</p>"
                         "<p style='color:#8b949e'>s22/s23 regime 门控 (R123): 5 种门控(市场弱/强/个股反向/组合)无一能让狠打\"全年<1\" — 桶整体盈利(PF1.75), ×0.15 是相对弱势压制; s23 按年翻转(2024 PF4.59/2026 PF0.13)观察中。</p>"
                         "<p style='color:#8b949e'>s23 软化探索 (R129): ×0.15/×0.35/×0.5/移除 → 组合 PF 7.04/7.03/7.03/7.02, P(v2>v1) 88.1%/86.3%/88.6%/88.2% — 全在噪声内, 年度翻转组合层面不实质, 维持现状。</p>"
                         "<p style='color:#8b949e;font-size:0.85em'>s24_eql_risk 已写入 combo_v23_shadow_v3 (影子列, 生产不动); 观察期后由用户决定是否升级生产。</p>"

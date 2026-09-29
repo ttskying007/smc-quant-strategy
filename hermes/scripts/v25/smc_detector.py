@@ -225,6 +225,100 @@ def detect_smc_signals(klines, mode='fixed'):
                 used_choch.add(ch_bar)
                 break
     
+    # ═══ 6. Reclaim_Reject — 二测拒绝 (池级, R125/R130 因果证据: 18/20 全胜) ═══
+    # 注意: 类型名故意不含 'Sweep' 子串 — s8 因子用 "Sweep" in s.type 过滤,
+    #       子串碰撞会把 RR 误计成扫 (additive 规则破坏), R131 修正。
+    # EQH/EQL 池 (≥2 swing 点 0.8% 聚类, 近250 bar) 影线假扫 → 20 bar 内回池反弹
+    # 且 close 未先破池位 → 信号 = 反弹 bar, 方向 = 反池侧 (EQH→bear 空拒绝, EQL→bull 多拒绝)
+    # 因果: 两遍法 — Pass1 全序列找池+扫日; Pass2 以扫日为参考重聚类, 池价 1% 内一致才发信号
+    # R131: 摆点源 = auto pivot (与 R125/R130 证据同源) — 自包含复制, 不动引擎 highs/lows
+    def _rr_is_sh(j, p):
+        if j < p or j + p >= n:
+            return False
+        hi = klines[j]["h"]
+        return (hi > max(klines[k]["h"] for k in range(j - p, j))
+                and hi >= max(klines[k]["h"] for k in range(j + 1, j + p + 1)))
+
+    def _rr_is_sl(j, p):
+        if j < p or j + p >= n:
+            return False
+        lo = klines[j]["l"]
+        return (lo < min(klines[k]["l"] for k in range(j - p, j))
+                and lo <= min(klines[k]["l"] for k in range(j + 1, j + p + 1)))
+
+    def _rr_pick_pivot(ref_bar, lookback=250):
+        n_ = min(ref_bar, n - 1)
+        start = max(8, n_ - lookback)
+        meta = {}
+        for p in (2, 3, 4, 5, 6, 8):
+            cnt = 0
+            for j in range(max(p, start), max(p, n_ - p) + 1):
+                if _rr_is_sh(j, p) or _rr_is_sl(j, p):
+                    cnt += 1
+            span = max(1, n_ - start)
+            meta[p] = cnt / span * 100
+            if 8.0 <= meta[p] <= 14.0:
+                return p
+        return min(meta, key=lambda w: abs(meta[w] - 11.0))
+
+    def _rr_swings(ref_bar, side):
+        p = _rr_pick_pivot(ref_bar)
+        if side == 'EQH':
+            return [{'bar': j, 'price': klines[j]['h']}
+                    for j in range(p, min(ref_bar, n - p) - p + 1) if _rr_is_sh(j, p)]
+        return [{'bar': j, 'price': klines[j]['l']}
+                for j in range(p, min(ref_bar, n - p) - p + 1) if _rr_is_sl(j, p)]
+
+    def _cluster_sw(sw_list, ref_bar, tol_ratio=0.008, lookback=250):
+        cut = max(0, ref_bar - lookback)
+        cand = sorted([(s['bar'], s['price']) for s in sw_list if s['bar'] >= cut and s['bar'] <= ref_bar],
+                      key=lambda x: -x[0])
+        used = [False] * len(cand)
+        out = []
+        for a in range(len(cand)):
+            if used[a]:
+                continue
+            p1 = cand[a][1]
+            members = [a]
+            for b in range(a + 1, len(cand)):
+                if abs(cand[b][1] - p1) / p1 <= tol_ratio:
+                    members.append(b)
+                    used[b] = True
+            if len(members) >= 2:
+                js = [cand[m][0] for m in members]
+                out.append({'price': sum(cand[m][1] for m in members) / len(members),
+                            'last_bar': max(js)})
+        return out
+
+    for _side, _sdir in (('EQH', 'bear'), ('EQL', 'bull')):
+        # Pass1: 全序列参考找池 + 扫日/二测候选
+        for q in _cluster_sw(_rr_swings(n, _side), n):
+            pp = q['price']
+            sweep_i = -1
+            for i in range(q['last_bar'] + 1, n):
+                _hi = float(klines[i].get('h', 0))
+                _lo = float(klines[i].get('l', 0))
+                _cl = float(klines[i].get('c', 0))
+                _touched = (_hi > pp) if _side == 'EQH' else (_lo < pp)
+                _broke = (_cl > pp) if _side == 'EQH' else (_cl < pp)
+                if _touched and sweep_i < 0:
+                    sweep_i = i
+                if _broke:
+                    break  # 实收穿越 → 池被吃, 不发信号
+                if sweep_i >= 0 and i > sweep_i + 20:
+                    break  # 20 bar 内无二测
+                if _touched and sweep_i >= 0 and i > sweep_i:
+                    # 二测反弹候选 → Pass2 因果验证 (以扫日为参考重聚类)
+                    _causal = _cluster_sw(_rr_swings(sweep_i, _side), sweep_i)
+                    _hit = next((c2 for c2 in _causal if abs(c2['price'] - pp) / pp <= 0.01), None)
+                    if _hit is None:
+                        break  # 池聚类前视 → 剔除 (R130 标准)
+                    signals.append(Signal('Reclaim_Reject', i, _sdir, price=round(_cl, 2),
+                        strength=round(abs(pp - _cl) / pp * 100, 2),
+                        confidence=0.65,
+                        meta={'pool_price': round(pp, 2), 'sweep_bar': sweep_i, 'side': _side}))
+                    break
+
     # ═══ 5. Dedup — keep strongest signal per bar ═══
     signals.sort(key=lambda s: (s.bar, -s.strength))
     deduped = []
