@@ -1,40 +1,41 @@
 {
-  "generated_at": "2026-09-20 00:11:32",
+  "generated_at": "2026-09-29 19:29:15",
   "milestone": {
-    "days_accum": 9,
-    "closed": 10,
+    "days_accum": 15,
+    "closed": 16,
     "next_gate": "G7 30closed+20d",
-    "pct_to_30": 33.3
+    "pct_to_30": 53.3
   },
   "escore_dist": {
-    "n_with_e": 27,
+    "n_with_e": 55,
     "bands": {
-      "high": 19,
-      "mid": 8
+      "high": 32,
+      "mid": 23
     },
-    "avg_e": 0.615
+    "avg_e": 0.595
   },
   "family_dist": {
-    "SMC_REVERSAL": 27
+    "SMC_REVERSAL": 55
   },
   "exit_dist": {
-    "TIME_STOP": 10,
-    "FILL_WINDOW_EXPIRED": 4,
-    "INVALIDATED_BEFORE_FILL": 3,
-    "OPEN": 10
+    "TIME_STOP": 16,
+    "FILL_WINDOW_EXPIRED": 11,
+    "INVALIDATED_BEFORE_FILL": 12,
+    "OPEN": 16
   },
   "loss_attribution": {
     "n_attributed": 0,
-    "n_loss": 8,
+    "n_loss": 13,
     "coverage_pct": 0.0,
     "dist": {}
   },
   "alerts": [
-    "负收益集中: 8/10 closed 为负"
+    "负收益集中: 13/16 closed 为负",
+    "观察期平均负: -1.15%"
   ],
   "raw": {
-    "total": 27,
-    "closed": 10,
-    "open": 17
+    "total": 55,
+    "closed": 16,
+    "open": 39
   }
 }

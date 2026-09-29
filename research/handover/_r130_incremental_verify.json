@@ -1,7 +1,7 @@
 {
- "total": 20,
- "agree": 18,
- "causal_n": 18,
+ "total": 21,
+ "agree": 19,
+ "causal_n": 19,
  "detail": [
   {
    "symbol": "000020.SZ",
@@ -11,17 +11,6 @@
     "reason": "池价不一致 (15.469999999999999 vs 16.06)"
    },
    "agree": false
-  },
-  {
-   "symbol": "000068.SZ",
-   "side": "EQH",
-   "verify": {
-    "ok": true,
-    "pool": 3.35,
-    "retest_date": "20260909",
-    "ret_10b_signed": 1.81
-   },
-   "agree": true
   },
   {
    "symbol": "000100.SZ",
@@ -42,6 +31,17 @@
     "pool": 35.37,
     "retest_date": "20260529",
     "ret_10b_signed": 20.99
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000510.SZ",
+   "side": "EQL",
+   "verify": {
+    "ok": true,
+    "pool": 15.64,
+    "retest_date": "20260914",
+    "ret_10b_signed": 1.23
    },
    "agree": true
   },
@@ -161,6 +161,17 @@
     "pool": 12.94,
     "retest_date": "20260803",
     "ret_10b_signed": 5.88
+   },
+   "agree": true
+  },
+  {
+   "symbol": "000722.SZ",
+   "side": "EQH",
+   "verify": {
+    "ok": true,
+    "pool": 15.89,
+    "retest_date": "20260914",
+    "ret_10b_signed": 14.42
    },
    "agree": true
   },

@@ -1,56 +1,57 @@
 {
-  "generated_at": "2026-09-20 10:17:18",
+  "generated_at": "2026-09-29 19:27:35",
   "days": [
-    "2026-09-19",
-    "2026-09-18",
-    "2026-09-17",
-    "2026-09-16",
-    "2026-09-15"
+    "2026-09-29",
+    "2026-09-28",
+    "2026-09-27",
+    "2026-09-25",
+    "2026-09-24"
   ],
-  "raw_announcements": 116,
-  "contains_buyback_or_increase": 116,
-  "classified_positive": 41,
+  "raw_announcements": 134,
+  "contains_buyback_or_increase": 134,
+  "classified_positive": 32,
   "tri_decompose": {
-    "source_supply": 116,
-    "quality_reject": 59,
-    "data_missing": 4,
+    "source_supply": 134,
+    "quality_reject": 71,
+    "data_missing": 3,
     "execution_capacity": {
-      "dup": 6,
-      "portfolio_gate": 4,
-      "bad_sl": 2,
+      "dup": 5,
+      "portfolio_gate": 0,
+      "bad_sl": 0,
       "note": "portfolio_gate=组合容量拒绝(R15 接线: 总暴露≤0.8/单日≤5/持仓≤10/kill switch); dup=同股同日重复挂单去重; bad_sl=sl>=entry 非法几何 fail-closed 拒单(R8)"
     },
     "orders_created": 0,
     "conservation_note": "raw = quality_reject(分类+阶段+ADX+bad_sl) + data_missing + dup + portfolio_gate + orders"
   },
   "reject_by_reason": {
-    "event_filter_hard": 0,
-    "event_filter_soft": 24,
+    "event_filter_hard": 1,
+    "event_filter_soft": 38,
     "event_filter_soft_with_delta_research": 7,
-    "stage": 17,
-    "adx": 9,
-    "nodata": 4,
-    "dup": 6
+    "stage": 15,
+    "adx": 10,
+    "nodata": 3,
+    "dup": 5,
+    "rolled_weekend": 2
   },
+  "alpha_shadow_low": 0,
+  "jev_judged": 0,
+  "v23_tagged": 0,
   "orders_created": 0,
   "all_orders_created": 0,
   "terminal_stage_counts": {
-    "RANK_LT3": 2,
-    "STAGE_UPTREND": 16,
-    "CAPACITY_REJECT": 4,
-    "ADX_LT20": 9,
-    "DUP_EXISTING": 3,
-    "DATA_MISSING": 4,
-    "STAGE_MARKUP": 1,
-    "BAD_SL_GE_ENTRY": 2
+    "STAGE_UPTREND": 14,
+    "DATA_MISSING": 3,
+    "ADX_LT20": 10,
+    "DUP_EXISTING": 4,
+    "STAGE_MARKUP": 1
   },
   "note": "漏斗逐层：公告总数→含增持/回购→分类为正事件→去重→有K线→阶段→ADX→挂单。soft_with_delta 为研究候选（进展类含金额/比例增量），默认流仍拒绝。",
   "conservation": {
-    "universe_total": 41,
-    "data_missing": 4,
-    "strategy_reject": 37,
+    "universe_total": 32,
+    "data_missing": 3,
+    "strategy_reject": 29,
     "passed_to_order": 0,
-    "terminal_state_count": 41,
+    "terminal_state_count": 32,
     "mutex_check": true,
     "note": "positive event keys = data_missing + strategy_reject + event_orders（每股每日唯一终态）"
   }

@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-09-29 19:27:51",
+  "history_n": 11,
+  "latest": {
+    "day": "2026-09-29",
+    "generated_at": "2026-09-29 19:27:35",
+    "raw": 134,
+    "positive": 32,
+    "orders": 0,
+    "reject": {
+      "event_filter_hard": 1,
+      "event_filter_soft": 38,
+      "event_filter_soft_with_delta_research": 7,
+      "stage": 15,
+      "adx": 10,
+      "nodata": 3,
+      "dup": 5,
+      "rolled_weekend": 2
+    }
+  },
+  "alarms": []
+}

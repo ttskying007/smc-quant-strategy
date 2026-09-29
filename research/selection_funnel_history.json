@@ -81,19 +81,104 @@
   },
   {
     "day": "2026-09-22",
-    "generated_at": "2026-09-22 08:11:13",
-    "raw": 94,
+    "generated_at": "2026-09-22 18:08:49",
+    "raw": 132,
+    "positive": 37,
+    "orders": 1,
+    "reject": {
+      "event_filter_hard": 1,
+      "event_filter_soft": 31,
+      "event_filter_soft_with_delta_research": 6,
+      "stage": 18,
+      "adx": 9,
+      "nodata": 4,
+      "dup": 6,
+      "rolled_weekend": 10
+    }
+  },
+  {
+    "day": "2026-09-23",
+    "generated_at": "2026-09-23 18:06:10",
+    "raw": 130,
+    "positive": 31,
+    "orders": 2,
+    "reject": {
+      "event_filter_hard": 1,
+      "event_filter_soft": 29,
+      "event_filter_soft_with_delta_research": 6,
+      "stage": 22,
+      "adx": 5,
+      "nodata": 0,
+      "dup": 4,
+      "rolled_weekend": 9
+    }
+  },
+  {
+    "day": "2026-09-24",
+    "generated_at": "2026-09-24 18:01:32",
+    "raw": 148,
+    "positive": 36,
+    "orders": 3,
+    "reject": {
+      "event_filter_hard": 3,
+      "event_filter_soft": 36,
+      "event_filter_soft_with_delta_research": 6,
+      "stage": 22,
+      "adx": 7,
+      "nodata": 1,
+      "dup": 6,
+      "rolled_weekend": 0
+    }
+  },
+  {
+    "day": "2026-09-25",
+    "generated_at": "2026-09-25 18:27:27",
+    "raw": 179,
+    "positive": 43,
+    "orders": 0,
+    "reject": {
+      "event_filter_hard": 3,
+      "event_filter_soft": 41,
+      "event_filter_soft_with_delta_research": 7,
+      "stage": 24,
+      "adx": 10,
+      "nodata": 1,
+      "dup": 9,
+      "rolled_weekend": 3
+    }
+  },
+  {
+    "day": "2026-09-28",
+    "generated_at": "2026-09-28 18:48:24",
+    "raw": 131,
+    "positive": 34,
+    "orders": 2,
+    "reject": {
+      "event_filter_hard": 2,
+      "event_filter_soft": 28,
+      "event_filter_soft_with_delta_research": 6,
+      "stage": 18,
+      "adx": 7,
+      "nodata": 2,
+      "dup": 6,
+      "rolled_weekend": 3
+    }
+  },
+  {
+    "day": "2026-09-29",
+    "generated_at": "2026-09-29 19:27:35",
+    "raw": 134,
     "positive": 32,
     "orders": 0,
     "reject": {
-      "event_filter_hard": 0,
-      "event_filter_soft": 19,
-      "event_filter_soft_with_delta_research": 6,
-      "stage": 13,
-      "adx": 6,
-      "nodata": 4,
+      "event_filter_hard": 1,
+      "event_filter_soft": 38,
+      "event_filter_soft_with_delta_research": 7,
+      "stage": 15,
+      "adx": 10,
+      "nodata": 3,
       "dup": 5,
-      "rolled_weekend": 10
+      "rolled_weekend": 2
     }
   }
 ]

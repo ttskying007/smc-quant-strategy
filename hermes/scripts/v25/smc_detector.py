@@ -291,8 +291,10 @@ def detect_smc_signals(klines, mode='fixed'):
                             'last_bar': max(js)})
         return out
 
+    rr_signals = []
     for _side, _sdir in (('EQH', 'bear'), ('EQL', 'bull')):
         # Pass1: 全序列参考找池 + 扫日/二测候选
+        # R132: RR 走独立列表 — 不参与下方 Dedup (同 bar 挤掉现有信号会破坏 additive)
         for q in _cluster_sw(_rr_swings(n, _side), n):
             pp = q['price']
             sweep_i = -1
@@ -314,7 +316,7 @@ def detect_smc_signals(klines, mode='fixed'):
                     _hit = next((c2 for c2 in _causal if abs(c2['price'] - pp) / pp <= 0.01), None)
                     if _hit is None:
                         break  # 池聚类前视 → 剔除 (R130 标准)
-                    signals.append(Signal('Reclaim_Reject', i, _sdir, price=round(_cl, 2),
+                    rr_signals.append(Signal('Reclaim_Reject', i, _sdir, price=round(_cl, 2),
                         strength=round(abs(pp - _cl) / pp * 100, 2),
                         confidence=0.65,
                         meta={'pool_price': round(pp, 2), 'sweep_bar': sweep_i, 'side': _side}))
@@ -328,7 +330,8 @@ def detect_smc_signals(klines, mode='fixed'):
         if s.bar != last_bar:
             deduped.append(s)
             last_bar = s.bar
-    
+    # R132: RR 追加在去重后 — 独立家族, 不挤掉现有信号 (additive 保持)
+    deduped.extend(sorted(rr_signals, key=lambda s: s.bar))
     return deduped
 
 

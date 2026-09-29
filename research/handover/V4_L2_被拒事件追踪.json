@@ -9,16 +9,14 @@
   },
   "rejected_all": {
     "fwd5": {
-      "n": 3,
-      "avg": -4.319,
-      "wr": 0.0
+      "n": 0
     },
     "fwd10": {
       "n": 0
     }
   },
   "rejected_by_reason": {
-    "无K线数据": {
+    "阶段=UPTREND(非ACCUM/DOWNTREND)": {
       "fwd5": {
         "n": 0
       },
@@ -26,11 +24,9 @@
         "n": 0
       }
     },
-    "阶段=UPTREND(非ACCUM/DOWNTREND)": {
+    "无K线数据": {
       "fwd5": {
-        "n": 2,
-        "avg": -2.575,
-        "wr": 0.0
+        "n": 0
       },
       "fwd10": {
         "n": 0

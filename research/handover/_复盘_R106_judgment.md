@@ -16,7 +16,12 @@
 - 新 v2 升级票 (自适应链): 分歧单 PF < 一致单 PF (证明 v2 狠打有效)
 
 ## 影子因子计数 (R127)
-- s24_eql_risk (磁区毒性): 12 腿 (w×0.15)
+- s24_eql_risk (磁区毒性): 11 腿 (w×0.15)
 - s25_reverse (二测拒绝反向): 0 腿 (记录-only)
 - s22/s23 (相对弱势压制): 66/38 腿 (w×0.15)
 - 反向候选 (sweep→reverse 2.0): 20 信号全胜 (research/combo_reverse_candidates.csv)
+
+## 观察期追踪 (R130b)
+- 观察起始: 2026-09-24 (s24 接入) | 已观察 5 天 | 剩余 25 天到 30 天仪式
+- 30 天仪式后: 重跑 r106 对比 v1/v2 (含 s24/s25), 用户决定是否 flip SMC_V23V2_AS_PRODUCER=1
+- 因果候选集: research/combo_reverse_candidates_causal.csv (R130: 18/20 一致, 全部盈利)

@@ -1,8 +1,8 @@
 {
-  "run_id": "daily-20260914-153002",
-  "as_of_date": "20260914",
-  "code_version": "55fce1539785",
-  "config_hash": "b5c567438732",
+  "run_id": "daily-20260929-153024",
+  "as_of_date": "20260929",
+  "code_version": "18c5befdd3bf",
+  "config_hash": "eb38f4e61573",
   "code_watch": "R26 mtime 版本守卫(sim_scheduler 7 模块)",
   "cost_model_version": "COST_V1_FEE_TOTAL_020_SLIP_SIDE_001",
   "adx_impl_version": "ADX14_WILDER_20260912",

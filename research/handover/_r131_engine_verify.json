@@ -1,20 +1,10 @@
 {
- "causal_n": 18,
- "covered_n": 14,
- "missed_n": 4,
- "engine_rr_total": 25,
- "extra_n": 11,
+ "causal_n": 19,
+ "covered_n": 19,
+ "missed_n": 0,
+ "engine_rr_total": 31,
+ "extra_n": 12,
  "extra": [
-  [
-   "000068.SZ",
-   "20260302",
-   "bull"
-  ],
-  [
-   "000068.SZ",
-   "20260916",
-   "bull"
-  ],
   [
    "000100.SZ",
    "20251216",
@@ -47,6 +37,11 @@
   ],
   [
    "000701.SZ",
+   "20260130",
+   "bull"
+  ],
+  [
+   "000701.SZ",
    "20260609",
    "bull"
   ],
@@ -56,6 +51,16 @@
    "bear"
   ],
   [
+   "000722.SZ",
+   "20260305",
+   "bear"
+  ],
+  [
+   "000722.SZ",
+   "20260623",
+   "bull"
+  ],
+  [
    "000768.SZ",
    "20260227",
    "bear"
@@ -63,13 +68,31 @@
  ],
  "covered": [
   {
-   "symbol": "000068.SZ",
+   "symbol": "000100.SZ",
+   "side": "EQL",
+   "pool_price": "4.08",
+   "sweep_date": "20260515",
+   "signal_date": "20260518",
+   "entry_price": "4.13",
+   "ret_10b_signed": "4.36"
+  },
+  {
+   "symbol": "000338.SZ",
    "side": "EQH",
-   "pool_price": "3.35",
-   "sweep_date": "20260908",
-   "signal_date": "20260909",
-   "entry_price": "3.31",
-   "ret_10b_signed": "1.81"
+   "pool_price": "35.37",
+   "sweep_date": "20260527",
+   "signal_date": "20260529",
+   "entry_price": "34.97",
+   "ret_10b_signed": "20.99"
+  },
+  {
+   "symbol": "000510.SZ",
+   "side": "EQL",
+   "pool_price": "15.64",
+   "sweep_date": "20260911",
+   "signal_date": "20260914",
+   "entry_price": "17.06",
+   "ret_10b_signed": "1.23"
   },
   {
    "symbol": "000534.SZ",
@@ -88,6 +111,15 @@
    "signal_date": "20260519",
    "entry_price": "18.12",
    "ret_10b_signed": "17.6"
+  },
+  {
+   "symbol": "000571.SZ",
+   "side": "EQL",
+   "pool_price": "5.15",
+   "sweep_date": "20260511",
+   "signal_date": "20260512",
+   "entry_price": "5.15",
+   "ret_10b_signed": "11.26"
   },
   {
    "symbol": "000589.SZ",
@@ -117,6 +149,15 @@
    "ret_10b_signed": "5.43"
   },
   {
+   "symbol": "000695.SZ",
+   "side": "EQL",
+   "pool_price": "11.65",
+   "sweep_date": "20260714",
+   "signal_date": "20260715",
+   "entry_price": "11.79",
+   "ret_10b_signed": "10.18"
+  },
+  {
    "symbol": "000701.SZ",
    "side": "EQL",
    "pool_price": "4.3",
@@ -142,6 +183,15 @@
    "signal_date": "20260803",
    "entry_price": "12.93",
    "ret_10b_signed": "5.88"
+  },
+  {
+   "symbol": "000722.SZ",
+   "side": "EQH",
+   "pool_price": "15.89",
+   "sweep_date": "20260911",
+   "signal_date": "20260914",
+   "entry_price": "15.05",
+   "ret_10b_signed": "14.42"
   },
   {
    "symbol": "000752.SZ",

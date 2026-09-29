@@ -1,16 +1,16 @@
 {
  "eqh": {
-  "n": 20,
-  "win": 6,
+  "n": 18,
+  "win": 5,
   "fail": 0,
-  "no_retest": 14,
+  "no_retest": 13,
   "win_rate": 100.0
  },
  "eql": {
-  "n": 11,
-  "win": 3,
+  "n": 14,
+  "win": 5,
   "fail": 0,
-  "no_retest": 8,
+  "no_retest": 9,
   "win_rate": 100.0
  },
  "retest_fwd": [
@@ -20,13 +20,6 @@
    "sweep_date": "20260420",
    "retest_date": "20260429",
    "ret_10b": -15.32
-  },
-  {
-   "sym": "000068.SZ",
-   "side": "eqh",
-   "sweep_date": "20260908",
-   "retest_date": "20260909",
-   "ret_10b": -1.81
   },
   {
    "sym": "000338.SZ",
@@ -48,6 +41,13 @@
    "sweep_date": "20260515",
    "retest_date": "20260518",
    "ret_10b": 4.36
+  },
+  {
+   "sym": "000510.SZ",
+   "side": "eql",
+   "sweep_date": "20260911",
+   "retest_date": "20260914",
+   "ret_10b": 1.23
   }
  ],
  "yearly": {
@@ -125,15 +125,7 @@
   },
   "000012.SZ": {
    "eqh": [],
-   "eql": [
-    {
-     "sym_t": "20260902",
-     "price": 3.68,
-     "sweep_date": "20260916",
-     "verdict": "no_retest",
-     "retest_date": ""
-    }
-   ]
+   "eql": []
   },
   "000014.SZ": {
    "eqh": [],
@@ -149,7 +141,15 @@
   },
   "000019.SZ": {
    "eqh": [],
-   "eql": []
+   "eql": [
+    {
+     "sym_t": "20260916",
+     "price": 6.61,
+     "sweep_date": "20260928",
+     "verdict": "retest_win",
+     "retest_date": "20260929"
+    }
+   ]
   },
   "000020.SZ": {
    "eqh": [
@@ -210,8 +210,8 @@
      "sym_t": "20260825",
      "price": 22.63,
      "sweep_date": "20260911",
-     "verdict": "no_retest",
-     "retest_date": ""
+     "verdict": "retest_win",
+     "retest_date": "20260929"
     }
    ]
   },
@@ -233,7 +233,15 @@
   },
   "000042.SZ": {
    "eqh": [],
-   "eql": []
+   "eql": [
+    {
+     "sym_t": "20260916",
+     "price": 8.07,
+     "sweep_date": "20260928",
+     "verdict": "no_retest",
+     "retest_date": ""
+    }
+   ]
   },
   "000045.SZ": {
    "eqh": [
@@ -308,15 +316,7 @@
    "eql": []
   },
   "000068.SZ": {
-   "eqh": [
-    {
-     "sym_t": "20260828",
-     "price": 3.35,
-     "sweep_date": "20260908",
-     "verdict": "retest_win",
-     "retest_date": "20260909"
-    }
-   ],
+   "eqh": [],
    "eql": [
     {
      "sym_t": "20260907",
@@ -504,7 +504,15 @@
      "retest_date": ""
     }
    ],
-   "eql": []
+   "eql": [
+    {
+     "sym_t": "20260917",
+     "price": 8.65,
+     "sweep_date": "20260929",
+     "verdict": "no_retest",
+     "retest_date": ""
+    }
+   ]
   },
   "000410.SZ": {
    "eqh": [
@@ -524,7 +532,15 @@
   },
   "000415.SZ": {
    "eqh": [],
-   "eql": []
+   "eql": [
+    {
+     "sym_t": "20260629",
+     "price": 3.99,
+     "sweep_date": "20260928",
+     "verdict": "no_retest",
+     "retest_date": ""
+    }
+   ]
   },
   "000419.SZ": {
    "eqh": [],
@@ -643,15 +659,7 @@
    ]
   },
   "000513.SZ": {
-   "eqh": [
-    {
-     "sym_t": "20260730",
-     "price": 31.33,
-     "sweep_date": "20260803",
-     "verdict": "no_retest",
-     "retest_date": ""
-    }
-   ],
+   "eqh": [],
    "eql": []
   },
   "000514.SZ": {

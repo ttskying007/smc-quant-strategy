@@ -1,5 +1,5 @@
 {
- "total": 20,
+ "total": 21,
  "eqh": [
   {
    "symbol": "000020.SZ",
@@ -9,15 +9,6 @@
    "signal_date": "20260429",
    "entry_price": 15.93,
    "ret_10b_signed": 15.32
-  },
-  {
-   "symbol": "000068.SZ",
-   "side": "EQH",
-   "pool_price": 3.35,
-   "sweep_date": "20260908",
-   "signal_date": "20260909",
-   "entry_price": 3.31,
-   "ret_10b_signed": 1.81
   },
   {
    "symbol": "000338.SZ",
@@ -92,6 +83,15 @@
    "ret_10b_signed": 5.88
   },
   {
+   "symbol": "000722.SZ",
+   "side": "EQH",
+   "pool_price": 15.89,
+   "sweep_date": "20260911",
+   "signal_date": "20260914",
+   "entry_price": 15.05,
+   "ret_10b_signed": 14.42
+  },
+  {
    "symbol": "000752.SZ",
    "side": "EQH",
    "pool_price": 12.62,
@@ -137,6 +137,15 @@
    "signal_date": "20260518",
    "entry_price": 4.13,
    "ret_10b_signed": 4.36
+  },
+  {
+   "symbol": "000510.SZ",
+   "side": "EQL",
+   "pool_price": 15.64,
+   "sweep_date": "20260911",
+   "signal_date": "20260914",
+   "entry_price": 17.06,
+   "ret_10b_signed": 1.23
   },
   {
    "symbol": "000571.SZ",

@@ -1,5 +1,5 @@
 {
-  "ts": "2026-09-18 15:30:23",
+  "ts": "2026-09-29 15:30:47",
   "sources": {
     "sina": {
       "ok": true,
@@ -14,15 +14,15 @@
       "detail": "HTTP Error 502: Bad Gateway"
     },
     "ths_fuyao": {
-      "ok": false,
-      "detail": "<urlopen error _ssl.c:993: The handshake operation timed out"
+      "ok": true,
+      "detail": "OK"
     },
     "netease": {
       "ok": false,
       "detail": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate "
     }
   },
-  "coverage": 97.7,
-  "latest": "20260914",
+  "coverage": 97.9,
+  "latest": "20260928",
   "alerts": []
 }
