@@ -1,0 +1,26 @@
+{
+ "old": {
+  "n": 1844,
+  "avg": 4.11,
+  "wr": 64.4,
+  "pf": 3.39
+ },
+ "new": {
+  "n": 576,
+  "avg": -0.57,
+  "wr": 39.1,
+  "pf": 0.74
+ },
+ "drops": {
+  "no_tp_sl": 174,
+  "no_high_break_in_window": 94,
+  "sim_skipped": 11,
+  "gap_up_too_far": 260,
+  "retrace_fail_close_below_L": 250,
+  "no_klines": 334,
+  "no_retrace_in_window": 130,
+  "no_data_after_entry": 15
+ },
+ "entered_n": 576,
+ "event_pool": 1844
+}

@@ -1,0 +1,15 @@
+{
+ "stats": {
+  "total": 1844,
+  "no_high_break": 1180,
+  "no_retrace": 1119,
+  "no_poi_retrace": 1570,
+  "new_low_entry": 74,
+  "all_violated": 1752,
+  "clean": 92
+ },
+ "viol_avg": 4.25,
+ "clean_avg": 1.46,
+ "viol_n": 1752,
+ "clean_n": 92
+}

@@ -1812,6 +1812,14 @@ def _load_v22_legs(symbol):
                         RES_BRK[r['symbol'] + '|' + r['entry_date']] = r
             except Exception:
                 RES_BRK = {}
+            # R133: 入场链纪律违规标记 (r133_entry_discipline_diag.py 产出)
+            DISC = {}
+            try:
+                with open(r'E:\test\smc_project\research\combo_v22_entry_discipline.csv', encoding='utf-8-sig') as fh:
+                    for r in _csv.DictReader(fh):
+                        DISC[r['symbol'] + '|' + r['entry_date']] = r
+            except Exception:
+                DISC = {}
             # 再读 v2 全链狠打影子 (R101-s22/s23 终版, R105 重写)
             hhll = sh2  # 复用变量名以贴合 R106 代码
             # FIX(R111c): 恢复 R88b 的 enrich 块 —— R107 编辑中丢失, 导致 legs 全空
@@ -1853,6 +1861,12 @@ def _load_v22_legs(symbol):
                         leg['_resonance_side'] = _rb2.get('resonance_side') or ''
                     except Exception:
                         leg['_resonance_break'] = ''
+                    # R133: 入场链纪律违规 (r133 产出) — 腿表纪律列 + 图上进场标记警示
+                    try:
+                        _dc = DISC.get(r['symbol'] + '|' + r['entry_date']) or {}
+                        leg['_violations'] = _dc.get('violations') or 'CLEAN'
+                    except Exception:
+                        leg['_violations'] = ''
                     legs.append(leg)
         except Exception:
             legs = []
@@ -2597,6 +2611,19 @@ function renderLegsTable(legs){
         return (below?'<span style=color:#3fb950>SL在SSL下方(防扫)</span>':'<span style=color:#f85149>SL未落到SSL下方</span>')
             +(ssl>0?('<br/>参照SSL='+ssl.toFixed(2)):'');
     }
+    function violNote(leg){
+        // R133: 入场链纪律违规可视化 — 用户 2026-10-24 投诉项直接上表/上图
+        var v=leg.violations||'';
+        if(!v)return '<span style=color:#8b949e>-</span>';
+        if(v==='CLEAN')return '<span style=color:#3fb950;title="破前高+回踩突破位+回踩POI+未创新低 全合规">✓合规</span>';
+        var m={'NO_HIGH_BREAK':'未破前高','NO_RETRACE':'未回踩','NO_POI':'未回踩POI','NEW_LOW_ENTRY':'新低进场'};
+        var parts=String(v).split(';').map(function(x){
+            var lab=m[x]||x;
+            var c=(x==='NEW_LOW_ENTRY')?'#f85149':'#d29922';
+            return '<span style="color:'+c+';font-weight:bold">'+lab+'</span>';
+        });
+        return parts.join('<br/>');
+    }
     function sweepNote(leg){
         var en=leg.enrich||{};
         var s=en.sweeps_10b, sd=en.sweep_dir;
@@ -2614,6 +2641,7 @@ function renderLegsTable(legs){
         +'<th>SL 设计(在什么水平/为什么这么设)</th>'
         +'<th>共振破位(R121)</th>'
         +'<th>PnL</th><th>持有bar</th><th>v24影子权重+flags</th><th>v2全链影子(R94)</th><th>结构状态(R101)</th>'
+        +'<th>入场纪律(R133)</th>'
         +'<th>引擎信号序列(按时间)</th></tr></thead><tbody>'
         +legs.map(function(leg,i){
             var pnl=Number(leg.pnl||0), cls=pnl>0?'green':'red';
@@ -2639,6 +2667,7 @@ function renderLegsTable(legs){
                 +'<td style="color:'+wc+';font-weight:bold">'+w.toFixed(2)+'<br/><span style="font-size:9px;color:#8b949e">'+(leg.v23_flags||'none')+'</span></td>'
                 +'<td style="color:'+wc2+';font-weight:bold">'+w2.toFixed(2)+'</td>'
                 +'<td style="font-size:9px;color:#a5b1c2">'+(((leg.structure_state||'')).split('(')[0]||'-')+'</td>'
+                +'<td style="font-size:9px">'+violNote(leg)+'</td>'
                 +'<td style="font-size:9px">'+sweepNote(leg)+'<br/>'+(seq||'-')+'</td></tr>';
         }).join('')+'</tbody></table>' + legsDetailHtml(legs);
 }
@@ -4340,6 +4369,9 @@ def build_audit_portal(slug=''):
                         "<p style='color:#8b949e'>引擎接入 (R131/R132): v25 detector 新增 Reclaim_Reject 类型(不含Sweep子串, 避免s8碰撞; RR独立列表不参与dedup) — 因果候选覆盖 <b style='color:#3fb950'>19/19 (100%)</b> + 引擎新增 12 个; <b style='color:#f85149'>但引擎新增 12 个收益为负 (n=9 avg−3.68% PF0.29, detector 实现较宽松稀释 edge)</b> → s25 维持键研究因果集, 引擎 RR 仅记录/展示。</p>"
                         "<p style='color:#8b949e'>s22/s23 regime 门控 (R123): 5 种门控(市场弱/强/个股反向/组合)无一能让狠打\"全年<1\" — 桶整体盈利(PF1.75), ×0.15 是相对弱势压制; s23 按年翻转(2024 PF4.59/2026 PF0.13)观察中。</p>"
                         "<p style='color:#8b949e'>s23 软化探索 (R129): ×0.15/×0.35/×0.5/移除 → 组合 PF 7.04/7.03/7.03/7.02, P(v2>v1) 88.1%/86.3%/88.6%/88.2% — 全在噪声内, 年度翻转组合层面不实质, 维持现状。</p>"
+                        "<p style='color:#8b949e'>入场链纪律诊断 (R133, 用户 2026-10-24 投诉验证): 1844 腿中 <b style='color:#f85149'>未破前高进场 64.0% / 未回踩POI 85.1% / 20bar新低进场 4.0% / 全合规仅 4.99%</b> — 根因=公告次日 close×0.99 闭眼限价单, 与结构确认脱钩。</p>"
+                        "<p style='color:#8b949e'>严格纪律入场证伪 (R134, 同事件池): 破前高→回踩POI→入场 = n=576 <b style='color:#f85149'>avg−0.57% PF0.74</b> vs 旧引擎 +4.11% PF3.39 — 公告动量 edge 在闭眼进场, 等确认+回踩后动量耗尽变均值回归。纪律版全放弃原因: 踏空高开260/回踩穿250/未破前高94/未回踩130。</p>"
+                        "<p style='color:#8b949e'>最小纪律过滤有效 (R135): <b style='color:#3fb950'>只剔『20bar新低当日进场』74 笔(avg−0.57% PF0.84) → 留存 1770 avg+4.31% PF3.61, 基线改善</b>; 反例: 剔『趋势向下进场』1180笔(avg+4.56% PF4.29)反而亏钱 — 下跌+公告动量是该策略利润来源, 不能按趋势过滤。(仅研究, 生产冻结不动)</p>"
                         "<p style='color:#8b949e;font-size:0.85em'>s24_eql_risk 已写入 combo_v23_shadow_v3 (影子列, 生产不动); 观察期后由用户决定是否升级生产。</p>"
                         "</div>")
     except Exception:
@@ -7619,6 +7651,8 @@ class Handler(BaseHTTPRequestHandler):
                                     # R121: 共振破位
                                     'resonance_break': _lg.get('_resonance_break'),
                                     'resonance_side': _lg.get('_resonance_side'),
+                                    # R133: 入场链纪律违规标记
+                                    'violations': _lg.get('_violations'),
                                     # R110: 明细全链字段 (逐腿 tooltips/表格用)
                                     'mfe_pct': _lg.get('mfe_pct'), 'mae_pct': _lg.get('mae_pct'),
                                     'rr_exit': _lg.get('rr_exit'), 'signal_chain_kind': _lg.get('signal_chain'),
@@ -9084,6 +9118,8 @@ class Handler(BaseHTTPRequestHandler):
                         # R121: 共振破位 (腿表共振列)
                         'resonance_break': _lg.get('_resonance_break'),
                         'resonance_side': _lg.get('_resonance_side'),
+                        # R133: 入场链纪律违规 (腿表纪律列)
+                        'violations': _lg.get('_violations'),
                         # R110: 明细全链字段
                         'mfe_pct': _lg.get('mfe_pct'), 'mae_pct': _lg.get('mae_pct'),
                         'rr_exit': _lg.get('rr_exit'), 'signal_chain_kind': _lg.get('signal_chain'),
