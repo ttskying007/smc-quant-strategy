@@ -1883,6 +1883,38 @@ def _load_v22_legs(symbol):
     return out
 
 
+# R134/R136: 纪律版入场链 (r134_disciplined_entry.py 产出) — K线叠加可视化
+_DISC_ENTRIES_CACHE = None
+
+
+def _load_disc_entries(symbol):
+    """纪律版入场(破前高→回踩POI→入场)按 symbol 归一化; 日期转 'YYYY-MM-DD' 对齐图表轴."""
+    global _DISC_ENTRIES_CACHE
+    if _DISC_ENTRIES_CACHE is None:
+        import csv as _csv
+        by_sym = {}
+        def _dd(x):
+            # R136b: 对齐 K线轴日期格式 'YYYYMMDD' (图表 klines.date 为无横线)
+            return str(x or '').strip().replace('-', '')
+        try:
+            with open(r'E:\test\smc_project\research\combo_v23_disciplined_entry.csv', encoding='utf-8-sig') as fh:
+                for r in _csv.DictReader(fh):
+                    by_sym.setdefault(r['symbol'], []).append({
+                        'event_date': _dd(r['event_date']), 'entry_date': _dd(r['entry_date']),
+                        'buy_price': float(r['buy_price'] or 0),
+                        'break_date': _dd(r['break_date']), 'break_level': float(r['break_level'] or 0),
+                        'retrace_date': _dd(r['retrace_date']), 'poi_kind': r['poi_kind'],
+                        'net_pnl_pct': float(r['net_pnl_pct'] or 0),
+                        'reason': r.get('reason'), 'old_net': r.get('old_net'),
+                        'wait_bars': r.get('wait_bars'), 'retrace_bars': r.get('retrace_bars'),
+                    })
+        except Exception:
+            by_sym = {}
+        _DISC_ENTRIES_CACHE = by_sym
+    s = str(symbol).replace('_SH', '.SH').replace('_SZ', '.SZ').replace('_BJ', '.BJ')
+    return _DISC_ENTRIES_CACHE.get(s, [])
+
+
 def _load_v20c_trades_for(symbol, klines, chart_date_idx):
     """Load v20c backtest trades for symbol, enriched with prices/sub-signals (all versions)."""
     global _V20C_TRADES_CACHE
@@ -2244,6 +2276,35 @@ function loadKline(){
                 var okC=rt.state==='retrace_ok'?'#3fb950':(rt.state==='retrace_fail'?'#f85149':'#8b949e');
                 ovMP.push({coord:[endX,rt.price],value:rt.state,symbol:'circle',symbolSize:10,itemStyle:{color:okC},label:{show:true,fontSize:9,color:okC,formatter:rt.signal||rt.state}});
             }
+            // R136: 纪律版入场链可视化 (R134, 研究轨道) — 事件→破前高→回踩POI→纪律入场, 三点一线
+            (d.disc_entries||[]).forEach(function(g){
+                var bl=Number(g.break_level)||0, bp2=Number(g.buy_price)||0;
+                if(!g.event_date||!g.break_date||!g.entry_date||bl<=0)return;
+                ovMP.push({coord:[g.event_date,bl],value:'观',symbol:'roundRect',symbolSize:[26,14],
+                    itemStyle:{color:'#444c56',borderColor:'#8b949e',borderWidth:1},
+                    _tt:'<b>事件(公告) '+g.event_date+'</b><br/>从此进入纪律观察期(等破前高)',
+                    label:{show:true,fontSize:8,color:'#c9d1d9',formatter:'事件'}});
+                ovML.push([{coord:[g.event_date,bl],lineStyle:{color:'#6e7681',type:'dotted',width:1},
+                    label:{show:false}},{coord:[g.break_date,bl]}]);
+                ovMP.push({coord:[g.break_date,bl],value:'破',symbol:'triangle',symbolSize:13,
+                    itemStyle:{color:'#58a6ff',borderColor:'#0d1117',borderWidth:1},
+                    _tt:'<b>破前高 '+g.break_date+'</b> @ '+bl+'<br/>等候 '+g.wait_bars+' bar 后确认结构翻转',
+                    label:{show:true,fontSize:9,color:'#58a6ff',formatter:'破前高'}});
+                ovML.push([{coord:[g.break_date,bl],lineStyle:{color:'#3fb950',type:'dashed',width:1},
+                    label:{show:false}},{coord:[g.retrace_date,bl]}]);
+                ovMP.push({coord:[g.retrace_date,bl],value:'踩',symbol:'circle',symbolSize:9,
+                    itemStyle:{color:'#d29922',borderColor:'#0d1117',borderWidth:1},
+                    _tt:'<b>回踩POI('+g.poi_kind+') '+g.retrace_date+'</b><br/>破位后 '+g.retrace_bars+' bar 回踩到位',
+                    label:{show:true,fontSize:8,color:'#d29922',formatter:'回踩'}});
+                var win=Number(g.net_pnl_pct||0)>=0;
+                ovMP.push({coord:[g.entry_date,bp2],value:'纪律入',symbol:'diamond',symbolSize:13,
+                    itemStyle:{color:win?'#3fb950':'#f85149',borderColor:'#fff',borderWidth:1.5},
+                    _tt:'<b>纪律入场(R134) '+g.entry_date+' @ '+bp2+'</b>'
+                        +'<br/>链: 事件 '+g.event_date+' → 破前高 '+g.break_date+' → 回踩 '+g.poi_kind+' '+g.retrace_date
+                        +'<br/>纪律版 PnL: '+(win?'+':'')+g.net_pnl_pct+'% | 旧引擎同事件: '+g.old_net+'%'
+                        +'<br/><span style="color:#8b949e">研究轨道, 非生产入场</span>',
+                    label:{show:true,fontSize:9,color:win?'#3fb950':'#f85149',fontWeight:'bold',formatter:'纪律入'}});
+            });
             chart.setOption({series:[{id:'smc_chain_ov',name:'SMC链',type:'line',data:[],z:5,
                 markLine:{silent:true,symbol:['none','none'],data:ovML},
                 markArea:{silent:true,data:ovMA},
@@ -2298,14 +2359,24 @@ function buildMarkAreas(af){
         var upper=Number(s.upper)||0, lower=Number(s.lower)||0;
         if(upper<=0||lower<=0||upper===lower)return;
         var idx=Number(s.idx);
-        var endX=idx+10<dates.length?dates[idx+10]:dates[dates.length-1];
+        // R136 (用户图2投诉): 箱体不再固定延伸10bar/图末 —— 收口于被对侧收盘穿越的 bar;
+        // 从未被穿越的 live POI 延伸至图右缘 (它仍是有效区域)。
+        var bear=/Bear/.test(s.type||'') || s.direction==='bear';
+        var endI=dates.length-1, consumed=false;
+        for(var k=idx+1;k<dates.length;k++){
+            var cl=ohlcvData[k][1];
+            if(bear){ if(cl>upper){endI=k;consumed=true;break;} }
+            else { if(cl<lower){endI=k;consumed=true;break;} }
+        }
+        if(!consumed && idx+10<dates.length) endI=Math.min(endI, dates.length-1);
+        var endX=dates[endI];
         seq++;
         fa.push([{
             name:(s.seq||seq)+''+style.label,
             xAxis:dates[idx],yAxis:lower,
-            _tt:(s.type||style.label)+'<br/>锚点bar: '+idx+' '+(dates[idx]||'')+'<br/>区域: '+lower.toFixed(2)+' ~ '+upper.toFixed(2)+'<br/>规则: '+(s.pine_rule||''),
-            itemStyle:{color:style.fill,borderColor:style.stroke,borderWidth:1,opacity:0.7}
-        },{xAxis:endX,yAxis:upper,_tt:(s.type||style.label)+'<br/>锚点bar: '+idx+' '+(dates[idx]||'')+'<br/>区域: '+lower.toFixed(2)+' ~ '+upper.toFixed(2)+'<br/>规则: '+(s.pine_rule||'')}]);
+            _tt:(s.type||style.label)+'<br/>锚点bar: '+idx+' '+(dates[idx]||'')+'<br/>区域: '+lower.toFixed(2)+' ~ '+upper.toFixed(2)+'<br/>规则: '+(s.pine_rule||'')+'<br/>'+(consumed?('被穿越@'+dates[endI]):'存活中(live POI)'),
+            itemStyle:{color:style.fill,borderColor:style.stroke,borderWidth:1,opacity:consumed?0.45:0.85}
+        },{xAxis:endX,yAxis:upper,_tt:(s.type||style.label)+'<br/>锚点bar: '+idx+' '+(dates[idx]||'')+'<br/>区域: '+lower.toFixed(2)+' ~ '+upper.toFixed(2)+'<br/>规则: '+(s.pine_rule||'')+'<br/>'+(consumed?('被穿越@'+dates[endI]):'存活中(live POI)')}]);
     });
     return fa;
 }
@@ -9142,6 +9213,7 @@ class Handler(BaseHTTPRequestHandler):
                 'swings': swings_list, 'wave_swings': wave_swings_list, 'swing_count': len(swings_list),
                 'trades': trade_list, 'trade_count': len(trade_list),
                 'smc_legs': smc_legs,
+                'disc_entries': _load_disc_entries(symbol),
                 'sim_markers': sim_markers, 'smc_chain': smc_chain,
                 'highlight': highlight, 'seq': seq_raw,
                 'symbol': symbol, 'tf': tf, 'version': ver, 'frontend_version': FRONTEND_VERSION
@@ -9153,6 +9225,7 @@ class Handler(BaseHTTPRequestHandler):
                 'trades': trade_list, 'trade_count': len(trade_list),
                 'smc_legs': smc_legs,
                 'sim_markers': sim_markers, 'smc_chain': smc_chain,
+                'disc_entries': _load_disc_entries(symbol),
                 'highlight': highlight, 'seq': seq_raw,
                 'symbol': symbol, 'tf': tf, 'version': ver, 'frontend_version': FRONTEND_VERSION
             }
