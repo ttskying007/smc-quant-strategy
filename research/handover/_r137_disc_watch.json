@@ -1,0 +1,11 @@
+{
+ "asof": "20260930",
+ "event_pool": 231,
+ "stage_counts": {
+  "DROPPED": 55,
+  "ENTERED": 153,
+  "WAIT_BREAK": 21,
+  "READY": 2
+ },
+ "ready_n": 2
+}

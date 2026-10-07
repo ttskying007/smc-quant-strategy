@@ -28,6 +28,12 @@ try:
         REV.setdefault(_r['symbol'], []).append((str(_r['signal_date']).replace('-', ''), _r['side']))
 except Exception:
     REV = {}
+# R137 (s26, 记录-only 不加权): 入场链纪律违规标记 (r133_entry_discipline_diag.py 产出)
+try:
+    DISC = {r['symbol'] + '|' + str(r['entry_date']).replace('-', ''): (r.get('violations') or '')
+            for r in csv.DictReader(open(ROOT / 'research/combo_v22_entry_discipline.csv', encoding='utf-8-sig'))}
+except Exception:
+    DISC = {}
 rows = list(csv.DictReader(open(ROOT / 'research/combo_v22_trades.csv', encoding='utf-8-sig')))
 
 conn = sqlite3.connect(CFG.ANNOUNCE_DB)
@@ -96,6 +102,18 @@ def w_final(r):
                  if abs(int(sd8 or 0) - int(r['entry_date'] or 0)) <= 3]
     if _rev_hits:
         flags.append('s25_reverse_' + '+'.join(_rev_hits))
+    # R137: 入场链纪律违规 (R133 诊断) — s26 记录-only, 不加权 (区分风险级别)
+    _v26 = DISC.get(r['symbol'] + '|' + r['entry_date'])
+    if _v26 and _v26 != 'CLEAN':
+        for _vk in _v26.split(';'):
+            if _vk == 'NEW_LOW_ENTRY':
+                flags.append('s26_newlow')      # F1 剔除候选 (R135: 74腿 avg−0.57%)
+            elif _vk == 'NO_HIGH_BREAK':
+                flags.append('s26_nohb')        # 未破前高进场 (R133: 64%)
+            elif _vk == 'NO_POI':
+                flags.append('s26_nopoi')       # 未回踩POI (R133: 85%)
+            elif _vk == 'NO_RETRACE':
+                flags.append('s26_noretrace')   # 未回踩突破位
     if 'CHoCH' in bk:
         w *= 0.4; flags.append(f's1v2_{bk}')
     if tr == 'up':

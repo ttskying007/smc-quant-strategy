@@ -1,5 +1,5 @@
 {
-  "ts": "2026-09-29 15:30:47",
+  "ts": "2026-10-06 15:30:14",
   "sources": {
     "sina": {
       "ok": true,
@@ -19,10 +19,12 @@
     },
     "netease": {
       "ok": false,
-      "detail": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate "
+      "detail": "<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occur"
     }
   },
   "coverage": 97.9,
-  "latest": "20260928",
-  "alerts": []
+  "latest": "20260930",
+  "alerts": [
+    "数据滞后 20260930(6日)"
+  ]
 }

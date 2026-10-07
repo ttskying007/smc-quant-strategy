@@ -1,19 +1,6 @@
 {
   "days": [
     {
-      "d8": "20260707",
-      "e": 0.3558,
-      "f1": 0.0258,
-      "f2": -0.0639,
-      "f3": 0.0078,
-      "mid_proxy": "512100",
-      "mid_stale_days": 0,
-      "asof_stale": false,
-      "exposure_coef": 0.5,
-      "recorded_at": "2026-09-10 23:39:48",
-      "backfilled": true
-    },
-    {
       "d8": "20260708",
       "e": 0.4084,
       "f1": 0.0248,
@@ -779,6 +766,19 @@
       "asof_stale": false,
       "exposure_coef": 0.75,
       "recorded_at": "2026-09-29 19:29:06",
+      "backfilled": true
+    },
+    {
+      "d8": "20260930",
+      "e": 0.5449,
+      "f1": 0.0543,
+      "f2": -0.1142,
+      "f3": -0.0346,
+      "mid_proxy": "512100",
+      "mid_stale_days": 0,
+      "asof_stale": false,
+      "exposure_coef": 1.0,
+      "recorded_at": "2026-10-01 19:15:38",
       "backfilled": true
     }
   ],

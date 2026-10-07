@@ -1,5 +1,5 @@
 {
-  "days": 9,
+  "days": 13,
   "history": [
     {
       "day": "2026-09-10",
@@ -140,6 +140,70 @@
         "nodata": 3,
         "dup": 5,
         "rolled_weekend": 2
+      }
+    },
+    {
+      "day": "2026-10-01",
+      "raw": 148,
+      "positive": 34,
+      "orders": 1,
+      "reject": {
+        "event_filter_hard": 0,
+        "event_filter_soft": 65,
+        "event_filter_soft_with_delta_research": 8,
+        "stage": 12,
+        "adx": 12,
+        "nodata": 6,
+        "dup": 2,
+        "rolled_weekend": 5
+      }
+    },
+    {
+      "day": "2026-10-02",
+      "raw": 148,
+      "positive": 34,
+      "orders": 0,
+      "reject": {
+        "event_filter_hard": 0,
+        "event_filter_soft": 65,
+        "event_filter_soft_with_delta_research": 8,
+        "stage": 12,
+        "adx": 12,
+        "nodata": 6,
+        "dup": 3,
+        "rolled_weekend": 5
+      }
+    },
+    {
+      "day": "2026-10-05",
+      "raw": 148,
+      "positive": 34,
+      "orders": 0,
+      "reject": {
+        "event_filter_hard": 0,
+        "event_filter_soft": 65,
+        "event_filter_soft_with_delta_research": 8,
+        "stage": 12,
+        "adx": 12,
+        "nodata": 6,
+        "dup": 3,
+        "rolled_weekend": 5
+      }
+    },
+    {
+      "day": "2026-10-06",
+      "raw": 148,
+      "positive": 34,
+      "orders": 0,
+      "reject": {
+        "event_filter_hard": 0,
+        "event_filter_soft": 65,
+        "event_filter_soft_with_delta_research": 8,
+        "stage": 12,
+        "adx": 12,
+        "nodata": 6,
+        "dup": 3,
+        "rolled_weekend": 5
       }
     }
   ]

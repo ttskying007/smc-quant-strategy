@@ -220,65 +220,65 @@
       "code": "000729",
       "date": "20260922",
       "reason": "阶段=UPTREND(非ACCUM/DOWNTREND)",
-      "fwd5": null,
+      "fwd5": -0.18,
       "fwd10": null,
-      "filled": false
+      "filled": true
     },
     {
       "code": "000731",
       "date": "20260922",
       "reason": "阶段=DISTRIB(非ACCUM/DOWNTREND)",
-      "fwd5": null,
+      "fwd5": -2.92,
       "fwd10": null,
-      "filled": false
+      "filled": true
     },
     {
       "code": "002042",
       "date": "20260922",
       "reason": "阶段=UPTREND(非ACCUM/DOWNTREND)",
-      "fwd5": null,
+      "fwd5": -10.25,
       "fwd10": null,
-      "filled": false
+      "filled": true
     },
     {
       "code": "002879",
       "date": "20260922",
       "reason": "阶段=UPTREND(非ACCUM/DOWNTREND)",
-      "fwd5": null,
+      "fwd5": 0.24,
       "fwd10": null,
-      "filled": false
+      "filled": true
     },
     {
       "code": "301235",
       "date": "20260922",
       "reason": "ADX=11.776345246007546<20",
-      "fwd5": null,
+      "fwd5": -15.25,
       "fwd10": null,
-      "filled": false
+      "filled": true
     },
     {
       "code": "603608",
       "date": "20260922",
       "reason": "ADX=15.184894126696978<20",
-      "fwd5": null,
+      "fwd5": -10.89,
       "fwd10": null,
-      "filled": false
+      "filled": true
     },
     {
       "code": "603836",
       "date": "20260922",
       "reason": "阶段=MARKUP(非ACCUM/DOWNTREND)",
-      "fwd5": null,
+      "fwd5": -0.52,
       "fwd10": null,
-      "filled": false
+      "filled": true
     },
     {
       "code": "605198",
       "date": "20260922",
       "reason": "阶段=MARKUP(非ACCUM/DOWNTREND)",
-      "fwd5": null,
+      "fwd5": -9.82,
       "fwd10": null,
-      "filled": false
+      "filled": true
     },
     {
       "code": "300636",
@@ -791,12 +791,148 @@
       "fwd5": null,
       "fwd10": null,
       "filled": false
+    },
+    {
+      "code": "600673",
+      "date": "20261001",
+      "reason": "ADX=17.825332095587008<20",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "600731",
+      "date": "20261001",
+      "reason": "阶段=UPTREND(非ACCUM/DOWNTREND)",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "600785",
+      "date": "20261001",
+      "reason": "阶段=UPTREND(非ACCUM/DOWNTREND)",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "603351",
+      "date": "20261001",
+      "reason": "阶段=UPTREND(非ACCUM/DOWNTREND)",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "688360",
+      "date": "20261001",
+      "reason": "rank_score=2<3",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "002062",
+      "date": "20260930",
+      "reason": "阶段=MARKUP(非ACCUM/DOWNTREND)",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "002083",
+      "date": "20260930",
+      "reason": "ADX=15.452650219291602<20",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "300176",
+      "date": "20260930",
+      "reason": "无K线数据",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "300433",
+      "date": "20260930",
+      "reason": "ADX=17.90755821680511<20",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "300690",
+      "date": "20260930",
+      "reason": "阶段=UPTREND(非ACCUM/DOWNTREND)",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "600673",
+      "date": "20260930",
+      "reason": "ADX=17.825332095587008<20",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "601236",
+      "date": "20260930",
+      "reason": "ADX=18.36290682939015<20",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "603650",
+      "date": "20260930",
+      "reason": "rank_score=2<3",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "300093",
+      "date": "20260929",
+      "reason": "ADX=9.481155210713165<20",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "300632",
+      "date": "20260929",
+      "reason": "无K线数据",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "300720",
+      "date": "20260929",
+      "reason": "无K线数据",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
+    },
+    {
+      "code": "301235",
+      "date": "20260929",
+      "reason": "ADX=10.492005987979578<20",
+      "fwd5": null,
+      "fwd10": null,
+      "filled": false
     }
   ],
   "summary": {
     "阶段=UPTREND(非ACCUM/DOWNTR": {
-      "n": 15,
-      "avg_fwd5": -3.11,
+      "n": 18,
+      "avg_fwd5": -3.16,
       "avg_fwd10": -3.04
     },
     "ADX=0.33003300330025626<": {
@@ -814,6 +950,11 @@
       "avg_fwd5": -1.02,
       "avg_fwd10": 0.96
     },
+    "阶段=MARKUP(非ACCUM/DOWNTRE": {
+      "n": 2,
+      "avg_fwd5": -5.17,
+      "avg_fwd10": null
+    },
     "ADX=15.789473684210732<2": {
       "n": 1,
       "avg_fwd5": -4.2,
@@ -823,6 +964,21 @@
       "n": 1,
       "avg_fwd5": 9.02,
       "avg_fwd10": 25.63
+    },
+    "阶段=DISTRIB(非ACCUM/DOWNTR": {
+      "n": 1,
+      "avg_fwd5": -2.92,
+      "avg_fwd10": null
+    },
+    "ADX=11.776345246007546<2": {
+      "n": 1,
+      "avg_fwd5": -15.25,
+      "avg_fwd10": null
+    },
+    "ADX=15.184894126696978<2": {
+      "n": 1,
+      "avg_fwd5": -10.89,
+      "avg_fwd10": null
     },
     "ADX=19.57294841288216<20": {
       "n": 1,
@@ -865,5 +1021,5 @@
       "avg_fwd10": null
     }
   },
-  "days_accum": 10
+  "days_accum": 11
 }

@@ -13,3 +13,5 @@
 {"code": "300001", "date": "2026-09-24", "signal_combo": "BUYBACK_STRONG", "p_executable": 0.37, "event_kind": "false_signal", "event_kind_conf": 0.37, "excess_score": 0.18, "excess_conf": 0.82, "model": "jev-1.13.0"}
 {"code": "688525", "date": "2026-09-28", "signal_combo": "BUYBACK_STRONG", "p_executable": 0.63, "event_kind": "bottom_accumulation", "event_kind_conf": 0.91, "excess_score": 1.91, "excess_conf": 0.66, "model": "jev-1.13.0"}
 {"code": "300124", "date": "2026-09-28", "signal_combo": "HOLDER_INCREASE", "p_executable": 0.44, "event_kind": "bottom_accumulation", "event_kind_conf": 0.77, "excess_score": 1.77, "excess_conf": 0.51, "model": "jev-1.13.0"}
+{"code": "300893", "date": "2026-10-01", "signal_combo": "BUYBACK_STRONG", "p_executable": 0.5, "event_kind": "bottom_accumulation", "event_kind_conf": 0.77, "excess_score": 1.88, "excess_conf": 0.55, "model": "jev-1.13.0"}
+{"code": "300893", "date": "2026-10-01", "signal_combo": "BUYBACK_STRONG", "p_executable": 0.37, "event_kind": "false_signal", "event_kind_conf": 0.37, "excess_score": 0.19, "excess_conf": 0.81, "model": "jev-1.13.0"}

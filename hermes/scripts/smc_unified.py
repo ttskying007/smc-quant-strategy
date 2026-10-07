@@ -4448,6 +4448,57 @@ def build_audit_portal(slug=''):
     except Exception:
         pass
 
+    # R137: 纪律观察名单 (前向化 R134 状态机, 记录-only 影子工具)
+    _disc_watch_card = ''
+    try:
+        import csv as _csv_w
+        _wj = json.load(open(r'E:\test\smc_project\research\handover\_r137_disc_watch.json', encoding='utf-8'))
+        _wrows = list(_csv_w.DictReader(open(r'E:\test\smc_project\research\combo_v24_disc_watch.csv', encoding='utf-8-sig')))
+        _ready = [r for r in _wrows if r['stage'] == 'READY']
+        _wbr = [r for r in _wrows if r['stage'] == 'WAIT_BREAK']
+        _wrt = [r for r in _wrows if r['stage'] == 'WAIT_RETEST']
+        def _wesc(s):
+            return html.escape(str(s or ''))
+        def _row_w(r):
+            if r['stage'] == 'READY':
+                return (f"<tr><td class='mono' style='color:#3fb950'>{_wesc(r['symbol'])}</td>"
+                        f"<td class='mono'>{_wesc(r['event_date'])}</td>"
+                        f"<td class='mono'>破 {_wesc(r['break_date'])} @ {_wesc(r['break_level'])}</td>"
+                        f"<td class='mono'>踩 {_wesc(r['poi_kind'])} {_wesc(r['retrace_date'])}</td>"
+                        f"<td class='mono'>{_wesc(r['last_close'])}</td>"
+                        f"<td style='color:#3fb950'><b>READY·下一bar候选</b></td></tr>")
+            if r['stage'] == 'WAIT_RETEST':
+                return (f"<tr><td class='mono' style='color:#d29922'>{_wesc(r['symbol'])}</td>"
+                        f"<td class='mono'>{_wesc(r['event_date'])}</td>"
+                        f"<td class='mono'>破 {_wesc(r['break_date'])} @ {_wesc(r['break_level'])}</td>"
+                        f"<td class='mono' style='font-size:0.9em'>{_wesc(r['poi_desc'])}</td>"
+                        f"<td class='mono'>{_wesc(r['last_close'])}</td>"
+                        f"<td style='color:#d29922'>已破{_wesc(r['since_break'])}bar等回踩</td></tr>")
+            return (f"<tr><td class='mono' style='color:#58a6ff'>{_wesc(r['symbol'])}</td>"
+                    f"<td class='mono'>{_wesc(r['event_date'])}</td>"
+                    f"<td class='mono'>待破 {_wesc(r['level_date'])} @ {_wesc(r['level'])}</td>"
+                    f"<td class='mono'>距前高 {_wesc(r['gap_pct'])}%</td>"
+                    f"<td class='mono'>{_wesc(r['last_close'])}</td>"
+                    f"<td style='color:#58a6ff'>已等{_wesc(r['wait_bars'])}bar</td></tr>")
+        _shown = _ready + _wrt[:8] + _wbr[:10]
+        _sc = _wj.get('stage_counts', {})
+        _disc_watch_card = (
+            "<div class='card' style='border-left:3px solid #58a6ff'>"
+            f"<h2>🧘 纪律观察名单 (R137 前向影子工具, asof {_wesc(_wj.get('asof','?'))})</h2>"
+            f"<p style='color:#8b949e'>口径=R134 状态机前向化(记录-only, 不交易): 事件池=近120bar 内公告动量事件 {_wj.get('event_pool',0)} 笔。"
+            f"<span style='color:#3fb950'>READY(回踩到位·可纪律入场) {len(_ready)}</span> | "
+            f"<span style='color:#d29922'>WAIT_RETEST(已破前高等回踩) {len(_wrt)}</span> | "
+            f"<span style='color:#58a6ff'>WAIT_BREAK(未破前高) {len(_wbr)}</span> | "
+            f"<span style='color:#8b949e'>ENTERED(链早已完成·不可追) {_sc.get('ENTERED',0)} / DROPPED {_sc.get('DROPPED',0)}</span></p>"
+            "<table><thead><tr><th>代码</th><th>事件日</th><th>破位/前高</th><th>回踩/POI</th><th>现价</th><th>纪律状态</th></tr></thead><tbody>"
+            + ''.join(_row_w(r) for r in _shown) +
+            "</tbody></table>"
+            "<p style='color:#8b949e;font-size:0.85em'>提醒(R134 证伪结论): 该纪律若严格执行历史输出 n=576 avg−0.57% PF0.74 — "
+            "本表是『按纪律等』的可观察性工具, 不是买入信号。</p>"
+            "</div>")
+    except Exception:
+        pass
+
     # R127: 反向候选卡 (sweep→reverse 2.0, R125 证据链) — /autopsy 展示
     try:
         import csv as _csv_rev
@@ -4581,7 +4632,7 @@ def build_audit_portal(slug=''):
             body = '<div class="card">报告不存在: ' + html.escape(slug) + '</div>'
     else:
         preview = ''.join(f'<div class="card"><a href="/audit?r={html.escape(r["slug"])}" style="font-size:1.1em;color:#58a6ff">{html.escape(r["title"])}</a><div style="color:#8b949e">{html.escape(r["tag"])}</div></div>' for r in reports)
-        body = f'{_review_card}{_eq_card}{_rev_card}{shadow_card}<div class="card" style="border-left:3px solid #58a6ff"><h2>研究审计门户</h2><p>R60-R99 全部自动化报告在一起。K线链 / 逐腿审计 / 手术预注册 / 熊市追踪 / 全信号家族都在这里。</p></div>{preview}'
+        body = f'{_review_card}{_eq_card}{_disc_watch_card}{_rev_card}{shadow_card}<div class="card" style="border-left:3px solid #58a6ff"><h2>研究审计门户</h2><p>R60-R99 全部自动化报告在一起。K线链 / 逐腿审计 / 手术预注册 / 熊市追踪 / 全信号家族都在这里。</p></div>{preview}'
 
     return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"><title>研究审计门户</title><style>{CSS} .stats{{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}} .stat{{flex:1;min-width:180px;background:#161b22;border-radius:8px;padding:10px 14px}} .val{{font-size:1.3em;font-weight:700}} .lbl{{color:#8b949e;font-size:0.85em}} table{{width:100%;border-collapse:collapse;font-size:0.86em}} th,td{{padding:5px 8px;border:1px solid #30363d;text-align:left}} th{{background:#161b22}} pre{{background:#0d1117;padding:8px;border-radius:6px;font-size:0.85em;overflow:auto}}</style></head><body>{build_nav()}<div class="container" style="max-width:1400px">
 <div class="stats">{kpi_html}</div>

@@ -1,21 +1,21 @@
 {
-  "checked_at": "2026-09-29 19:27:51",
-  "history_n": 11,
+  "checked_at": "2026-10-06 18:18:09",
+  "history_n": 15,
   "latest": {
-    "day": "2026-09-29",
-    "generated_at": "2026-09-29 19:27:35",
-    "raw": 134,
-    "positive": 32,
+    "day": "2026-10-06",
+    "generated_at": "2026-10-06 18:17:52",
+    "raw": 148,
+    "positive": 34,
     "orders": 0,
     "reject": {
-      "event_filter_hard": 1,
-      "event_filter_soft": 38,
-      "event_filter_soft_with_delta_research": 7,
-      "stage": 15,
-      "adx": 10,
-      "nodata": 3,
-      "dup": 5,
-      "rolled_weekend": 2
+      "event_filter_hard": 0,
+      "event_filter_soft": 65,
+      "event_filter_soft_with_delta_research": 8,
+      "stage": 12,
+      "adx": 12,
+      "nodata": 6,
+      "dup": 3,
+      "rolled_weekend": 5
     }
   },
   "alarms": []
