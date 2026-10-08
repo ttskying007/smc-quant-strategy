@@ -1,0 +1,6 @@
+﻿kline: 200
+has R138 col: True
+legs: 5
+seq_verdict legs: 5 first: S1_TREND_FAIL
+audit: 200
+R138 card: True

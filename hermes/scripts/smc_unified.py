@@ -1820,6 +1820,14 @@ def _load_v22_legs(symbol):
                         DISC[r['symbol'] + '|' + r['entry_date']] = r
             except Exception:
                 DISC = {}
+            # R138: 入场序列三步判定 (①趋势→②突破后回撤→③到POI, r138_entry_sequence.py 产出)
+            SEQ = {}
+            try:
+                with open(r'E:\test\smc_project\research\combo_v25_entry_sequence.csv', encoding='utf-8-sig') as fh:
+                    for r in _csv.DictReader(fh):
+                        SEQ[r['symbol'] + '|' + r['entry_date']] = r
+            except Exception:
+                SEQ = {}
             # 再读 v2 全链狠打影子 (R101-s22/s23 终版, R105 重写)
             hhll = sh2  # 复用变量名以贴合 R106 代码
             # FIX(R111c): 恢复 R88b 的 enrich 块 —— R107 编辑中丢失, 导致 legs 全空
@@ -1867,6 +1875,19 @@ def _load_v22_legs(symbol):
                         leg['_violations'] = _dc.get('violations') or 'CLEAN'
                     except Exception:
                         leg['_violations'] = ''
+                    # R138: 三步序列判定 (①趋势 ②突破后回撤 ③到POI) — 腿表三步链列
+                    try:
+                        _sq = SEQ.get(r['symbol'] + '|' + r['entry_date']) or {}
+                        leg['_seq'] = _sq.get('verdict') or ''
+                        leg['_seq_meta'] = {'trend': _sq.get('trend_state') or '',
+                                            'bk': _sq.get('breakout_kind') or '',
+                                            'bk_date': _sq.get('breakout_date') or '',
+                                            'rs': _sq.get('retrace_state') or '',
+                                            'poi': ','.join([x for x, k in (('OB', _sq.get('in_ob')), ('FVG', _sq.get('in_fvg')), ('OTE', _sq.get('in_ote')))
+                                                             if str(k) in ('True', 'bull')]) or '-'}
+                    except Exception:
+                        leg['_seq'] = ''
+                        leg['_seq_meta'] = {}
                     legs.append(leg)
         except Exception:
             legs = []
@@ -2702,6 +2723,18 @@ function renderLegsTable(legs){
         if(String(s)==='0')return '<span style=color:#8b949e>近10bar:无sweep</span>';
         return '<span style=color:#9e6ae8>近10bar来sweep x'+s+'('+(sd||'?')+')</span>';
     }
+    function seqNote(leg){
+        // R138: 三步链判定 ①趋势→②突破后回撤→③到POI
+        var v=leg.seq_verdict||'';
+        if(!v)return '<span style=color:#8b949e>-</span>';
+        var m={'ALL_OK':['#3fb950','✓全序合规'],'S1_TREND_FAIL':['#f85149','①趋势✗(下跌进场)'],
+               'S2_NO_PULLBACK':['#f0883e','②破位后未回撤追'],'S2_PULLBACK_BROKE':['#d29922','②回踩穿位'],
+               'S2_UNKNOWN':['#8b949e','②回撤?'],'S3_NOT_AT_POI':['#bc8cff','③未到POI']};
+        var e=m[v]||['#8b949e',v];
+        var mt=leg.seq_meta||{};
+        var tt='R138三步链: ①趋势:'+(mt.trend||'?')+' ②突破:'+(mt.bk||'?')+'@'+(mt.bk_date||'?')+' 回撤:'+(mt.rs||'?')+' ③POI:'+(mt.poi||'-');
+        return '<span style="color:'+e[0]+';font-weight:bold" title="'+tt+'">'+e[1]+'</span>';
+    }
     el.innerHTML='<table style="font-size:10px"><thead><tr>'
         +'<th>#</th><th>类型</th><th>当时趋势</th>'
         +'<th>突破(什么时候/什么信号)</th>'
@@ -2713,6 +2746,7 @@ function renderLegsTable(legs){
         +'<th>共振破位(R121)</th>'
         +'<th>PnL</th><th>持有bar</th><th>v24影子权重+flags</th><th>v2全链影子(R94)</th><th>结构状态(R101)</th>'
         +'<th>入场纪律(R133)</th>'
+        +'<th>三步链(R138: 趋势→回撤→POI)</th>'
         +'<th>引擎信号序列(按时间)</th></tr></thead><tbody>'
         +legs.map(function(leg,i){
             var pnl=Number(leg.pnl||0), cls=pnl>0?'green':'red';
@@ -2739,6 +2773,7 @@ function renderLegsTable(legs){
                 +'<td style="color:'+wc2+';font-weight:bold">'+w2.toFixed(2)+'</td>'
                 +'<td style="font-size:9px;color:#a5b1c2">'+(((leg.structure_state||'')).split('(')[0]||'-')+'</td>'
                 +'<td style="font-size:9px">'+violNote(leg)+'</td>'
+                +'<td style="font-size:9px">'+seqNote(leg)+'</td>'
                 +'<td style="font-size:9px">'+sweepNote(leg)+'<br/>'+(seq||'-')+'</td></tr>';
         }).join('')+'</tbody></table>' + legsDetailHtml(legs);
 }
@@ -4443,6 +4478,7 @@ def build_audit_portal(slug=''):
                         "<p style='color:#8b949e'>入场链纪律诊断 (R133, 用户 2026-10-24 投诉验证): 1844 腿中 <b style='color:#f85149'>未破前高进场 64.0% / 未回踩POI 85.1% / 20bar新低进场 4.0% / 全合规仅 4.99%</b> — 根因=公告次日 close×0.99 闭眼限价单, 与结构确认脱钩。</p>"
                         "<p style='color:#8b949e'>严格纪律入场证伪 (R134, 同事件池): 破前高→回踩POI→入场 = n=576 <b style='color:#f85149'>avg−0.57% PF0.74</b> vs 旧引擎 +4.11% PF3.39 — 公告动量 edge 在闭眼进场, 等确认+回踩后动量耗尽变均值回归。纪律版全放弃原因: 踏空高开260/回踩穿250/未破前高94/未回踩130。</p>"
                         "<p style='color:#8b949e'>最小纪律过滤有效 (R135): <b style='color:#3fb950'>只剔『20bar新低当日进场』74 笔(avg−0.57% PF0.84) → 留存 1770 avg+4.31% PF3.61, 基线改善</b>; 反例: 剔『趋势向下进场』1180笔(avg+4.56% PF4.29)反而亏钱 — 下跌+公告动量是该策略利润来源, 不能按趋势过滤。(仅研究, 生产冻结不动)</p>"
+                        "<p style='color:#8b949e'>入场序列三步判定 (R138, 用户指令顺序 ①趋势→②突破后回撤→③到POI): 全 1510 腿逐腿分层 — <b style='color:#3fb950'>全序合规 61腿 avg+1.54% PF2.38</b>(正收益但低于基线) | <b style='color:#f85149'>①趋势✗(下跌进场) 1177腿 avg+4.56% PF4.32</b>(利润池, 剔除亏钱) | <b style='color:#f0883e'>②破位后未回撤追 97腿 avg−0.01% PF0.99(唯一确定值得剔的桶)</b> | ②回踩穿位 115腿 avg+1.90% PF2.40 | ③未到POI 60腿 avg+1.91% PF2.69。腿表已加『三步链(R138)』列逐腿展示。</p>"
                         "<p style='color:#8b949e;font-size:0.85em'>s24_eql_risk 已写入 combo_v23_shadow_v3 (影子列, 生产不动); 观察期后由用户决定是否升级生产。</p>"
                         "</div>")
     except Exception:
@@ -7775,6 +7811,9 @@ class Handler(BaseHTTPRequestHandler):
                                     'resonance_side': _lg.get('_resonance_side'),
                                     # R133: 入场链纪律违规标记
                                     'violations': _lg.get('_violations'),
+                                    # R138: 三步序列判定 (①趋势→②突破后回撤→③到POI)
+                                    'seq_verdict': _lg.get('_seq'),
+                                    'seq_meta': _lg.get('_seq_meta'),
                                     # R110: 明细全链字段 (逐腿 tooltips/表格用)
                                     'mfe_pct': _lg.get('mfe_pct'), 'mae_pct': _lg.get('mae_pct'),
                                     'rr_exit': _lg.get('rr_exit'), 'signal_chain_kind': _lg.get('signal_chain'),
@@ -9242,6 +9281,9 @@ class Handler(BaseHTTPRequestHandler):
                         'resonance_side': _lg.get('_resonance_side'),
                         # R133: 入场链纪律违规 (腿表纪律列)
                         'violations': _lg.get('_violations'),
+                        # R138: 三步序列判定 (①趋势→②突破后回撤→③到POI)
+                        'seq_verdict': _lg.get('_seq'),
+                        'seq_meta': _lg.get('_seq_meta'),
                         # R110: 明细全链字段
                         'mfe_pct': _lg.get('mfe_pct'), 'mae_pct': _lg.get('mae_pct'),
                         'rr_exit': _lg.get('rr_exit'), 'signal_chain_kind': _lg.get('signal_chain'),
