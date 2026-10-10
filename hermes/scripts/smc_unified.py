@@ -4567,6 +4567,33 @@ def build_audit_portal(slug=''):
     except Exception:
         pass
 
+    # R141: 逐月回测对比卡 (生产池1844 vs G123留存850, r141 handover)
+    _monthly_card = ''
+    try:
+        _mtxt = open(r'E:\test\smc_project\research\handover\_r141_monthly.txt', encoding='utf-8').read().strip().splitlines()
+        def _pf_c(seg):
+            try:
+                v = float(seg.strip().split()[-1])
+            except Exception:
+                return '#8b949e'
+            return '#f85149' if v < 1 else ('#d29922' if v < 3 else '#3fb950')
+        _mtr = []
+        for _ln in _mtxt[1:]:
+            _p = [x.strip() for x in _ln.split('|')]
+            if len(_p) < 3:
+                continue
+            _tot = _p[0].startswith('----')
+            _mtr.append("<tr%s><td class='mono'>%s</td><td class='mono' style='color:%s'>%s</td><td class='mono' style='color:%s'>%s</td></tr>" % (
+                " style='border-top:2px solid #30363d'" if _tot else '',
+                html.escape(_p[0]), _pf_c(_p[1]), html.escape(_p[1]), _pf_c(_p[2]), html.escape(_p[2])))
+        _monthly_card = ("<div class='card' style='border-left:3px solid #3fb950'>"
+                         "<h2>📅 逐月回测对比 (R141, 生产池1844腿 vs G123留存850腿 — 等待用户拍板)</h2>"
+                         "<p style='color:#8b949e'>格式: n avg% WR PF。红=PF<1 亏损月, 金=PF<3, 绿=PF≥3。利润集中在超跌反弹月(202402/202409-10/202501/202607); 亏损月=202401(微盘崩)/202405-406阴跌/202603-06震荡。G123 把 202503/202606 从亏转盈、大幅强化巨月, 但会整月踏空 202604(18腿全胜+18.8%) 并削减强月参与度。</p>"
+                         "<table><thead><tr><th>月</th><th>生产池1844 (n avg WR PF)</th><th>G123留存 (n avg WR PF)</th></tr></thead><tbody>"
+                         + ''.join(_mtr) + "</tbody></table></div>")
+    except Exception:
+        pass
+
     # R127: 反向候选卡 (sweep→reverse 2.0, R125 证据链) — /autopsy 展示
     try:
         import csv as _csv_rev
@@ -4700,7 +4727,7 @@ def build_audit_portal(slug=''):
             body = '<div class="card">报告不存在: ' + html.escape(slug) + '</div>'
     else:
         preview = ''.join(f'<div class="card"><a href="/audit?r={html.escape(r["slug"])}" style="font-size:1.1em;color:#58a6ff">{html.escape(r["title"])}</a><div style="color:#8b949e">{html.escape(r["tag"])}</div></div>' for r in reports)
-        body = f'{_review_card}{_eq_card}{_disc_watch_card}{_rev_card}{shadow_card}<div class="card" style="border-left:3px solid #58a6ff"><h2>研究审计门户</h2><p>R60-R99 全部自动化报告在一起。K线链 / 逐腿审计 / 手术预注册 / 熊市追踪 / 全信号家族都在这里。</p></div>{preview}'
+        body = f'{_review_card}{_eq_card}{_disc_watch_card}{_monthly_card}{_rev_card}{shadow_card}<div class="card" style="border-left:3px solid #58a6ff"><h2>研究审计门户</h2><p>R60-R99 全部自动化报告在一起。K线链 / 逐腿审计 / 手术预注册 / 熊市追踪 / 全信号家族都在这里。</p></div>{preview}'
 
     return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"><title>研究审计门户</title><style>{CSS} .stats{{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}} .stat{{flex:1;min-width:180px;background:#161b22;border-radius:8px;padding:10px 14px}} .val{{font-size:1.3em;font-weight:700}} .lbl{{color:#8b949e;font-size:0.85em}} table{{width:100%;border-collapse:collapse;font-size:0.86em}} th,td{{padding:5px 8px;border:1px solid #30363d;text-align:left}} th{{background:#161b22}} pre{{background:#0d1117;padding:8px;border-radius:6px;font-size:0.85em;overflow:auto}}</style></head><body>{build_nav()}<div class="container" style="max-width:1400px">
 <div class="stats">{kpi_html}</div>
