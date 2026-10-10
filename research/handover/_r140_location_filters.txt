@@ -1,0 +1,9 @@
+=== R140 位置过滤器证伪 — 腿池 1510 (基线 avg=3.83% PF=3.69) ===
+  G1_drop_weak_day(<40)            留 n=  973 avg=5.18% PF=6.83 | 剔 n= 537 avg=1.4% PF=1.58
+  G2_drop_under_high(±2%)          留 n= 1362 avg=4.21% PF=3.94 | 剔 n= 148 avg=0.36% PF=1.27
+  G3_drop_newlow_rng(≤10)          留 n= 1417 avg=3.98% PF=3.93 | 剔 n=  93 avg=1.63% PF=1.67
+  G4_drop_chase_up                 留 n= 1430 avg=4.04% PF=3.91 | 剔 n=  80 avg=0.18% PF=1.09
+  G5_drop_gap_dead(<-3%)           留 n= 1489 avg=3.88% PF=3.82 | 剔 n=  21 avg=0.51% PF=1.1
+  G12_drop_weak_day+under_high     留 n=  893 avg=5.54% PF=7.37 | 剔 n= 617 avg=1.36% PF=1.61
+  G123_drop_weak+high+newlow       留 n=  850 avg=5.7% PF=7.87 | 剔 n= 660 avg=1.43% PF=1.65
+写出 _r140_location_filters.json

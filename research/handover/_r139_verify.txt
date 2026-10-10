@@ -1,0 +1,3 @@
+﻿kline: 200 locCol=True
+legs=5 withLoc=5 sample_daypos=52.2
+audit=200 R139=True R140=True

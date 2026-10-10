@@ -1,0 +1,27 @@
+=== R139 入场位置归纳研究 — 1510 腿 ===
+[区间分位 → PnL]
+  loc20 00-10        n=   93 avg=1.63% PF=1.67
+  loc20 10-30        n=  306 avg=3.41% PF=2.61
+  loc20 30-60        n=  640 avg=4.95% PF=5.14
+  loc20 60-85        n=  365 avg=3.56% PF=4.64
+  loc20 85-100(顶)    n=  106 avg=1.19% PF=1.82
+[趋势 × 区间半区]
+  down|high_half       n=  591 avg=4.25% PF=5.54
+  down|low_half        n=  713 avg=4.21% PF=3.46
+  up|high_half         n=  105 avg=0.51% PF=1.27
+  up|low_half          n=  101 avg=2.16% PF=2.23
+[顶阻力]
+  resistance_2pct      n=  148 avg=0.36% PF=1.27
+  clear_sky_5pct       n= 1048 avg=5.13% PF=4.76
+[事件日强弱 day_pos]
+  mid          n=  421 avg=4.14% PF=4.32
+  strong>70    n=  552 avg=5.97% PF=10.75
+  weak<40      n=  537 avg=1.4% PF=1.58
+[跳空 gap]
+  gap-3~3      n= 1438 avg=3.75% PF=3.71
+  gap<-3       n=   21 avg=0.51% PF=1.1
+  gap>3        n=   51 avg=7.52% PF=7.94
+[top20%赢家 vs bottom20%输家 中位画像]
+  输家: {'loc20': 36.0, 'near_high': 8.4, 'near_low': -5.2, 'day_pos': 28.6, 'gap_pct': 0.0, 'ret20': -6.9, 'vol_ratio': 1.1}
+  赢家: {'loc20': 44.6, 'near_high': 18.7, 'near_low': -20.7, 'day_pos': 67.9, 'gap_pct': 0.0, 'ret20': -13.4, 'vol_ratio': 1.0}
+写出 combo_v25_entry_location.csv + _r139_entry_location.json
