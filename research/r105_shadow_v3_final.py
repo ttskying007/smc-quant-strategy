@@ -40,6 +40,12 @@ try:
            for r in csv.DictReader(open(ROOT / 'research/combo_v25_entry_location.csv', encoding='utf-8-sig'))}
 except Exception:
     LOC = {}
+# R143 (s28, 记录-only 不加权): R138 三步序列判定 (r138_entry_sequence.py 产出)
+try:
+    SEQ = {r['symbol'] + '|' + r['entry_date']: r
+           for r in csv.DictReader(open(ROOT / 'research/combo_v25_entry_sequence.csv', encoding='utf-8-sig'))}
+except Exception:
+    SEQ = {}
 rows = list(csv.DictReader(open(ROOT / 'research/combo_v22_trades.csv', encoding='utf-8-sig')))
 
 conn = sqlite3.connect(CFG.ANNOUNCE_DB)
@@ -136,6 +142,18 @@ def w_final(r):
                 flags.append('s27_botdec')      # G3: 区间底10% (R140: 93腿 PF1.67)
         except Exception:
             pass
+    # R143: R138 三步序列判定 (s28 记录-only, 不加权) — 追击/未到POI/全合规
+    _sq = SEQ.get(r['symbol'] + '|' + r['entry_date'])
+    if _sq:
+        _v = _sq.get('verdict') or ''
+        if _v == 'S2_NO_PULLBACK':
+            flags.append('s28_chase')           # ②破位后未回撤追 (R138: 97腿 PF0.99)
+        elif _v == 'S3_NOT_AT_POI':
+            flags.append('s28_notpoi')          # ③未到POI (R138: 60腿 PF2.69)
+        elif _v == 'S2_PULLBACK_BROKE':
+            flags.append('s28_pbbroke')         # ②回踩穿位 (115腿 PF2.40)
+        elif _v == 'ALL_OK':
+            flags.append('s28_all_ok')          # 全序合规 (61腿 PF2.38, 正样本标记)
     if 'CHoCH' in bk:
         w *= 0.4; flags.append(f's1v2_{bk}')
     if tr == 'up':
