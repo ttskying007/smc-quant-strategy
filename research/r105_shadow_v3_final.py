@@ -34,6 +34,12 @@ try:
             for r in csv.DictReader(open(ROOT / 'research/combo_v22_entry_discipline.csv', encoding='utf-8-sig'))}
 except Exception:
     DISC = {}
+# R141 (s27, 记录-only 不加权): 入场位置特征 (r139_entry_location.py 产出) — G1/G2/G3 候选因子
+try:
+    LOC = {r['symbol'] + '|' + r['entry_date']: r
+           for r in csv.DictReader(open(ROOT / 'research/combo_v25_entry_location.csv', encoding='utf-8-sig'))}
+except Exception:
+    LOC = {}
 rows = list(csv.DictReader(open(ROOT / 'research/combo_v22_trades.csv', encoding='utf-8-sig')))
 
 conn = sqlite3.connect(CFG.ANNOUNCE_DB)
@@ -114,6 +120,22 @@ def w_final(r):
                 flags.append('s26_nopoi')       # 未回踩POI (R133: 85%)
             elif _vk == 'NO_RETRACE':
                 flags.append('s26_noretrace')   # 未回踩突破位
+    # R141: 入场位置因子 (s27 记录-only, 不加权) — G1弱收盘/G2顶阻力/G3区间底 (R139/R140 证据)
+    _lc = LOC.get(r['symbol'] + '|' + r['entry_date'])
+    if _lc:
+        try:
+            _dp = float(_lc.get('day_pos') or 0)
+            _l20 = float(_lc.get('loc20') or 0)
+            _nhv = _lc.get('near_high')
+            _nh = float(_nhv) if _nhv not in (None, '') else None
+            if _dp < 40:
+                flags.append('s27_weakday')     # G1: 事件日收盘位<40% (R140: 537腿 PF1.58)
+            if _nh is not None and -2 <= _nh <= 2:
+                flags.append('s27_underhigh')   # G2: 前高压顶±2% (R140: 148腿 PF1.27)
+            if _l20 <= 10:
+                flags.append('s27_botdec')      # G3: 区间底10% (R140: 93腿 PF1.67)
+        except Exception:
+            pass
     if 'CHoCH' in bk:
         w *= 0.4; flags.append(f's1v2_{bk}')
     if tr == 'up':

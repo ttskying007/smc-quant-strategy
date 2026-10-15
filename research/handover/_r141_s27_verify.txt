@@ -1,0 +1,8 @@
+total legs: 1844, no-flag legs: 0
+s27_weakday: 537
+s27_underhigh: 148
+s27_botdec: 93
+s26_newlow: 74
+s26_nohb: 1180
+s26_nopoi: 1570
+s26_noretrace: 1119

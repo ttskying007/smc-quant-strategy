@@ -1,0 +1,190 @@
+{
+ "G1_weakday": {
+  "kept": {
+   "n": 973,
+   "avg": 5.18,
+   "wr": 75.1,
+   "pf": 6.83
+  },
+  "dropped": {
+   "n": 537,
+   "avg": 1.4,
+   "wr": 49.0,
+   "pf": 1.58
+  },
+  "monthly_consistency": "22/28",
+  "by_era": {
+   "2023-2025": {
+    "kept": {
+     "n": 810,
+     "avg": 5.16,
+     "wr": 76.2,
+     "pf": 7.15
+    },
+    "dropped": {
+     "n": 419,
+     "avg": 0.58,
+     "wr": 47.0,
+     "pf": 1.23
+    }
+   },
+   "2026_样本外": {
+    "kept": {
+     "n": 163,
+     "avg": 5.24,
+     "wr": 69.9,
+     "pf": 5.67
+    },
+    "dropped": {
+     "n": 118,
+     "avg": 4.33,
+     "wr": 55.9,
+     "pf": 3.35
+    }
+   }
+  },
+  "bootstrap_P_avg_gt_base": 1.0,
+  "bootstrap_P_pf_gt_base": 1.0
+ },
+ "G2_underhigh": {
+  "kept": {
+   "n": 1362,
+   "avg": 4.21,
+   "wr": 67.5,
+   "pf": 3.94
+  },
+  "dropped": {
+   "n": 148,
+   "avg": 0.36,
+   "wr": 50.0,
+   "pf": 1.27
+  },
+  "monthly_consistency": "22/27",
+  "by_era": {
+   "2023-2025": {
+    "kept": {
+     "n": 1108,
+     "avg": 3.97,
+     "wr": 68.1,
+     "pf": 3.78
+    },
+    "dropped": {
+     "n": 121,
+     "avg": 0.24,
+     "wr": 49.6,
+     "pf": 1.17
+    }
+   },
+   "2026_样本外": {
+    "kept": {
+     "n": 254,
+     "avg": 5.27,
+     "wr": 65.4,
+     "pf": 4.63
+    },
+    "dropped": {
+     "n": 27,
+     "avg": 0.93,
+     "wr": 51.9,
+     "pf": 1.8
+    }
+   }
+  },
+  "bootstrap_P_avg_gt_base": 1.0,
+  "bootstrap_P_pf_gt_base": 1.0
+ },
+ "G3_botdec": {
+  "kept": {
+   "n": 1417,
+   "avg": 3.98,
+   "wr": 68.2,
+   "pf": 3.93
+  },
+  "dropped": {
+   "n": 93,
+   "avg": 1.63,
+   "wr": 29.0,
+   "pf": 1.67
+  },
+  "monthly_consistency": "11/21",
+  "by_era": {
+   "2023-2025": {
+    "kept": {
+     "n": 1156,
+     "avg": 3.93,
+     "wr": 69.2,
+     "pf": 3.95
+    },
+    "dropped": {
+     "n": 73,
+     "avg": -1.59,
+     "wr": 19.2,
+     "pf": 0.44
+    }
+   },
+   "2026_样本外": {
+    "kept": {
+     "n": 261,
+     "avg": 4.2,
+     "wr": 64.0,
+     "pf": 3.87
+    },
+    "dropped": {
+     "n": 20,
+     "avg": 13.38,
+     "wr": 65.0,
+     "pf": 16.04
+    }
+   }
+  },
+  "bootstrap_P_avg_gt_base": 0.971,
+  "bootstrap_P_pf_gt_base": 0.998
+ },
+ "G123": {
+  "kept": {
+   "n": 850,
+   "avg": 5.7,
+   "wr": 78.6,
+   "pf": 7.87
+  },
+  "dropped": {
+   "n": 660,
+   "avg": 1.43,
+   "wr": 49.4,
+   "pf": 1.65
+  },
+  "monthly_consistency": "24/29",
+  "by_era": {
+   "2023-2025": {
+    "kept": {
+     "n": 707,
+     "avg": 5.85,
+     "wr": 80.3,
+     "pf": 8.78
+    },
+    "dropped": {
+     "n": 522,
+     "avg": 0.56,
+     "wr": 47.1,
+     "pf": 1.24
+    }
+   },
+   "2026_样本外": {
+    "kept": {
+     "n": 143,
+     "avg": 4.99,
+     "wr": 69.9,
+     "pf": 5.09
+    },
+    "dropped": {
+     "n": 138,
+     "avg": 4.72,
+     "wr": 58.0,
+     "pf": 3.88
+    }
+   }
+  },
+  "bootstrap_P_avg_gt_base": 1.0,
+  "bootstrap_P_pf_gt_base": 1.0
+ }
+}
