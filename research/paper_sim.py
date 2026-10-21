@@ -846,6 +846,58 @@ def _v23v2_of(order, chain_v2=None):
                     flags.append("s25_reverse_" + "+".join(_hits))
         except Exception:
             pass
+        # R143: s26/s27/s28 影子旗 (记录-only, 不加权) — 与 r105 影子账本同口径
+        # s27 位置因子: 事件日收盘位/区间分位/顶阻力 (R139/R140 因果特征, 现算)
+        try:
+            _sd8 = str(order.get("signal_date") or "").replace("-", "")
+            _ep = float(order.get("entry_price") or 0)
+            _bs = bars_of(order.get("code", "")) or []
+            _di = -1
+            for _i in range(len(_bs) - 1, -1, -1):
+                if str(_bs[_i]["t"]) <= _sd8:
+                    _di = _i
+                    break
+            if _bs and _di >= 20 and _ep > 0:
+                _prior = _bs[_di - 20:_di]
+                _hi20 = max(float(b["h"]) for b in _prior)
+                _lo20 = min(float(b["l"]) for b in _prior)
+                if _ep <= _lo20:
+                    flags.append("s26_newlow")      # F1 候选 (R135: 74腿 PF0.84)
+                if _hi20 > _lo20 and (_ep - _lo20) / (_hi20 - _lo20) * 100 <= 10:
+                    flags.append("s27_botdec")      # 区间底10% (R140: PF1.67)
+                _db = _bs[_di]
+                _drng = float(_db["h"]) - float(_db["l"])
+                if _drng > 0 and (float(_db["c"]) - float(_db["l"])) / _drng * 100 < 40:
+                    flags.append("s27_weakday")     # G1 弱收盘 (R140: PF1.58)
+                _sh = None
+                for _j in range(_di - PIVOT, max(PIVOT, _di - 90), -1):
+                    if _j - PIVOT < 0 or _j + PIVOT >= min(len(_bs), _di + 1):
+                        continue
+                    if all(float(_bs[_j]["h"]) >= float(_bs[_k]["h"]) for _k in range(_j - PIVOT, _j + PIVOT + 1)):
+                        _sh = float(_bs[_j]["h"])
+                        break
+                if _sh and -2 <= (_sh / _ep - 1) * 100 <= 2:
+                    flags.append("s27_underhigh")   # G2 顶阻力±2% (R140: PF1.27)
+        except Exception:
+            pass
+        # s26 链纪律 + s28 序列判定 (tr/bk/rt_st 为 v2 链字段)
+        try:
+            if not bk:
+                flags.append("s26_nohb")            # 未破前高进场 (R133)
+            if rt_st == "no_retrace":
+                flags.append("s26_noretrace")       # 未回踩突破位 (R133)
+            _poi = any(f in flags for f in ("s10_in_ob", "s10v2_in_ob", "s12_in_ote", "s12v2_in_ote"))
+            if tr == "up" or bk in ("BOS↑", "CHoCH↑"):
+                if rt_st == "no_retrace":
+                    flags.append("s28_chase")       # R138 S2_NO_PULLBACK (97腿 PF0.99)
+                elif rt_st == "retrace_fail":
+                    flags.append("s28_pbbroke")     # ②回踩穿位 (115腿 PF2.40)
+                elif rt_st == "retrace_ok" and not _poi:
+                    flags.append("s28_notpoi")      # ③未到POI (60腿 PF2.69)
+                elif rt_st == "retrace_ok" and _poi:
+                    flags.append("s28_all_ok")      # 全序合规正样本 (61腿 PF2.38)
+        except Exception:
+            pass
         return {"weight": round(w, 3), "flags": flags, "whale_90d_n": n_ev,
                 "mode": "norm_chain+norm_enrich+hard_soc_v21",
                 "date": time.strftime("%Y-%m-%d")}
