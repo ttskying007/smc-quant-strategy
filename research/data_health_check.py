@@ -40,6 +40,26 @@ try:
 except Exception:
     coverage, latest = 0, ""
 
+# FIX(2026-10-26, R146): 时序假警报修复 — 健康检查作为前置探测运行时, scanner 结果还是
+# 昨天的(latest_date 停在上一交易日), 导致"数据滞后N日"误报整日挂着。兜底: 实测 3 只
+# 流动性股的 K线缓存最大 bar 日期, 取 max(scanner, cache_probe) 作为真实数据新鲜度。
+try:
+    import glob as _glob
+    _probe_max = ""
+    _kline_dir = getattr(CFG, "KT_CACHE", "") or r"E:\test\smc_project\hermes\kline_cache_tencent"
+    for _code in ("000001_SZ", "000651_SZ", "600519_SH"):
+        for _fp in _glob.glob(os.path.join(_kline_dir, f"{_code}_daily_800.json")) or []:
+            _d = json.load(open(_fp, encoding="utf-8"))
+            _raw = _d if isinstance(_d, list) else (_d.get("klines") or _d.get("bars") or [])
+            if _raw:
+                _t = str((_raw[-1] or {}).get("t") or (_raw[-1] or {}).get("day") or "").replace("-", "")
+                if _t > _probe_max:
+                    _probe_max = _t
+    if _probe_max > str(latest or ""):
+        latest = _probe_max
+except Exception:
+    pass
+
 alerts = []
 if not any(v["ok"] for v in status.values()):
     alerts.append("所有数据源不可用（严重）")
